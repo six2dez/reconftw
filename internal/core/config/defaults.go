@@ -403,7 +403,7 @@ func Defaults() *Config {
 					RateLimit:      0,
 					Threads:        0,
 					MaxTimeSeconds: 900,
-					Flags:          " -mc all -fc 404 -sf -noninteractive -of json",
+					Flags:          " -mc all -fc 404 -ac -sf -noninteractive -of json",
 				},
 				HTTPX: AdvToolHTTPX{
 					RateLimit:      150,

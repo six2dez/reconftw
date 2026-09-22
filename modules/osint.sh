@@ -655,6 +655,57 @@ function third_party_misconfigs() {
     fi
 }
 
+function lunar_exposure() {
+    ensure_dirs osint
+
+    if { [[ ! -f "$called_fn_dir/.${FUNCNAME[0]}" ]] || [[ $DIFF == true ]]; } \
+        && [[ $LUNAR_EXPOSURE == true ]] && [[ $OSINT == true ]] \
+        && ! [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+
+        start_func "${FUNCNAME[0]}" "Domain exposure in infostealer logs and breaches (Lunar)"
+
+        local _out="${dir}/osint/lunar_exposure.json"
+        local _tmp _code
+        if ! _tmp=$(mktemp -t reconftw_lunar.XXXXXX); then
+            end_func "Could not create a temporary file for the Lunar query" "${FUNCNAME[0]}"
+            return
+        fi
+
+        # Staged, then published by rename: a truncated or error body must not
+        # replace a good result from a previous run.
+        _code=$(run_command curl -s --max-time "${LUNAR_TIMEOUT:-30}" \
+            -H 'Accept: application/json' \
+            -w '%{http_code}' -o "$_tmp" \
+            "https://api.lunarcyber.com/domain-exposure?domain=${domain}" 2>>"$LOGFILE") || _code="000"
+
+        if [[ "$_code" != "200" ]]; then
+            rm -f "$_tmp" 2>/dev/null
+            end_func "Lunar API returned HTTP ${_code:-000}; no exposure data recorded" "${FUNCNAME[0]}"
+            return
+        fi
+
+        # A 200 carrying a non-JSON body is an outage or interstitial page, not
+        # data. Record nothing rather than a file downstream has to guess about.
+        if ! jq -e . "$_tmp" >/dev/null 2>&1; then
+            rm -f "$_tmp" 2>/dev/null
+            end_func "Lunar API returned 200 with a non-JSON body; nothing recorded" "${FUNCNAME[0]}"
+            return
+        fi
+
+        mv "$_tmp" "$_out"
+        end_func "Results are saved in $domain/osint/lunar_exposure.json" "${FUNCNAME[0]}"
+
+    else
+        if [[ $LUNAR_EXPOSURE == false ]] || [[ $OSINT == false ]]; then
+            skip_notification "disabled"
+        elif [[ $domain =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            return
+        else
+            skip_notification "processed"
+        fi
+    fi
+}
+
 function spoof() {
     ensure_dirs osint
 

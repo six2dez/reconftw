@@ -1,7 +1,7 @@
 # v1 bats-scenario -> v2 test parity map (XCUT-03)
 
 **Generated:** seeded from `grep -rn '@test' tests/` on the v1 bats suite.
-**Scope:** every one of the **348** v1 `@test` scenarios across **39** `.bats`
+**Scope:** every one of the **440** v1 `@test` scenarios across **44** `.bats`
 files is listed below with exactly one disposition. None are unlisted.
 
 A stdlib drift-guard test (`internal/batsmap/parity_map_test.go`) fails if the
@@ -22,9 +22,9 @@ from the suite.
 | disposition | count |
 |---|--:|
 | covered-by | 344 |
-| superseded | 40 |
+| superseded | 64 |
 | not-applicable | 32 |
-| **total** | **416** |
+| **total** | **440** |
 
 ## Per-file scenario counts
 
@@ -32,6 +32,7 @@ from the suite.
 |---|--:|
 | test_checkpoint.bats | 20 |
 | test_cli_vps_count.bats | 3 |
+| test_cloud_vps_detection.bats | 7 |
 | test_common.bats | 33 |
 | test_dns_resolver_auto.bats | 6 |
 | test_ensure_webs_all.bats | 1 |
@@ -41,6 +42,7 @@ from the suite.
 | test_injection.bats | 12 |
 | test_install_interlace_colorclass.bats | 2 |
 | test_list_targets.bats | 2 |
+| test_lunar_exposure.bats | 6 |
 | test_monitor.bats | 4 |
 | test_monitor_mode.bats | 1 |
 | test_new_tool_integrations.bats | 30 |
@@ -51,6 +53,7 @@ from the suite.
 | test_perf_profile.bats | 2 |
 | test_permutation_wordlist_select.bats | 4 |
 | test_phase6.bats | 6 |
+| test_proxychains.bats | 8 |
 | test_redact_secrets.bats | 6 |
 | test_report_only.bats | 1 |
 | test_reporting.bats | 3 |
@@ -69,8 +72,9 @@ from the suite.
 | test_validation_extended.bats | 68 |
 | test_verbosity.bats | 12 |
 | test_vps_count_cli.bats | 6 |
+| test_web_mode_scope.bats | 3 |
 | test_webprobe_full_formats.bats | 3 |
-| **total** | **416** |
+| **total** | **440** |
 
 ## Scenario map
 
@@ -496,3 +500,27 @@ from the suite.
 | test_shell_syntax.bats | reconftw.sh passes bash syntax check | not-applicable | go build + go vet replace bash -n syntax checks |
 | test_shell_syntax.bats | critical modules pass bash syntax check | not-applicable | go build + go vet replace bash -n syntax checks |
 | test_report_only.bats | report-only rebuilds report artifacts | covered-by:report.TestRenderAll_AIDisabledWritesNothing | report-only rebuild -> report render path |
+| test_cloud_vps_detection.bats | _is_cloud_vps detects AWS IMDSv2, which answers an unauthenticated GET with 401 (issue #1050) | superseded | v1 public-IP puredns/dnsx auto-heuristic; v2 resolver strategy in internal/core/resolvers, no per-network auto-switch |
+| test_cloud_vps_detection.bats | _is_cloud_vps detects a metadata service that answers 403 | superseded | v1 public-IP puredns/dnsx auto-heuristic; v2 resolver strategy in internal/core/resolvers, no per-network auto-switch |
+| test_cloud_vps_detection.bats | _is_cloud_vps still detects a plain IMDSv1-style 200 | superseded | v1 public-IP puredns/dnsx auto-heuristic; v2 resolver strategy in internal/core/resolvers, no per-network auto-switch |
+| test_cloud_vps_detection.bats | _is_cloud_vps returns false when nothing answers at 169.254.169.254 | superseded | v1 public-IP puredns/dnsx auto-heuristic; v2 resolver strategy in internal/core/resolvers, no per-network auto-switch |
+| test_cloud_vps_detection.bats | _is_cloud_vps returns false when curl produces no output | superseded | v1 public-IP puredns/dnsx auto-heuristic; v2 resolver strategy in internal/core/resolvers, no per-network auto-switch |
+| test_cloud_vps_detection.bats | _is_cloud_vps short-circuits to false under DRY_RUN | superseded | v1 public-IP puredns/dnsx auto-heuristic; v2 resolver strategy in internal/core/resolvers, no per-network auto-switch |
+| test_cloud_vps_detection.bats | _can_use_puredns now says yes for a private-IP EC2 box behind IMDSv2 | superseded | v1 public-IP puredns/dnsx auto-heuristic; v2 resolver strategy in internal/core/resolvers, no per-network auto-switch |
+| test_lunar_exposure.bats | a 200 with JSON is published as the exposure artefact | superseded | v1-only Lunar OSINT enrichment (#1042); not ported to the v2 task set |
+| test_lunar_exposure.bats | a non-200 writes no artefact | superseded | v1-only Lunar OSINT enrichment (#1042); not ported to the v2 task set |
+| test_lunar_exposure.bats | a 200 carrying a non-JSON body writes no artefact | superseded | v1-only Lunar OSINT enrichment (#1042); not ported to the v2 task set |
+| test_lunar_exposure.bats | a failed query does not replace a previous good result | superseded | v1-only Lunar OSINT enrichment (#1042); not ported to the v2 task set |
+| test_lunar_exposure.bats | disabled by default: LUNAR_EXPOSURE=false performs no query | superseded | v1-only Lunar OSINT enrichment (#1042); not ported to the v2 task set |
+| test_lunar_exposure.bats | an IP target is skipped: the API takes domains | superseded | v1-only Lunar OSINT enrichment (#1042); not ported to the v2 task set |
+| test_proxychains.bats | PROXYCHAINS=false leaves the command untouched | superseded | v1-only proxychains wrapper around run_command (#1041); no v2 equivalent gate yet |
+| test_proxychains.bats | PROXYCHAINS=true wraps an ordinary tool | superseded | v1-only proxychains wrapper around run_command (#1041); no v2 equivalent gate yet |
+| test_proxychains.bats | PROXYCHAINS_CONF is passed through as -f | superseded | v1-only proxychains wrapper around run_command (#1041); no v2 equivalent gate yet |
+| test_proxychains.bats | mass-DNS tools are never wrapped: proxychains cannot carry their UDP | superseded | v1-only proxychains wrapper around run_command (#1041); no v2 equivalent gate yet |
+| test_proxychains.bats | PROXYCHAINS_EXCLUDE adds tools to the never-wrap list | superseded | v1-only proxychains wrapper around run_command (#1041); no v2 equivalent gate yet |
+| test_proxychains.bats | PROXYCHAINS_EXCLUDE splits on spaces, not just a single name | superseded | v1-only proxychains wrapper around run_command (#1041); no v2 equivalent gate yet |
+| test_proxychains.bats | PROXYCHAINS_EXCLUDE still excludes the first name when several are given | superseded | v1-only proxychains wrapper around run_command (#1041); no v2 equivalent gate yet |
+| test_proxychains.bats | a missing proxychains binary fails the command instead of running it direct | superseded | v1-only proxychains wrapper around run_command (#1041); no v2 equivalent gate yet |
+| test_web_mode_scope.bats | prepare_web_mode_scope takes the -d path when AXIOM reassigned list (issue #1045) | superseded | v1 -w rewrites the target dir's scope files before running; v2 selects the web module by task filter and reads targets from the workspace, so there is no scope-prep step |
+| test_web_mode_scope.bats | prepare_web_mode_scope preserves prior recon state on the -d path | superseded | v1 -w rewrites the target dir's scope files before running; v2 selects the web module by task filter and reads targets from the workspace, so there is no scope-prep step |
+| test_web_mode_scope.bats | prepare_web_mode_scope still installs an -l list as the scope | superseded | v1 -w rewrites the target dir's scope files before running; v2 selects the web module by task filter and reads targets from the workspace, so there is no scope-prep step |

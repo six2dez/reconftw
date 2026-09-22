@@ -6,9 +6,9 @@
 //
 // DEPENDENCY: DependsOn ["web.httpx"] — reads artefacts/hosts.jsonl as input.
 //
-// ARG VECTOR (RESEARCH §ffuf — verbatim v1 form, web.sh:1497-1499):
+// ARG VECTOR (RESEARCH §ffuf — v1 form, web.sh:1497-1499, plus -ac per #1049):
 //
-//	ffuf -mc all -fc 404 -sf -noninteractive -of json
+//	ffuf -mc all -fc 404 -ac -sf -noninteractive -of json
 //	     -t <threads> -rate <rate> -H "<header>"
 //	     -w <wordlist> -maxtime <maxtime>
 //	     -u <hostURL>/FUZZ -o <stagingFile>
@@ -277,10 +277,21 @@ func runFFUFHost(ctx context.Context, app *appctx.AppContext, toolName, hostURL 
 	stagingFile string,
 ) ([]FuzzRecord, error) {
 	// Build arg vector (RESEARCH §ffuf verbatim v1 form web.sh:1497-1499).
-	// -mc all -fc 404 -sf -noninteractive -of json
+	// -mc all -fc 404 -ac -sf -noninteractive -of json
+	//
+	// -ac is a deliberate DIVERGENCE from the v1 form this vector was ported
+	// from, and it was added to v1 at the same time (issue #1049). Against an app
+	// that answers 200 for every path, -fc 404 filters nothing: every wordlist
+	// entry counts as a hit, and recursion below then descends into each fake
+	// "directory", multiplying the false positives per level until the phase
+	// effectively never finishes and the output is noise. -ac probes a handful of
+	// paths that cannot exist, derives the site's real not-found signature from
+	// the responses — size, words and lines, not just the status code — and
+	// filters results against it.
 	args := []string{
 		"-mc", "all",
 		"-fc", "404",
+		"-ac",
 		"-sf",
 		"-noninteractive",
 		"-of", "json",

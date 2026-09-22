@@ -98,7 +98,9 @@ var subdomainWebProbes = []toolProbe{
 	{name: "nuclei", args: []string{"-headless", "-id", "screenshot", "-V", "dir={O}", "-l", "{F}", "-silent"}, mirrors: probeMirrorsNoTask},
 
 	// ffuf: web directory fuzzer (FfufTask — ffuf.go)
-	{name: "ffuf", args: []string{"-mc", "all", "-fc", "404", "-sf", "-noninteractive", "-of", "json", "-w", "{W}", "-maxtime", "5", "-u", "https://example.com/FUZZ", "-o", "{O}"}, mirrors: probeMirrorsNoTask},
+	// -ac (auto-calibration) is required, not optional: without it a soft-404
+	// target makes -fc 404 inert and recursion runs away (#1049). See ffuf.go.
+	{name: "ffuf", args: []string{"-mc", "all", "-fc", "404", "-ac", "-sf", "-noninteractive", "-of", "json", "-w", "{W}", "-maxtime", "5", "-u", "https://example.com/FUZZ", "-o", "{O}"}, mirrors: probeMirrorsNoTask},
 
 	// katana: web crawler (KatanaTask — katana.go: -silent -list {F} -jc -kf all -c N -d 2 -fs rdn)
 	{name: "katana", args: []string{"-silent", "-list", "{F}", "-jc", "-kf", "all", "-c", "1", "-d", "2", "-fs", "rdn"}, mirrors: probeMirrorsNoTask},
