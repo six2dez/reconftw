@@ -489,6 +489,48 @@ function progress_bar() {
 
 # Execute command in dry-run mode if enabled
 # Usage: run_command <command> [args...]
+# _proxychains_bin — echo the proxychains binary to use, or fail.
+# PROXYCHAINS_BIN wins when set; otherwise proxychains4 is preferred because the
+# proxychains-ng fork is what ships as `proxychains4` on Debian/Ubuntu and as
+# `proxychains-ng` (binary `proxychains4`) on Homebrew.
+function _proxychains_bin() {
+    if [[ -n "${PROXYCHAINS_BIN:-}" ]]; then
+        command -v "$PROXYCHAINS_BIN" 2>/dev/null && return 0
+        return 1
+    fi
+    command -v proxychains4 2>/dev/null && return 0
+    command -v proxychains 2>/dev/null && return 0
+    return 1
+}
+
+# _proxychains_applies <tool-name> — false for tools proxychains cannot carry.
+#
+# proxychains hooks libc connect() and covers TCP only. Three classes break
+# under it, and breaking them silently is worse than not proxying them:
+#
+#   * mass-DNS resolvers (massdns, puredns, dnsx, shuffledns) send raw UDP/53
+#     from their own socket code. Under proxychains they either fall back to the
+#     system resolver or return nothing at all — the resolution step then
+#     reports zero hosts and the whole run looks empty for no visible reason.
+#   * naabu/nmap SYN scanning uses raw sockets, which never reach connect().
+#   * statically-linked Go binaries do not resolve libc symbols, so the LD_PRELOAD
+#     hook is a no-op; they leak DIRECTLY while appearing proxied. The
+#     ProjectDiscovery tools are the common case here, which is why the honest
+#     answer for them is their own -proxy flag, not this wrapper.
+#
+# PROXYCHAINS_EXCLUDE lets an operator extend the list without editing code.
+function _proxychains_applies() {
+    local _tool="${1:-}"
+    [[ -z "$_tool" ]] && return 1
+
+    local _skip
+    for _skip in massdns puredns dnsx shuffledns naabu nmap masscan \
+        ${PROXYCHAINS_EXCLUDE:-}; do
+        [[ "$_tool" == "$_skip" ]] && return 1
+    done
+    return 0
+}
+
 function run_command() {
     if [[ "${DRY_RUN:-false}" == "true" ]]; then
         # Extract tool name (first word, strip path)
@@ -518,6 +560,24 @@ function run_command() {
     if [[ "$cmd_name" == axiom-* ]]; then
         _run_axiom_command_with_detection "$@"
         return $?
+    fi
+
+    # PROXYCHAINS (#1041): route this tool's traffic through the configured
+    # chain. Applied HERE because run_command is the single gate every external
+    # tool goes through, so one place covers all of them without touching each
+    # tool's own (mutually incompatible) proxy flags.
+    if [[ "${PROXYCHAINS:-false}" == "true" ]] && _proxychains_applies "$cmd_name"; then
+        local _pc
+        if _pc=$(_proxychains_bin); then
+            local -a _pc_argv=("$_pc" -q)
+            [[ -n "${PROXYCHAINS_CONF:-}" ]] && _pc_argv+=(-f "$PROXYCHAINS_CONF")
+            set -- "${_pc_argv[@]}" "$@"
+        else
+            # Fail LOUD, not silently direct: the whole point of enabling this is
+            # that the operator does not want these packets leaving un-proxied.
+            notification "PROXYCHAINS=true but no proxychains binary was found — ${cmd_name} would run UN-PROXIED; skipping it" warn
+            return 1
+        fi
     fi
 
     if [[ "${ADAPTIVE_RATE_LIMIT:-false}" == "true" ]]; then
