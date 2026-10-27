@@ -1433,7 +1433,20 @@ function sendToNotify {
         if [[ -n "${slack_channel}" ]] && [[ -n "${slack_auth}" ]]; then
             register_secret "${slack_auth}"
             notification "Sending ${domain} data over Slack" info
-            run_command curl -F "file=@${1}" -F "initial_comment=reconftw zip file" -F "channels=${slack_channel}" -H "Authorization: Bearer ${slack_auth}" https://slack.com/api/files.upload 2>>"$LOGFILE" >/dev/null
+            # files.upload was sunset: get an upload URL, POST the bytes, then complete the upload
+            local slack_filename slack_length slack_response slack_upload_url slack_file_id slack_files_json
+            slack_filename=$(basename "${1}")
+            slack_length=$(wc -c <"${1}" | tr -d ' ')
+            slack_response=$(run_command curl -s -H "Authorization: Bearer ${slack_auth}" --data-urlencode "filename=${slack_filename}" --data-urlencode "length=${slack_length}" https://slack.com/api/files.getUploadURLExternal 2>>"$LOGFILE")
+            slack_upload_url=$(printf '%s' "${slack_response}" | jq -r '.upload_url // empty' 2>/dev/null)
+            slack_file_id=$(printf '%s' "${slack_response}" | jq -r '.file_id // empty' 2>/dev/null)
+            if [[ -n "${slack_upload_url}" ]] && [[ -n "${slack_file_id}" ]]; then
+                run_command curl -s -X POST -H "Authorization: Bearer ${slack_auth}" -H "Content-Type: application/octet-stream" --data-binary "@${1}" "${slack_upload_url}" 2>>"$LOGFILE" >/dev/null
+                slack_files_json=$(jq -nc --arg id "${slack_file_id}" --arg title "${slack_filename}" '[{id: $id, title: $title}]')
+                run_command curl -s -H "Authorization: Bearer ${slack_auth}" --data-urlencode "files=${slack_files_json}" --data-urlencode "channels=${slack_channel}" --data-urlencode "initial_comment=reconftw zip file" https://slack.com/api/files.completeUploadExternal 2>>"$LOGFILE" >/dev/null
+            elif [[ "${DRY_RUN:-false}" != "true" ]]; then
+                _print_msg WARN "Slack upload failed: could not get an upload URL"
+            fi
         fi
     fi
 }
