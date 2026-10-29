@@ -21,16 +21,18 @@ from the suite.
 
 | disposition | count |
 |---|--:|
-| covered-by | 344 |
-| superseded | 64 |
+| covered-by | 348 |
+| superseded | 79 |
 | not-applicable | 32 |
-| **total** | **440** |
+| **total** | **459** |
 
 ## Per-file scenario counts
 
 | bats_file | @test count |
 |---|--:|
+| test_cfg_flag_arrays.bats | 9 |
 | test_checkpoint.bats | 20 |
+| test_checkpoint_guard.bats | 6 |
 | test_cli_vps_count.bats | 3 |
 | test_cloud_vps_detection.bats | 7 |
 | test_common.bats | 33 |
@@ -39,7 +41,7 @@ from the suite.
 | test_export_cli.bats | 2 |
 | test_exports.bats | 3 |
 | test_full_flow.bats | 16 |
-| test_injection.bats | 12 |
+| test_injection.bats | 16 |
 | test_install_interlace_colorclass.bats | 2 |
 | test_list_targets.bats | 2 |
 | test_lunar_exposure.bats | 6 |
@@ -74,7 +76,7 @@ from the suite.
 | test_vps_count_cli.bats | 6 |
 | test_web_mode_scope.bats | 3 |
 | test_webprobe_full_formats.bats | 3 |
-| **total** | **440** |
+| **total** | **459** |
 
 ## Scenario map
 
@@ -430,6 +432,25 @@ from the suite.
 | test_injection.bats | sanitize_ip allows valid CIDR | covered-by:output.TestScopeRejectsInjection | IP/CIDR injection rejection |
 | test_injection.bats | sanitize_interlace_input removes dangerous chars | superseded | v2 has no interlace input file to sanitize |
 | test_injection.bats | outscope file handles path traversal attempt | covered-by:config.TestNoPathTraversal | outscope path-traversal rejection |
+| test_cfg_flag_arrays.bats | unquoted scalar expansion under IFS=newline/tab yields ONE word (the defect being guarded) | superseded | v1 bash array/IFS guard (phase 21); v2 reads typed TOML fields, see config.TestAdvToolFieldsAreWired |
+| test_cfg_flag_arrays.bats | reconftw.cfg: GOTATOR_FLAGS is a 7-element array whose SECOND element is 1 | superseded | v1 bash array/IFS guard (phase 21); v2 reads typed TOML fields, see config.TestAdvToolFieldsAreWired |
+| test_cfg_flag_arrays.bats | reconftw.cfg: NUCLEI_EXTRA_ARGS, NUCLEI_DAST_EXTRA_ARGS and AXIOM_EXTRA_ARGS are empty arrays | superseded | v1 bash array/IFS guard (phase 21); v2 reads typed TOML fields, see config.TestAdvToolFieldsAreWired |
+| test_cfg_flag_arrays.bats | _as_array splits a legacy scalar on spaces despite IFS=newline/tab | superseded | v1 bash array/IFS guard (phase 21); v2 reads typed TOML fields, see config.TestAdvToolFieldsAreWired |
+| test_cfg_flag_arrays.bats | _as_array splits an exported legacy scalar (export cannot hold arrays) | superseded | v1 bash array/IFS guard (phase 21); v2 reads typed TOML fields, see config.TestAdvToolFieldsAreWired |
+| test_cfg_flag_arrays.bats | _as_array splits a string assigned over an existing array (custom config after reconftw.cfg) | superseded | v1 bash array/IFS guard (phase 21); v2 reads typed TOML fields, see config.TestAdvToolFieldsAreWired |
+| test_cfg_flag_arrays.bats | _as_array is a no-op for a proper array and preserves elements with spaces | superseded | v1 bash array/IFS guard (phase 21); v2 reads typed TOML fields, see config.TestAdvToolFieldsAreWired |
+| test_cfg_flag_arrays.bats | _as_array turns unset and empty scalars into empty arrays | superseded | v1 bash array/IFS guard (phase 21); v2 reads typed TOML fields, see config.TestAdvToolFieldsAreWired |
+| test_cfg_flag_arrays.bats | _normalize_flag_arrays converts every flag variable at once | superseded | v1 bash array/IFS guard (phase 21); v2 reads typed TOML fields, see config.TestAdvToolFieldsAreWired |
+| test_checkpoint_guard.bats | nuclei_check skips when its checkpoint exists | superseded | v1 called_fn sentinel guard (phase 21); v2 checkpoints.db covers this via core/checkpoint tests |
+| test_checkpoint_guard.bats | nuclei_check runs again when DIFF=true despite the checkpoint | superseded | v1 called_fn sentinel guard (phase 21); v2 checkpoints.db covers this via core/checkpoint tests |
+| test_checkpoint_guard.bats | test_ssl skips when its checkpoint exists | superseded | v1 called_fn sentinel guard (phase 21); v2 checkpoints.db covers this via core/checkpoint tests |
+| test_checkpoint_guard.bats | test_ssl runs when the checkpoint is absent | superseded | v1 called_fn sentinel guard (phase 21); v2 checkpoints.db covers this via core/checkpoint tests |
+| test_checkpoint_guard.bats | metadata skips when its checkpoint exists | superseded | v1 called_fn sentinel guard (phase 21); v2 checkpoints.db covers this via core/checkpoint tests |
+| test_checkpoint_guard.bats | metadata runs when the checkpoint is absent | superseded | v1 called_fn sentinel guard (phase 21); v2 checkpoints.db covers this via core/checkpoint tests |
+| test_injection.bats | deleteOutScoped anchors non-wildcard entries to the whole hostname | covered-by:output.TestScopeExcludeListDropsAtTheFilter | host-anchored exclude list at the write boundary (phase 21) |
+| test_injection.bats | deleteOutScoped matches URL lists by host (scheme, port and path tolerated) | covered-by:output.TestScopeExcludeListDropsAtTheFilter | host-anchored exclude list at the write boundary (phase 21) |
+| test_injection.bats | deleteOutScoped wildcard entries keep suffix semantics but stay host-anchored | covered-by:output.TestScopeExcludeListDropsAtTheFilter | host-anchored exclude list at the write boundary (phase 21) |
+| test_injection.bats | deleteOutScoped returns 0 and empties the file when every line is out of scope | covered-by:output.TestScopeExcludeListDropsAtTheFilter | host-anchored exclude list at the write boundary (phase 21) |
 | test_vps_count_cli.bats | help advertises --vps-count | covered-by:cmd.TestTranslateV1Args | --vps-count CLI parse/validation |
 | test_vps_count_cli.bats | --vps-count rejects 0 | covered-by:cmd.TestTranslateV1Args | --vps-count CLI parse/validation |
 | test_vps_count_cli.bats | --vps-count rejects non-numeric values | covered-by:cmd.TestTranslateV1Args | --vps-count CLI parse/validation |

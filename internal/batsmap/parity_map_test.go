@@ -182,7 +182,10 @@ func TestBatsParityMapBaselineCount(t *testing.T) {
 	// `superseded`: proxychains and Lunar are v1-only features with no v2
 	// implementation, and the cloud-metadata probe feeds v1's per-network
 	// puredns/dnsx auto-switch, which v2 deliberately does not have.
-	const wantBaseline = 440
+	// 440 -> 459 (phase 21): test_cfg_flag_arrays (9) + test_checkpoint_guard (6)
+	// are v1-only guards (superseded); the 4 deleteOutScoped anchoring tests in
+	// test_injection map to output.TestScopeExcludeListDropsAtTheFilter.
+	const wantBaseline = 459
 	root := repoRoot(t)
 
 	if got := sum(batsScenarioCounts(t, root)); got != wantBaseline {
