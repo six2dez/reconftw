@@ -22,9 +22,9 @@ from the suite.
 | disposition | count |
 |---|--:|
 | covered-by | 348 |
-| superseded | 79 |
+| superseded | 80 |
 | not-applicable | 32 |
-| **total** | **459** |
+| **total** | **460** |
 
 ## Per-file scenario counts
 
@@ -59,7 +59,7 @@ from the suite.
 | test_redact_secrets.bats | 6 |
 | test_report_only.bats | 1 |
 | test_reporting.bats | 3 |
-| test_resolvers_hardening.bats | 6 |
+| test_resolvers_hardening.bats | 7 |
 | test_sanitize.bats | 26 |
 | test_scope_validation.bats | 16 |
 | test_shell_syntax.bats | 2 |
@@ -76,7 +76,7 @@ from the suite.
 | test_vps_count_cli.bats | 6 |
 | test_web_mode_scope.bats | 3 |
 | test_webprobe_full_formats.bats | 3 |
-| **total** | **459** |
+| **total** | **460** |
 
 ## Scenario map
 
@@ -222,6 +222,7 @@ from the suite.
 | test_resolvers_hardening.bats | _bruteforce_domains fails fast when required resolver files are missing | covered-by:resolvers.TestGenResolversFallsBackToHTTP | resolver refresh/hardening -> resolvers gen + resolve gate |
 | test_resolvers_hardening.bats | _resolve_domains fails fast for dnsx when trusted resolvers file is missing | covered-by:resolvers.TestGenResolversFallsBackToHTTP | resolver refresh/hardening -> resolvers gen + resolve gate |
 | test_resolvers_hardening.bats | _bruteforce_domains uses heartbeat path and skips timeout wrapper when DNS_BRUTE_TIMEOUT=0 | covered-by:resolvers.TestGenResolversFallsBackToHTTP | resolver refresh/hardening -> resolvers gen + resolve gate |
+| test_resolvers_hardening.bats | cached_download_typed in dry-run neither downloads nor copies a missing file | superseded | v1 resolver download cache in dry-run; v2 resolvers are acquired by core/resolvers with its own dry-run tests |
 | test_common.bats | ensure_dirs creates single directory | covered-by:output.TestOutputTreeCreatesSubdirs | workspace subdir creation |
 | test_common.bats | ensure_dirs creates multiple directories | covered-by:output.TestOutputTreeCreatesSubdirs | workspace subdir creation |
 | test_common.bats | ensure_dirs creates nested directories | covered-by:output.TestOutputTreeCreatesSubdirs | workspace subdir creation |
