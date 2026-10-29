@@ -7,16 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
+### v2 (Go, `dev-go`) — since v5.0.0-beta.1
+
+#### Fixed
+- v1-flag config variables that hold space-separated lists (`PROXYCHAINS_EXCLUDE` and friends) are split correctly: the migrator and the loader no longer inherit bash's `IFS=$'\n\t'` behaviour, so a list of several values is no longer read as one. Arrays in the migrated TOML are real arrays.
+- Config fields that were parsed but never consulted ("inert" keys) are wired to the code that should read them; a documented key now changes behaviour.
+- `-y` no longer silently aliases `deep`: it errors and points at `--ai` / `reconftw report`. The other v1 short aliases are unchanged (removed in v2.2.0).
+- `make ci` runs the same sequence as `.github/workflows/ci.yml` (gofumpt check, golangci-lint, `go test -race -short`, coverage self-test, critical and lib coverage gates). `make check` is the shorter local loop and is no longer described as "the gates CI runs".
+
+#### Added
+- Scope files on every scanning subcommand: `--include-file` / `-i` and `--exclude-file` / `-x` (one host, IP or CIDR per line). Enforced at the artefact write boundary like the target scope.
+- TOML presets `config/reconftw_{full,quick,stealth}.toml`, generated from the v1 presets with `reconftw migrate`; use with `--config`.
+- `secrets.toml.example`, `BRANCHES.md`, `THIRD_PARTY.md`, `data/wordlists/SOURCES.md`; `docs/ARCHITECTURE.md` now describes v2 (the bash description moved to `docs/ARCHITECTURE-v1-bash.md`); `CONTRIBUTING.md` and `SECURITY.md` cover the Go workflow and `secrets.toml`.
+
+#### Changed
+- Documentation matches the binary: `reconftw migrate --from-bash/--to` (not `--in/--out`), the Docker tags that are actually v2, the fact that `go install …@latest` cannot resolve the Go line, and the `Recon/<domain>` symlink that lands by default in the next beta (opt-out `output.compat.recon_symlink = false`).
+- `docs/openapi.json` removed; the schema embedded in the binary (`internal/mcp/openapi.json`) is the single source.
+
+### v1 (bash, `dev`) — unreleased
+
+#### Added
 - `swagger_check()` function in `modules/web.sh`: Swagger/OpenAPI definition discovery and authentication analysis using [sj](https://github.com/BishopFox/sj) (Swagger Jacker). Three phases: (1) active brute-force discovery of hidden swagger/openapi definitions via `sj brute` with interlace parallelization, (2) aggregation of swagger URLs from nuclei (`swagger-api`/`openapi` templates) and SwaggerSpy OSINT output (with scope filtering via `check_inscope`), (3) endpoint extraction (`sj endpoints`) and authentication testing (`sj automate`) to identify unauthenticated API endpoints. Config: `SJ_CHECK=true`, `SJ_BRUTE=true`, `SJ_AUTOMATE=true`, `SJ_TIMEOUT=30`, `SJ_MAX_TARGETS=200`. Output: `webs/swagger_urls.txt`, `vulns/swagger/endpoints_all.txt`, `vulns/swagger/automate/*.json`, `vulns/swagger/accessible_endpoints.txt`.
 
-### Changed
+#### Changed
 - Replaced metagoofil + exiftool with [exifray](https://github.com/mmarting/exifray) in `metadata()` function (`modules/osint.sh`). Single tool handles both file discovery and metadata extraction, outputting structured JSON (`osint/metadata.json`) plus a human-readable summary (`osint/metadata_results.txt`).
 
-### Removed
+#### Removed
 - Removed metagoofil from `install.sh` git repos, `config/tool_versions.txt`, and `modules/core.sh` tool checks.
 
-### Fixed
+#### Fixed
 - `sanitize_domain()` (`modules/utils.sh`) now URL-aware. Previously `tr -cd 'a-zA-Z0-9.-'` stripped `://` from inputs like `https://example.com`, producing a garbage hostname (`httpsexample.com`) that poisoned the DNS/probe pipeline. The function now normalizes the input first (strip scheme, userinfo, path/query/fragment, port) and validates IPv4 octets inline (rejects `https://1.2.3.999`). The whitelist `tr` step is preserved as last-line injection defense. New bats cases cover scheme, path, port, userinfo, query/fragment, `@` in path, and IPv4 URLs (valid + invalid).
 - Web mode (`-w`) accepts both `-d <domain|url>` and `-l <file>`. Previously `-d ... -w` errored out with "Web mode needs a website list file as target" because the `-w` dispatch branch only supported `-l`. The rewritten branch in `reconftw.sh` unifies both paths and errors only when neither is provided.
 - `-l <file> -w` pipeline now runs end-to-end. Before this fix, the `-w` branch copied the raw list to `webs/webs.txt` but `webprobe_full` reads from `subdomains/subdomains.txt` — which stayed empty — so probing skipped with `SKIP_NOINPUT` and cascaded skips through `urlchecks`, `sub_js_extract`, `url_gf`, `url_ext`. The branch now populates `subdomains/subdomains.txt` with sanitized hostnames (via `_sanitize_list_entry`), and truncates `webs/webs.txt` after `start()` so `webprobe_full` is the sole source of live URLs — downstream modules no longer mix raw user input (URLs with arbitrary paths/ports/dead hosts) with probed results.
@@ -25,6 +44,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     * **`-l` Multi mode**: the shared dir is *only* ever populated by `-l -w` invocations, so nothing in it predates a web run. The helper makes a read-only snapshot of the input list via `cp "$flist" "$_list_snapshot"` (tmpfile outside `$dir`) up front, then wipes every file under `$dir` except cross-run tracking (`.log/*`, `.incremental/*`, `.called_fn/*`, `debug.log`) plus `$flist` itself (belt-and-suspenders for when the list path falls inside `$dir`, e.g. `-l Recon/Multi/scope.txt`). All subsequent operations — including CRLF stripping via bash parameter expansion `${_t%$'\r'}` — run against the snapshot. The user's input file is provably untouched post-snapshot: content md5, mtime, and inode all survive a run. This catches current and future output dirs (`nuclei_output/`, `cms/`, `virtualhosts/`, any new module's outputs) without requiring an explicit allowlist to stay in sync. `subdomains/subdomains.txt` is written with `sort -u >` from the sanitized snapshot — each list defines its own scope.
     * **`-d <domain>` mode**: the per-domain dir may hold prior `-a`/`-s`/`-p` recon state that must survive (subdomain enumeration, `hosts/ips.txt` and `hosts/origin_ips.txt` needed by `virtualhosts()`/`tls_ip_pivots()`, `nuclei_output/**` history, `osint/*`, etc.). The helper wipes only pure web-pipeline artifacts (`webs/*`, `.tmp/*`, `js/*`, `fuzzing/*`, `gf/*`, `screenshots/*`, `assets.jsonl`) and preserves the rest. The target is appended to `subdomains/subdomains.txt` via `anew -q` so enumerated subs stay in scope.
 The one-shot `-w` dispatch also sets `DIFF=true`, matching the global `DIFF=true` that `monitor_mode` already sets. Both the one-shot `-w` dispatch and every `monitor_mode -w -l` cycle now call the same helper and check its return status — if the new scope can't be validated (mktemp/cp failed, or every list entry was rejected by sanitization so the staged hostname list ended up empty), the helper aborts **before** wiping `$dir` so prior state is preserved, the one-shot path exits with a clear error, and the monitor path skips `webs_menu` for that cycle only and falls through to the normal post-case flow (`monitor_snapshot`, `MONITOR_MAX_CYCLES` check, `sleep $interval_sec`). An earlier `continue` branch was removed because it bypassed those checks and busy-looped on persistent prep failures. Consecutive `-w` runs produce fully scoped output with zero cross-run contamination while preserving INCREMENTAL_MODE baselines and prior enumeration coverage.
+
+## [v5.0.0-beta.1] - 2026-09-01
+
+First public pre-release of the Go rewrite ("v2"). Opt-in only: `releases/latest` keeps
+serving the bash line until `v5.0.0`. See `docs/V2-BETA-ANNOUNCEMENT.md` and `MIGRATION.md`.
+
+### Added
+- Single static binary `reconftw` (Linux/macOS, amd64/arm64) with cobra subcommands: `recon`, `all`, `passive`, `subs`, `web`, `osint`, `vulns`, `zen`, `deep`, `monitor`, `quick-rescan`, `refresh-cache`, `gen-resolvers`, `report`, `notify`, `config show|sources`, `health-check`, `install`, `migrate`, `mcp serve`, `version`, `completion`. v1 short flags (`-d -l -r -a -s -w -n -p -z -y --vps`) kept as deprecated aliases.
+- TOML configuration merged from eight layers (defaults → `/etc` → `~/.config` → `./reconftw.toml` → `--config` → `secrets.toml` → `RECONFTW_*` → flags), validated, with every secret typed `log.Secret` and redacted from logs, `config show` and snapshots.
+- `reconftw migrate`: offline v1 `reconftw.cfg` → `reconftw.toml` translator; every key mapped, superseded (comment) or unknown (comment + loud warning); writes `0600`; clamps out-of-range values.
+- Task registry + bounded scheduler (`concurrency.max_jobs`, per-module fail-fast/best-effort, heartbeats) replacing the bash sourcing chain and unbounded background jobs.
+- Workspace output tree `workspaces/<target>/` with atomic JSONL artefacts (`subdomains`, `hosts`, `urls`, `findings`, `buckets`, `asns`, …), per-tool staging under `inputs/` merged by a single writer per artefact, scope enforced at the write boundary, `manifest.json`, per-workspace lock, and a `_compat/` v1-shape `.txt` tree.
+- Checkpoints in SQLite (`checkpoints.db`) keyed by task + target + config slice + wordlist hash; `--force` bypasses; incomplete runs retry.
+- Cross-scan `store.db` (hosts, urls, findings, scans) populated by end-of-scan ingest; `reconftw report` renders HTML, SARIF 2.1.0, CSV, Markdown, hotlist and Faraday from it without re-scanning, scoped to one scan.
+- Modules ported with ≥95 % measured parity on the canonical target: subdomains (passive, resolve, brute, permut incl. regulator/subwiz, recursive, csprecon, tls/reverse-ip, srv, ns-delegation, takeover, buckets, geo/asn), web (httpx, screenshots, nuclei, ffuf with auto-calibration, katana/urlfinder/waymore, js: subjs/jsluice/jsa/mantra/sourcemapper, arjun, gxss, nomore403, shortscan, vhostfinder, portscan+nerva, cdncheck/hakoriginfinder, favirecon, well-known, wordlistgen), osint (domain/ip info, emails+LeakSearch, dorks, github leaks/dorks/actions/repos with titus+trufflehog, cloud_enum, postman, swagger, misconfig-mapper, msftrecon, spoofy, gqlspection, metadata, cmseek), vulns (xss, sqli, ssrf with bounded interactsh OOB, lfi, ssti, crlf, cmdi, smuggling, web cache, second-order, fuzzparams, graphql, grpc, llm, websocket, testssl, spraying, nuclei DAST, fray).
+- `reconftw install`: installs the ~100 tools from the embedded, pinned `tools.lock` (Go / uv / system / Rust / repo-clone), bootstraps Go, uv and Rust with SHA-256-verified downloads, idempotent; `--profile core`, `--without`, `--health-check`.
+- MCP server (`reconftw mcp serve`, stdio or localhost HTTP with Bearer auth): per-session scope sandbox, cancellable runs owned by their session, `scan://` resources, embedded OpenAPI schema.
+- Monitor mode with persisted generation/baseline and notified fingerprints; notifications (Slack/Telegram/Discord) with digest coalescing; `notify --test`.
+- Axiom backend (experimental): whitelisted tools dispatched to an Ax fleet, time-capped, local fallback, output-file-over-exit-status.
+- Multi-stage non-root Docker image compiled per platform (amd64/arm64) with runtime verification in CI; GoReleaser release workflow; release gates (`make release-gates`, 26 gates) as the cutover sign-off.
+
+### Changed
+- Public tag sequence continues at `v5.x` (not `v2.x`) so the rewrite never sorts below `v4.1`.
+- Go toolchain pinned to a patched `1.26.x`; `govulncheck` runs in CI.
+
+### Known limitations in this beta
+- `Recon/<domain>/` is not created (only `workspaces/<target>/_compat/`); `dnscewl`/`dnstake` do not resolve on macOS; `dalfox` v3 exits non-zero on the pinned v2.9.2 arg vector; throughput versus v1 unmeasured; parity measured on one target.
 
 ## [v4.1] - 2026-03-06
 

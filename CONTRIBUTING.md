@@ -1,6 +1,10 @@
 # Contributing to reconFTW
 
-Thank you for your interest in contributing to reconFTW! This guide covers everything you need to get started.
+Thank you for your interest in contributing to reconFTW! There are two code
+lines in this repository (see [BRANCHES.md](BRANCHES.md)):
+
+- **Go v2** on `dev-go` — the rewrite, in beta. New work goes here.
+- **bash v1** on `dev`/`main` — the current public release, maintenance only.
 
 ## Code of Conduct
 
@@ -10,224 +14,199 @@ Please read and follow the [Code of Conduct](CODE_OF_CONDUCT.md) in all interact
 
 If you discover a security vulnerability, **do not open a public issue**. See [SECURITY.md](SECURITY.md) for responsible disclosure instructions.
 
-## Development Setup
+---
 
-1. **Fork and clone** the repository:
+## Go v2 (`dev-go`)
 
-   ```bash
-   git clone https://github.com/<your-username>/reconftw
-   cd reconftw
-   git remote add upstream https://github.com/six2dez/reconftw
-   git checkout dev
-   ```
-
-2. **Install dependencies**:
-
-   ```bash
-   ./install.sh
-   ```
-
-3. **Install dev tools** (optional but recommended):
-
-   ```bash
-   # Linting
-   brew install shellcheck    # or: apt install shellcheck
-   # Formatting
-   brew install shfmt         # or: go install mvdan.cc/sh/v3/cmd/shfmt@latest
-   # Testing
-   brew install bats-core     # or: apt install bats
-   ```
-
-## Project Structure
-
-```
-reconftw/
-├── reconftw.sh              # Entry point (~536 lines) — arg parsing, module loading, dispatch
-├── reconftw.cfg             # Default configuration file
-├── install.sh               # Installer script
-├── Makefile                 # Data management, lint, fmt, test targets
-├── modules/
-│   ├── core.sh              # Lifecycle, logging, notifications, cleanup
-│   ├── modes.sh             # Scan modes, argument parsing, help
-│   ├── subdomains.sh        # Subdomain enumeration functions
-│   ├── web.sh               # Web analysis, fuzzing, JS checks
-│   ├── vulns.sh             # Vulnerability scanning functions
-│   ├── osint.sh             # OSINT module functions
-│   ├── axiom.sh             # Ax/Axiom fleet management helpers
-│   └── utils.sh             # Shared utilities, sanitization, validation
-├── tests/
-│   ├── run_tests.sh         # Test runner (--all for integration)
-│   ├── unit/                # bats-core unit tests
-│   ├── integration/         # bats-core integration tests
-│   ├── security/            # Security/injection tests
-│   ├── mocks/               # Tool mocks for isolated testing
-│   └── fixtures/            # Test data files
-├── Docker/
-│   └── Dockerfile           # Official Docker image definition
-└── Terraform/               # AWS deployment via Terraform + Ansible
-```
-
-## Code Style
-
-- **Shell**: Bash 4+ required. Use `#!/bin/bash` shebang.
-- **Formatter**: `shfmt` with project defaults — `shfmt -w -i 4 -bn -ci`
-- **Linter**: `shellcheck -S warning`
-- Run both before submitting:
-
-  ```bash
-  make lint
-  make fmt
-  ```
-
-## Input Safety Rules
-
-All user-supplied input **must** be sanitized before use:
-
-- Use `sanitize_domain()` for domain names
-- Use `sanitize_ip()` for IP/CIDR input
-- Use `sanitize_interlace_input()` for arguments passed to interlace
-- **Never** use `eval` on user input
-- **Always** quote variables: `"${var}"`, not `$var`
-
-## How to Add a New Function
-
-1. **Choose the right module**: Place your function in the appropriate file under `modules/`:
-   - Subdomain work → `subdomains.sh`
-   - Web analysis → `web.sh`
-   - Vulnerability checks → `vulns.sh`
-   - OSINT → `osint.sh`
-   - Utilities → `utils.sh`
-
-2. **Follow the lifecycle pattern**:
-
-   ```bash
-   function my_new_check() {
-       start_func "${FUNCNAME[0]}" "Running my new check"
-       # ... your logic ...
-       end_func "Results: ${FUNCNAME[0]}" "${FUNCNAME[0]}"
-   }
-   ```
-
-3. **Add a config toggle** in `reconftw.cfg`:
-
-   ```bash
-   MY_NEW_CHECK=true  # Enable or disable my new check
-   ```
-
-4. **Write tests**: Add a bats test in `tests/unit/`:
-
-   ```bash
-   @test "my_new_check validates input" {
-       source ./reconftw.sh --source-only
-       run my_new_check "valid-input"
-       [ "$status" -eq 0 ]
-   }
-   ```
-
-5. **Call it from a mode**: Wire the function into the appropriate mode in `modules/modes.sh`.
-
-## How to Add a New Tool Integration
-
-1. Add the install logic to `install.sh`
-2. Add configuration variables to `reconftw.cfg`
-3. Add the function that calls the tool to the appropriate module
-4. Wire it into the relevant scan mode in `modes.sh`
-5. Add a `--check-tools` entry if the tool is required
-6. Write tests covering basic invocation
-7. Update the Features section in `README.md`
-
-## Configuration Change Guidelines
-
-When adding new configuration variables:
-
-- Use the environment-variable fallback pattern for secrets:
-
-  ```bash
-  MY_API_KEY="${MY_API_KEY:-}"
-  ```
-
-- Use descriptive names with comments explaining the purpose
-- Group related variables together in `reconftw.cfg`
-- Document new variables in the README configuration section
-
-## Testing
-
-### Running Tests
+### Setup
 
 ```bash
-# Unit tests only
-make test
+git clone https://github.com/<your-username>/reconftw
+cd reconftw
+git remote add upstream https://github.com/six2dez/reconftw
+git checkout dev-go
 
-# Security tests only
-make test-security
+go version                     # must satisfy the `go` line in go.mod
+make build                     # → bin/reconftw (stamped with git describe)
+./bin/reconftw install         # the ~100 external tools (optional for most tests)
 
-# Unit + security tests
-make test-all
-
-# Via the runner script
-./tests/run_tests.sh         # unit only
-./tests/run_tests.sh --all   # unit + integration
+# dev tools CI uses — same versions as .github/workflows/ci.yml
+go install mvdan.cc/gofumpt@v0.7.0
+go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2
+go install golang.org/x/vuln/cmd/govulncheck@v1.6.0
 ```
 
-### Pre-commit Hooks
+### Layout
 
-Install pre-commit hooks for automatic linting:
-
-```bash
-pip install pre-commit
-make setup-dev
+```
+cmd/reconftw/            cobra entry point, subcommands, v1 flag aliases
+internal/core/           kernel: config · appctx · task · scheduler · backend ·
+                         output · checkpoint · findings · ingest · report · notifier
+internal/modules/        the recon work: subdomains/ web/ osint/ vulns/
+internal/mcp/            MCP server (+ embedded openapi.json)
+internal/installer/      `reconftw install`
+internal/store/sqlc/     hand-maintained store.db queries (no sqlc generate)
+internal/core/backend/tools.lock   the v2 tool manifest (NOT the root tools.lock)
+docs/ARCHITECTURE.md     how it fits together — read this first
 ```
 
-### Writing Tests
-
-Tests use [bats-core](https://github.com/bats-core/bats-core). Place unit tests in `tests/unit/` with the `.bats` extension.
-
-Use the `--source-only` pattern to load functions without executing the main script:
+### The loop
 
 ```bash
-#!/usr/bin/env bats
+make fmt                         # gofumpt -w .
+make lint                        # golangci-lint run ./...
+go test -race -short ./...       # = make test — the per-push ring
+make integration-smoke           # the ^TestE2E gate (fails on zero matches)
+make ci                          # what ci.yml runs: fmt-check lint test coverage gates
+```
 
-setup() {
-    source ./reconftw.sh --source-only
-}
+`go test ./...` alone is **not** enough: `-race` has caught data races that a
+plain run hides, and the coverage gates (`make coverage-critical`,
+`make coverage-lib`) are part of CI. Run `make ci` before pushing.
 
-@test "sanitize_domain strips invalid chars" {
-    result="$(sanitize_domain 'exam;ple.com')"
-    [ "$result" = "example.com" ]
+Two things CI cannot check and you should, when you have the tools installed:
+
+```bash
+make realtools-args              # //go:build realtools — runs the real binaries
+                                 # against the pinned arg vectors; absent tools skip
+./bin/reconftw health-check      # exits 1 by design on an incomplete PATH
+```
+
+`make release-gates` is the full cutover sign-off (slow; needs nuclei). It is
+run before a tag, not before every PR.
+
+### Rules the tests enforce
+
+- **No raw subprocesses.** Only `internal/core/backend/local.go` may call
+  `exec.Command`. Tasks use `app.Tools.Run(...)` / `app.Tools.Stream(...)`.
+- **Staging → merge.** Multi-producer artefacts (`urls`, `findings`, `waf`,
+  `subdomains`, …) are written to `inputs/<artefact>.<tool>.jsonl` via
+  `output.StageJSONL`/`StageLines` (which *remove* the file on an empty run)
+  and appended once by the module's merge task. `staging_contract_test.go`
+  and `silent_success_test.go` ratchet this across every task.
+- **Consume the terminal stream error.** A `Stream` call must `Drain`/`Collect`
+  and act on the final error (`stream_contract_test.go`).
+- **Secrets are `log.Secret`.** Any `*Key/*Token/*Password/*Secret` config
+  field must use that type; the XCUT-07 sentinel fails the build if a
+  secret-shaped string reaches a log.
+- **Scope at the write boundary.** Never bypass `app.Tree.Append`.
+- **`--dry-run` before any mutation** in a stateful subcommand.
+
+### Adding a task
+
+1. Create `internal/modules/<module>/<tool>.go` with a type implementing
+   `task.Task` (`Name` = `"<module>.<action>"`, `Module`, `Description`,
+   `DependsOn`, `Enabled`, `Run`) and register it from `init()` with
+   `task.Register(&myTask{})`. Copy the closest existing task — e.g.
+   `internal/modules/web/shortscan.go` for a single-producer finding task.
+2. `Enabled(cfg)` must gate on a config field. Add the field to the right
+   struct in `internal/core/config/config.go` with `koanf` + `validate` tags,
+   its default in `defaults.go`, and — if v1 had an equivalent variable — its
+   mapping in `legacy_aliases.go` (the migrator corpus test will tell you if
+   you forgot). Document the key in `MIGRATION.md` §2.3.
+3. **Tool manifest entry.** Add the tool to
+   `internal/core/backend/tools.lock` (`[[tool]]` table: `name`, `kind`,
+   `go_module`/install coordinates, `description`, `default_args`,
+   `timeout_seconds`, `critical`, plus `clone_*` for repo-clone tools). The
+   installer, `health-check` and the registry all read this file; the root
+   `tools.lock` is the v1 installer's and must not be synced with it.
+4. **Flag table.** The arg vector your task passes is data. Register it in the
+   backend arg-vector coverage (`internal/core/backend/argvector_*_test.go`
+   and, for anything the real binary must accept, a `realtools`-tagged probe
+   in `smoke_test.go`). `make realtools-args` reports every task nobody
+   verifies (`ARGV_COVERAGE registered=… driven=…`).
+5. **Fixture with provenance.** Parser tests must run against **real captured
+   tool output**, not JSON typed to match the struct — that is how a wrong
+   `port` type once silently zeroed the whole web layer. Put the capture under
+   `internal/modules/<module>/testdata/<tool>_real_output.<ext>` and say in
+   the test file header which tool version produced it, with which flags,
+   against what (see `internal/modules/web/httpx_real_fixture_test.go`).
+   Sanitise secrets before committing. Mock-backend fixtures for
+   subprocess-free tests go under `internal/core/testutil/fixtures/<tool>/`
+   (its README has the layout).
+6. Wire the task into the stage list of the subcommand(s) that should run it
+   (`cmd/reconftw/composite_subcommands.go`) and add a DAG test if it adds a
+   dependency edge (`dag_test.go` in each module guards against cycles).
+7. If the task produces a new artefact, add it to the compat mapping
+   (`internal/core/output/compat.go`) only if v1 had the file, and to
+   `docs/ARCHITECTURE.md`'s workspace layout.
+
+### Pull requests
+
+1. Target **`dev-go`**.
+2. One behaviour change per PR; say what the user sees differently.
+3. `make ci` green; new tests for new behaviour.
+4. Mention the issue (`refs #N`, or `closes #N` only when it is fully fixed —
+   a partial fix in the *title* closes the issue on merge).
+
+---
+
+## Legacy v1 (bash, `dev`)
+
+The bash framework is in maintenance. Bug fixes are welcome; new features
+should target v2.
+
+### Setup
+
+```bash
+git checkout dev
+./install.sh
+brew install shellcheck shfmt bats-core   # or apt
+```
+
+### Structure
+
+```
+reconftw.sh      entry point — arg parsing, module loading, dispatch
+reconftw.cfg     default configuration
+install.sh       installer (reads the root tools.lock)
+lib/             validation.sh · common.sh · ui.sh · parallel.sh
+modules/         core.sh · modes.sh · subdomains.sh · web.sh · vulns.sh · osint.sh · axiom.sh · utils.sh
+tests/           unit/ integration/ security/ (bats), mocks/, fixtures/
+```
+
+### Style and safety
+
+- Bash 4.3+, `#!/bin/bash`; `shfmt -i 4 -bn -ci`; `shellcheck -S warning`.
+- Sanitize every input: `sanitize_domain()`, `sanitize_ip()`,
+  `sanitize_interlace_input()`; never `eval` user input; always quote.
+- `reconftw.sh` sets `IFS=$'\n\t'` globally: bare `read` and unquoted `${VAR}`
+  do not split on spaces. Assert on the *second* element when testing list
+  variables.
+
+### Adding a function
+
+```bash
+function my_new_check() {
+    start_func "${FUNCNAME[0]}" "Running my new check"
+    # ... run_command tool args ...
+    end_func "Results: ${FUNCNAME[0]}" "${FUNCNAME[0]}"
 }
 ```
 
-### CI Pipeline
+Add a toggle in `reconftw.cfg`, wire it in `modules/modes.sh`, add a bats test
+under `tests/unit/` using `source ./reconftw.sh --source-only`, and remember CI's
+unit job installs **no** recon tools — stub them.
 
-The GitHub Actions workflow (`.github/workflows/tests.yml`) runs on every push and pull request:
+### Tests
 
-1. **ShellCheck** — lints `reconftw.sh`, `modules/*.sh`, and `install.sh`
-2. **Unit Tests** — runs `bats tests/unit/*.bats`
-3. **Integration Tests** — installs reconFTW and runs tool checks
+```bash
+make bash-lint          # shellcheck
+make bash-fmt           # shfmt
+make bash-test-unit     # bats tests/unit
+make bash-test-security # bats tests/security
+make bash-test-all
+```
 
-## Pull Request Process
+### Pull requests
 
-1. **Target the `dev` branch** — never submit PRs directly to `main`
-2. **Keep PRs focused** — one feature or fix per PR
-3. **Include tests** for new functionality
-4. **Pass linting**: `make lint` must pass
-5. **Describe your changes** clearly in the PR description
-6. **Reference issues** if applicable (e.g., "Fixes #123")
+Target **`dev`**. Keep PRs focused, pass `make bash-lint`, include tests.
 
-## Bug Reports
+---
 
-Submit bugs via [GitHub Issues](https://github.com/six2dez/reconftw/issues/new/choose). Include:
+## Bug Reports and Feature Requests
 
-- reconFTW version (`git describe --tags`)
-- OS and Bash version (`bash --version`)
-- Steps to reproduce
-- Expected vs. actual behavior
-- Relevant log output
-
-## Feature Requests
-
-Open a [GitHub Issue](https://github.com/six2dez/reconftw/issues/new/choose) with:
-
-- A clear description of the feature
-- Use case / motivation
-- Example configuration or usage if applicable
+Submit via [GitHub Issues](https://github.com/six2dez/reconftw/issues/new/choose).
+For v2 use the *v2 beta feedback* template and include `reconftw version`,
+`reconftw config sources`, OS/arch, the command, and `workspaces/<target>/logs/run.log`.
+For v1 include `git describe --tags`, `bash --version`, steps and log output.

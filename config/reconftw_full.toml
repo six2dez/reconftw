@@ -1,0 +1,234 @@
+# reconFTW v2 Full profile — every module on, deep enumeration and active vulnerability scanning.
+# Generated from config/reconftw_full.cfg with `reconftw migrate --from-bash config/reconftw_full.cfg`.
+# Use:  reconftw --config config/reconftw_full.toml recon --target example.com
+# This file is config layer 5 (--config); it overrides ./reconftw.toml and is
+# overridden by secrets.toml, RECONFTW_* env vars and CLI flags.
+#
+# reconftw v2 configuration — migrated from reconftw.cfg by `reconftw migrate`.
+# Mapped v1 keys are live v2-native keys (inline `# was KEY`). Superseded/unknown
+# v1 keys are preserved as comments so this file loads with zero warnings.
+
+[subdomains]
+enabled = true  # was SUBDOMAINS_GENERAL
+
+[subdomains.passive]
+enabled = true  # was SUBPASSIVE
+
+[subdomains.crt]
+enabled = true  # was SUBCRT
+
+[subdomains.analytics]
+enabled = true  # was SUBANALYTICS
+
+[subdomains.brute]
+enabled = true  # was SUBBRUTE
+
+[subdomains.scraping]
+enabled = true  # was SUBSCRAPING
+
+[subdomains.permut]
+enabled = true  # was SUBPERMUTE
+ia_enabled = true  # was SUBIAPERMUTE
+regex_enabled = true  # was SUBREGEXPERMUTE
+wordlist_mode = "full"  # was PERMUTATIONS_WORDLIST_MODE
+
+[subdomains.takeover]
+enabled = true  # was SUBTAKEOVER
+
+[subdomains.recursive]
+passive_enabled = true  # was SUB_RECURSIVE_PASSIVE
+brute_enabled = true  # was SUB_RECURSIVE_BRUTE
+
+[subdomains.zone_transfer]
+enabled = true  # was ZONETRANSFER
+
+[subdomains.s3_buckets]
+enabled = true  # was S3BUCKETS
+
+[subdomains.ptr_sweep]
+enabled = true  # was PTR_SWEEP
+
+[subdomains.srv_enum]
+enabled = true  # was SRV_ENUM
+
+[subdomains.ns_delegation]
+enabled = true  # was NS_DELEGATION
+
+[subdomains.scope]
+deep_wildcard_filter = true  # was DEEP_WILDCARD_FILTER
+no_error_check = true  # was SUBNOERROR
+
+[subdomains.tls_pivot]
+enabled = true  # was TLS_IP_PIVOTS
+
+[web.probe]
+enabled = true  # was WEBPROBEFULL
+
+[web.screenshots]
+enabled = true  # was WEBSCREENSHOT
+
+[web.virtual_hosts]
+enabled = true  # was VIRTUALHOSTS
+
+[web.favirecon]
+enabled = true  # was FAVIRECON
+
+[web.waf]
+enabled = true  # was WAF_DETECTION
+
+[web.nuclei]
+enabled = true  # was NUCLEICHECK
+
+[web.nuclei_dast]
+enabled = true  # was NUCLEI_DAST
+
+[web.fuzz]
+enabled = true  # was FUZZ
+
+[web.iis_shortname]
+enabled = true  # was IIS_SHORTNAME
+
+[web.cms]
+enabled = true  # was CMS_SCANNER
+
+[web.js]
+enabled = true  # was JSCHECKS
+sub_extract = true  # was JS_SUB_EXTRACT
+
+[web.urls]
+enabled = true  # was URL_CHECK
+passive_enabled = true  # was URL_CHECK_PASSIVE
+active_enabled = true  # was URL_CHECK_ACTIVE
+waymore_timeout = "45m"  # was WAYMORE_TIMEOUT
+waymore_limit = 10000  # was WAYMORE_LIMIT
+gf_patterns = true  # was URL_GF
+ext_classify = true  # was URL_EXT
+
+[web.wellknown]
+enabled = true  # was WELLKNOWN_PIVOTS
+
+[web.wordlist]
+enabled = true  # was WORDLIST
+robots_enabled = true  # was ROBOTSWORDLIST
+password_dict = true  # was PASSWORD_DICT
+
+[web.portscan]
+enabled = true  # was PORTSCANNER
+passive_enabled = true  # was PORTSCAN_PASSIVE
+active_enabled = true  # was PORTSCAN_ACTIVE
+strategy = "naabu_nmap"  # was PORTSCAN_STRATEGY
+geo_info = true  # was GEO_INFO
+cdn_check = true  # was CDN_IP
+
+[web.portscan.naabu]
+enabled = true  # was NAABU_ENABLE
+
+[web.graphql]
+enabled = true  # was GRAPHQL_CHECK
+deep_introspect = true  # was GQLSPECTION
+
+[web.param_discovery]
+enabled = true  # was PARAM_DISCOVERY
+
+[web.grpc]
+enabled = true  # was GRPC_SCAN
+
+[web.cloud_enum]
+s3_profile = "optimized"  # was CLOUD_ENUM_S3_PROFILE
+s3_threads = 20  # was CLOUD_ENUM_S3_THREADS
+
+[vulns]
+enabled = true  # was VULNS_GENERAL
+
+[vulns.xss]
+enabled = true  # was XSS
+
+[vulns.sqli]
+enabled = true  # was SQLI
+sqlmap = true  # was SQLMAP
+ghauri = true  # was GHAURI
+
+[vulns.ssrf]
+enabled = true  # was SSRF_CHECKS
+
+[vulns.lfi]
+enabled = true  # was LFI
+
+[vulns.ssti]
+enabled = true  # was SSTI
+engine = "TInjA"  # was SSTI_ENGINE
+
+[vulns.crlf]
+enabled = true  # was CRLF_CHECKS
+
+[vulns.smuggling]
+enabled = true  # was SMUGGLING
+
+[vulns.cmdi]
+enabled = true  # was COMM_INJ
+
+[vulns.cache]
+enabled = true  # was WEBCACHE
+toxicache = true  # was WEBCACHE_TOXICACHE
+
+[vulns.bypass_4xx]
+enabled = true  # was BYPASSER4XX
+
+[vulns.fuzz_params]
+enabled = true  # was FUZZPARAMS
+
+[vulns.spray]
+enabled = true  # was SPRAY
+
+[vulns.broken_links]
+enabled = true  # was BROKENLINKS
+engine = "second-order"  # was BROKENLINKS_ENGINE
+
+[vulns.ssl]
+enabled = true  # was TEST_SSL
+
+[vulns.metadata]
+enabled = true  # was METADATA
+
+[osint]
+enabled = true  # was OSINT
+
+[osint.google_dorks]
+enabled = true  # was GOOGLE_DORKS
+
+[osint.github]
+enabled = true  # was GITHUB_DORKS / GITHUB_REPOS
+
+[osint.cloud]
+enabled = true  # was CLOUD_ENUM
+
+[osint.emails]
+enabled = true  # was EMAILS
+
+[osint.postman]
+enabled = true  # was API_LEAKS_POSTLEAKS
+
+[osint.api_leaks]
+enabled = true  # was API_LEAKS
+
+[osint.swagger]
+enabled = true  # was THIRD_PARTIES
+
+[osint.spoofy]
+enabled = true  # was SPOOF
+
+[osint.mail_hygiene]
+enabled = true  # was MAIL_HYGIENE
+
+[osint.domain_info]
+enabled = true  # was DOMAIN_INFO
+
+[osint.ip_info]
+enabled = true  # was IP_INFO
+
+[osint.ipv6]
+enabled = true  # was IPV6_SCAN
+
+[advanced]
+deep = true  # was DEEP
+

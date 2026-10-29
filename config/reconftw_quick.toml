@@ -1,0 +1,156 @@
+# reconFTW v2 Quick profile — passive-leaning, fast scan; brute/scraping/active vulns off.
+# Generated from config/reconftw_quick.cfg with `reconftw migrate --from-bash config/reconftw_quick.cfg`.
+# Use:  reconftw --config config/reconftw_quick.toml recon --target example.com
+# This file is config layer 5 (--config); it overrides ./reconftw.toml and is
+# overridden by secrets.toml, RECONFTW_* env vars and CLI flags.
+#
+# reconftw v2 configuration — migrated from reconftw.cfg by `reconftw migrate`.
+# Mapped v1 keys are live v2-native keys (inline `# was KEY`). Superseded/unknown
+# v1 keys are preserved as comments so this file loads with zero warnings.
+
+[subdomains.brute]
+enabled = false  # was SUBBRUTE
+
+[subdomains.scraping]
+enabled = false  # was SUBSCRAPING
+
+[subdomains.permut]
+enabled = true  # was SUBPERMUTE
+ia_enabled = false  # was SUBIAPERMUTE
+regex_enabled = false  # was SUBREGEXPERMUTE
+wordlist_mode = "short"  # was PERMUTATIONS_WORDLIST_MODE
+
+[subdomains.recursive]
+brute_enabled = false  # was SUB_RECURSIVE_BRUTE
+
+[subdomains.zone_transfer]
+enabled = false  # was ZONETRANSFER
+
+[subdomains.ptr_sweep]
+enabled = false  # was PTR_SWEEP
+
+[subdomains.srv_enum]
+enabled = true  # was SRV_ENUM
+
+[subdomains.ns_delegation]
+enabled = false  # was NS_DELEGATION
+
+[subdomains.scope]
+deep_wildcard_filter = false  # was DEEP_WILDCARD_FILTER
+no_error_check = false  # was SUBNOERROR
+
+[subdomains.tls_pivot]
+enabled = false  # was TLS_IP_PIVOTS
+
+[web.probe]
+enabled = true  # was WEBPROBEFULL
+
+[web.screenshots]
+enabled = false  # was WEBSCREENSHOT
+
+[web.virtual_hosts]
+enabled = false  # was VIRTUALHOSTS
+
+[web.favirecon]
+enabled = false  # was FAVIRECON
+
+[web.nuclei]
+enabled = false  # was NUCLEICHECK
+
+[web.nuclei_dast]
+enabled = false  # was NUCLEI_DAST
+
+[web.fuzz]
+enabled = false  # was FUZZ
+
+[web.iis_shortname]
+enabled = false  # was IIS_SHORTNAME
+
+[web.cms]
+enabled = false  # was CMS_SCANNER
+
+[web.js]
+enabled = false  # was JSCHECKS
+sub_extract = false  # was JS_SUB_EXTRACT
+
+[web.urls]
+active_enabled = false  # was URL_CHECK_ACTIVE
+waymore_timeout = "20m"  # was WAYMORE_TIMEOUT
+waymore_limit = 3000  # was WAYMORE_LIMIT
+
+[web.wellknown]
+enabled = false  # was WELLKNOWN_PIVOTS
+
+[web.wordlist]
+enabled = false  # was WORDLIST
+robots_enabled = false  # was ROBOTSWORDLIST
+password_dict = false  # was PASSWORD_DICT
+
+[web.portscan]
+enabled = false  # was PORTSCANNER
+active_enabled = false  # was PORTSCAN_ACTIVE
+cdn_check = false  # was CDN_IP
+
+[web.graphql]
+enabled = false  # was GRAPHQL_CHECK
+
+[web.param_discovery]
+enabled = false  # was PARAM_DISCOVERY
+
+[web.grpc]
+enabled = false  # was GRPC_SCAN
+
+[vulns]
+enabled = false  # was VULNS_GENERAL
+
+[vulns.xss]
+enabled = false  # was XSS
+
+[vulns.sqli]
+enabled = false  # was SQLI
+sqlmap = false  # was SQLMAP
+ghauri = false  # was GHAURI
+
+[vulns.ssrf]
+enabled = false  # was SSRF_CHECKS
+
+[vulns.lfi]
+enabled = false  # was LFI
+
+[vulns.ssti]
+enabled = false  # was SSTI
+
+[vulns.crlf]
+enabled = false  # was CRLF_CHECKS
+
+[vulns.smuggling]
+enabled = false  # was SMUGGLING
+
+[vulns.cmdi]
+enabled = false  # was COMM_INJ
+
+[vulns.cache]
+enabled = false  # was WEBCACHE
+toxicache = false  # was WEBCACHE_TOXICACHE
+
+[vulns.bypass_4xx]
+enabled = false  # was BYPASSER4XX
+
+[vulns.fuzz_params]
+enabled = false  # was FUZZPARAMS
+
+[vulns.spray]
+enabled = false  # was SPRAY
+
+[vulns.broken_links]
+enabled = false  # was BROKENLINKS
+
+[vulns.ssl]
+enabled = false  # was TEST_SSL
+
+[osint.postman]
+enabled = false  # was API_LEAKS_POSTLEAKS
+
+[osint.ipv6]
+enabled = false  # was IPV6_SCAN
+

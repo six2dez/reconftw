@@ -63,8 +63,8 @@ Please skip these; they are open on purpose and reporting them just adds noise:
   input we need to decide it.
 - **`dnscewl` / `dnstake` report as missing.** Neither resolves on macOS in this
   beta.
-- **`dalfox` may exit non-zero** with `unexpected argument '--no-spinner'` if your
-  installed dalfox is v3.x — the pinned vector targets v2.9.2.
+- **`dalfox` exits non-zero** with `unexpected argument '--no-spinner'` on dalfox
+  v3.x in beta.1 (XSS does not run). Already fixed on `dev-go`; no report needed.
 
 ## Logs
 

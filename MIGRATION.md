@@ -27,13 +27,18 @@ explicitly. See the opt-in section in the README.
 **Two things are not settled yet, and one of them is in this document's own
 audience line.**
 
-- **`Recon/<domain>/` is not created by the beta.** The bash-shape compat tree is
-  written under the workspace root as `_compat/` (see §2.2). Whether v2 should also
-  create the top-level `Recon/<domain>/` path is an OPEN decision, tracked as CUT-08.
-  If your pipeline reads `Recon/<domain>/`, **the beta will not feed it** — point it
-  at `_compat/` for now, and please say so on the
-  [v2 beta feedback](https://github.com/six2dez/reconftw/issues/new?template=v2-beta-feedback.md)
-  template, because script authors are exactly who that decision is for.
+- **`Recon/<domain>/` is not created by beta.1 — it is from the next beta on.** The
+  bash-shape compat tree is written under the workspace root as `_compat/` (see
+  §2.2). CUT-08 is decided: starting with the next beta, v2 also creates the
+  top-level `Recon/<domain>` symlink pointing at `_compat/` **by default**, with
+  `output.compat.recon_symlink = false` as the opt-out. Until that beta ships, point
+  pipelines at `workspaces/<target-id>/_compat/`.
+- **No `go install …@latest`.** The module path in `go.mod` is
+  `github.com/six2dez/reconftw` with no `/v5` suffix, so `go install` resolves
+  `@latest` to the last `v4.x` tag and refuses the `v5` tags. Whether the path
+  becomes `…/reconftw/v5` at `v5.0.0` is an open decision; the supported install
+  paths are the release archive for a named tag, `git clone -b dev-go && make
+  build`, or the `5.0.0-beta.N` Docker tag (README, *Installation*).
 - **Bug-for-bug parity is partially measured.** One canonical target has been run
   side-by-side against bash v1; the acceptance criterion asks for three to five.
   Treat differences as worth reporting rather than as settled behaviour.
@@ -128,7 +133,8 @@ reconftw recon   --target example.com --axiom   # via Axiom
 | `--web` | `reconftw web` | `-w` |
 | `--osint` | `reconftw osint` | `-n` |
 | _(none)_ | `reconftw zen` | `-z` |
-| _(none)_ | `reconftw deep` | `-y` |
+| _(none)_ | `reconftw deep` | — (**not** `-y`, see below) |
+| `--inscope <file>` / `--outscope <file>` | `--include-file <file>` / `--exclude-file <file>` | `-i` / `-x` |
 | `--monitor` | `reconftw monitor` | — |
 | `-d <domain>` | `--target <domain>` | `-d` |
 | `-l <file>` | `--list <file>` | `-l` |
@@ -144,6 +150,17 @@ Flag --recon has been deprecated, use subcommand 'recon' instead: `reconftw reco
 
 They are **removed in v2.2.0** (see §4, and the note on the `-o`/`-n` reassignment in
 ADR §8.2 — v2 assigns `-o` to `--output`, so OSINT's short flag is `-n`).
+
+**`-y` is not an alias.** In v1 `-y` selected the AI report; an early v2 build
+mapped it to `deep`, which turned "give me a report" into the heaviest active
+scan. `-y` now exits with an error that names the replacements: `reconftw report
+--target <domain>` for the report, `[ai] enabled = true` for AI summarisation.
+
+**Scope files.** v1's `--inscope`/`--outscope` become `--include-file`/`-i` and
+`--exclude-file`/`-x` on every scanning subcommand (one host, IP or CIDR per
+line). As in v1 they narrow the target's scope; unlike v1 the check runs again at
+the artefact write boundary, so an out-of-scope host never reaches
+`artefacts/`.
 
 ### 2.2 Output tree (`Recon/<domain>/*.txt` → `workspaces/<target-id>/artefacts/*.jsonl`) (CUT-07)
 
@@ -187,7 +204,14 @@ www.example.com
 **Compat window — your `Recon/<domain>/` scripts keep working (CUT-08).** For the
 6-month compat window (see §4) v2's compat writer reads the JSONL artefacts and
 re-emits the high-value bash-shape `.txt` files under `_compat/`, with a top-level
-`Recon/<domain>` symlink pointing at it:
+`Recon/<domain>` symlink pointing at it. **The symlink lands in the next beta**
+(beta.1 writes only `_compat/`, see §0); it is created by default relative to the
+directory you run from, and can be switched off:
+
+```toml
+[output.compat]
+recon_symlink = false   # default true from the next beta: skip the Recon/<domain> symlink
+```
 
 ```text
 workspaces/example.com/_compat/

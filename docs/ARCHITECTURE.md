@@ -1,124 +1,130 @@
-# reconFTW Architecture
+# reconFTW v2 architecture (Go)
 
-## Overview
+This describes the Go binary on `dev-go` (tagged `v5.0.0-beta.N`). The bash v1
+architecture that `main` still ships is preserved in
+[`ARCHITECTURE-v1-bash.md`](ARCHITECTURE-v1-bash.md).
 
-reconFTW is a modular reconnaissance framework. The codebase is organized as follows:
-
-```
-reconftw/
-├── reconftw.sh          # Main entry point, argument parsing, orchestration
-├── reconftw.cfg         # Main configuration file (all settings)
-├── modules/             # Phase-specific modules (what to do)
-│   ├── utils.sh         # Utility functions (cleanup, sanitization, caching)
-│   ├── core.sh          # Framework core (logging, tools check, lifecycle)
-│   ├── osint.sh         # OSINT gathering functions
-│   ├── subdomains.sh    # Subdomain enumeration
-│   ├── web.sh           # Web analysis and crawling
-│   ├── vulns.sh         # Vulnerability scanning
-│   ├── axiom.sh         # Ax (formerly Axiom) distributed scanning
-│   └── modes.sh         # Scan mode orchestration
-├── lib/                 # Pure utility libraries (how to do it)
-│   ├── config.sh        # [FUTURE] Modular config loader
-│   └── validation.sh    # Input validation functions
-└── tests/               # Test suite
-    ├── unit/            # Unit tests (bats)
-    ├── security/        # Security tests
-    └── mocks/           # Tool mocks for testing
-```
-
-## Module Load Order
-
-Modules are sourced in this specific order (defined in `reconftw.sh`):
-
-1. `modules/utils.sh` - Base utilities (must be first)
-2. `modules/core.sh` - Framework infrastructure
-3. `modules/osint.sh` - OSINT functions
-4. `modules/subdomains.sh` - Subdomain enumeration
-5. `modules/web.sh` - Web analysis
-6. `modules/vulns.sh` - Vulnerability scanning
-7. `modules/axiom.sh` - Distributed scanning
-8. `modules/modes.sh` - Mode orchestration (must be last)
-
-## Data Flow
+## One binary, one process, one scheduler
 
 ```
-Target Input → Sanitization → Phase Execution → Output Files
-     ↓              ↓               ↓               ↓
-  --domain     sanitize_domain   start_func     Recon/$domain/
-  --list       sanitize_ip       [tool calls]   subdomains/
-  --cidr                         end_func       webs/vulns/
+reconftw <subcommand> --target example.com
+  │
+  ├─ cmd/reconftw          cobra commands, v1 flag aliases, config/secrets paths
+  ├─ internal/core/config  8-layer merge → one validated *Config (secrets redacted)
+  ├─ internal/core/appctx  Boot(): logger · backend · checkpoint store · output tree
+  │                        · scheduler · notifier · UI — the dependency kernel
+  └─ internal/core/scheduler
+        runs the task DAG for the subcommand with bounded concurrency
+        ├─ internal/modules/subdomains   passive → resolve → permut/brute → enrichment
+        ├─ internal/modules/web          httpx → analysis → urls → js → bypass
+        ├─ internal/modules/osint        dorks · leaks · emails · cloud · metadata
+        └─ internal/modules/vulns        gf classify → injection → oob → dast
+              └─ internal/core/backend   every tool call: local exec (or Axiom),
+                                         rate-limited, resolved from tools.lock
 ```
 
-## Key Functions
+There is no sourcing chain and no shared mutable globals: every capability is a
+**task** registered in `internal/core/task`, and everything a task needs
+arrives through `*appctx.AppContext`.
 
-### Lifecycle Functions (core.sh)
-- `start_func(name, description)` - Begin a function, check if already done
-- `end_func(message, name)` - Complete a function, mark as done
+## Packages under `internal/core/`
 
-### Utility Functions (utils.sh)
-- `sanitize_domain(domain)` - Sanitize domain input (lowercase, safe chars)
-- `sanitize_ip(ip)` - Sanitize IP/CIDR input
-- `should_run_deep(count, limit)` - Check if DEEP mode should run
-- `deleteOutScoped(scopefile, targetfile)` - Remove out-of-scope entries
-- `run_command(cmd, args...)` - Execute with logging (respects DRY_RUN)
+| Package | Responsibility |
+|---|---|
+| `config` | Loads `Defaults()` → `/etc/reconftw/config.toml` → `~/.config/reconftw/config.toml` → `./reconftw.toml` → `--config` → `secrets.toml` → `RECONFTW_*` env → CLI flags (koanf + TOML). Validates with struct tags. `log.Secret`-typed fields are redacted everywhere. Also hosts `migrate` (v1 `.cfg` → TOML) and `profiles` (zen/deep). |
+| `log` | slog handler with a Redactor. Every secret value is registered at boot; `log.Secret` implements `LogValuer` so it can never print itself. |
+| `appctx` | `Target` (canonical identity → workspace slug, scope) and `Boot()`, which wires the kernel in the ADR-mandated order: logger, config, backend+runner, checkpoint store, output tree, scheduler, notifier, UI. |
+| `task` | The `Task` interface (`Name`, `Module`, `Description`, `DependsOn`, `Enabled`, `Run`), the global registry (`task.Register` from `init()`), topological sort, and module/prefix filters shared by the CLI and MCP. |
+| `scheduler` | Bounded concurrent dispatcher over the sorted DAG (`errgroup`, `concurrency.max_jobs`). Per-module failure policy (fail-fast vs best-effort), heartbeats for long tasks, checkpoint skip/record around every `Run`. One scheduler per scan — never shared between concurrent scans. |
+| `backend` | `Runner` / `Backend` abstraction over tool execution. `LocalBackend` is the only place that may spawn a subprocess (a lint test enforces this); `AxiomBackend` dispatches a whitelisted subset to an Ax fleet and falls back locally; `PassiveBackend` refuses active tools. The embedded `tools.lock` (`internal/core/backend/tools.lock`) is the registry: per-tool kind, install coordinates, default args, timeout, critical tier. Token-bucket rate limiting and a recorder (`logs/tools.jsonl`) live here too. |
+| `output` | The workspace tree and the write contract: atomic writes (temp → fsync → rename), a scope filter at the write boundary, **staging** files under `inputs/` and the single-writer merge into `artefacts/*.jsonl`, the `_compat/` v1-shape writer, the per-workspace lock, `manifest.json`. |
+| `checkpoint` | SQLite `checkpoints.db` per workspace. A task is skipped when a row exists for `(task, target, input_hash)` where the hash covers the task name, target, its config slice and wordlist contents; `--force` ignores it. Incomplete runs are recorded as errored so they retry. |
+| `findings` | The SARIF-compatible finding record and mappers from tool output. |
+| `ingest` | End-of-scan import of `artefacts/*.jsonl` into the shared `store.db` (hosts, urls, findings, scan rows) that `report`, `monitor`, SARIF/hotlist and AI read. |
+| `report` | HTML, SARIF 2.1.0, CSV, Markdown, hotlist and Faraday renderers over `store.db`, scoped to one scan. |
+| `notifier` | Slack / Telegram / Discord with a digest coalescer; `notify --test` is the only path that propagates failures. |
+| `resolvers` | Resolver list acquisition and `gen-resolvers` (dnsvalidator). |
+| `ui` | Status badges, TTY/NO_COLOR handling, verbosity. |
+| `errors`, `testutil` | Typed error reasons; `MockBackend` and fixture loading for tests. |
 
-### DNS Resolution Functions (utils.sh)
+`internal/store/sqlc/` is the hand-maintained query layer for `store.db`
+(there is no `sqlc generate`; edit the `.sql.go` files directly).
+`internal/installer/` implements `reconftw install` from the embedded
+`tools.lock`. `internal/mcp/` is the MCP server.
 
-All DNS resolution goes through two global wrappers that auto-select between puredns and dnsx based on the network environment:
+## A task's life
 
-- `_get_local_ip()` - Get the primary local IP address (cross-platform). Uses `route -n get default` on macOS and `ip -4 route get 1.1.1.1` on Linux to find the correct interface regardless of naming.
-- `_ip_is_public_ipv4(ip)` - Conservative check for publicly routable IPv4. Treats RFC1918, CGNAT (100.64.0.0/10), loopback, link-local, multicast/reserved as non-public.
-- `_is_behind_nat()` - Detect if running behind NAT (or unknown network) by checking the primary local IP. Defaults to NAT-safe behavior if detection fails.
-- `init_dns_resolver()` - Evaluates resolver selection once per run and caches it in `DNS_RESOLVER_SELECTED` when `DNS_RESOLVER=auto`.
-- `_select_dns_resolver()` - Select DNS resolver based on `DNS_RESOLVER` config. `puredns`/`dnsx` force the resolver; `auto` uses the cached selection from `init_dns_resolver()` (with a safe fallback if unset).
-- `_resolve_domains(input_file, output_file)` - Resolve a list of domains. Uses puredns (massdns + wildcard filter) on VPS or dnsx (Go net resolver + basic wildcard threshold) behind NAT.
-- `_bruteforce_domains(wordlist, target_domain, output_file)` - Bruteforce subdomains. Equivalent to `puredns bruteforce wordlist domain` or `dnsx -d domain -w wordlist`.
+1. **Registration.** A module file declares a type implementing `task.Task` and
+   calls `task.Register(&myTask{})` from `init()`. `Enabled(cfg)` gates it on
+   the config slice it owns; `DependsOn()` names the tasks that must finish
+   first. A nil `DependsOn` means "first concurrent group", not "no gate".
+2. **Selection.** The subcommand picks a module prefix list (`subs`, `web`,
+   `recon` = subs+web+osint, `all` = recon+vulns, …); `task.FilterByModuleAndEnabled`
+   narrows the registry; `topo` orders it.
+3. **Run.** The scheduler checks the checkpoint, starts a heartbeat, and calls
+   `Run(ctx, app)`. The task invokes tools only through `app.Tools.Run(...)`
+   (buffered) or `app.Tools.Stream(...)` (line events), never `exec.Command`.
+4. **Staging → merge.** A task that is one of several producers of an
+   artefact writes `inputs/<artefact>.<tool>.jsonl` through
+   `output.StageJSONL`/`StageLines` — which **removes** the staging file when
+   the run produced nothing, so stale results never republish. A single
+   merge task per artefact (`subdomains.merge`, web `MergeStage`/`urldedup`, …)
+   globs the staging files, deduplicates, applies scope and calls
+   `app.Tree.Append` once. Single-producer artefacts append directly.
+5. **Checkpoint.** On success the scheduler records the row; on an incomplete
+   tool run it records "errored" so the next invocation retries.
+6. **Finalise.** After the last stage: compat writer (`_compat/`), ingest into
+   `store.db`, reports, notifications, summary.
 
-**Why two resolvers:** puredns uses massdns which sends raw UDP packets to thousands of resolvers simultaneously. This floods the NAT table on consumer routers and can kill connectivity. dnsx uses Go's standard net resolver through the OS networking stack, which is NAT-friendly but lacks puredns's advanced wildcard detection.
+## Workspace layout
 
-### Permutation Functions (subdomains.sh)
-
-- `_select_permutations_wordlist(source_file)` - Choose wordlist based on `PERMUTATIONS_WORDLIST_MODE` and subdomain count. In `auto` mode: full list (849 words) for <=100 subs or DEEP mode, short list (162 words) for >100 subs.
-- `_run_permutation_engine(source_file)` - Run gotator with the auto-selected wordlist.
-- `_generate_permutation_candidates(source_file, output_file)` - Generate permutation candidates with byte-size limit.
-
-### Validation Functions (lib/validation.sh)
-- `validate_domain(domain)` - Validate domain format
-- `validate_ipv4(ip)` - Validate IPv4 address
-- `validate_boolean(value)` - Validate boolean string
-
-## Global Variables
-
-### Required (set before module load)
-- `$SCRIPTPATH` - Path to reconftw installation
-- `$domain` - Target domain
-- `$dir` - Output directory for current scan
-
-### Configuration (from reconftw.cfg)
-- `$DEEP` - Enable deep/thorough scanning
-- `$DEEP_LIMIT` - Threshold for auto-deep mode
-- `$AXIOM` - Enable distributed scanning
-- `$*_THREADS` - Thread counts per tool
-- `$DNS_RESOLVER` - DNS resolver selection (`auto`|`puredns`|`dnsx`)
-- `$DNS_RESOLVER_SELECTED` - Cached resolver selection for this run (set by `init_dns_resolver()` when `DNS_RESOLVER=auto`)
-- `$PERMUTATIONS_WORDLIST_MODE` - Wordlist selection (`auto`|`full`|`short`)
-- `$PERMUTATIONS_SHORT_THRESHOLD` - Subdomain count threshold for short wordlist (default: 100)
-
-## Error Codes
-
-Defined in `lib/validation.sh`:
-- `E_SUCCESS=0` - Success
-- `E_GENERAL=1` - General error
-- `E_MISSING_DEP=2` - Missing dependency
-- `E_INVALID_INPUT=3` - Invalid user input
-- `E_CONFIG=8` - Configuration error
-
-## Testing
-
-```bash
-make test          # Unit tests only
-make test-security # Security tests only
-make test-all      # All tests
-make lint          # Shellcheck errors
-make lint-fix      # Shellcheck warnings with context
 ```
+workspaces/<target-slug>/
+├── artefacts/        subdomains · hosts · urls · findings · buckets · asns … (.jsonl)
+├── inputs/           per-tool staging files (inputs/urls.katana.jsonl …)
+├── raw/              untouched tool output (raw/nuclei/, raw/screenshots/ …)
+├── reports/<scan>/   html · sarif · csv · markdown · hotlist · faraday
+├── logs/             run.log, tools.jsonl (every invocation, redacted)
+├── checkpoints.db    resume state for THIS workspace
+├── manifest.json     artefact inventory
+└── _compat/          v1-shape .txt files (+ Recon/<domain> symlink, see MIGRATION §2.2)
+
+<data_dir>/store.db   cross-scan SQLite: scans, hosts, urls, findings — read by
+                      report / monitor / SARIF / AI; written by ingest at scan end
+```
+
+`workspaces/` is the default root (`-o/--output`); the target slug comes from
+`appctx.NewTarget` (punycode-folded hostname, IP or CIDR).
+
+## Cross-cutting rules
+
+- **Scope** is enforced at the write boundary (`output.ScopeFilter`), not just
+  on input: an out-of-scope host/URL never lands in `artefacts/`.
+- **No raw subprocesses** outside `backend/local.go`
+  (`internal/core/backend/lint`). Arg vectors are data in `tools.lock` plus
+  per-task flags; their drift is guarded by `argvector_*` tests and the
+  `realtools`-tagged probes (`make realtools-args`, needs the tools on PATH).
+- **Dry run** (`--dry-run`) is honoured before any filesystem mutation in every
+  stateful subcommand.
+- **Secrets** are `log.Secret` in config, registered with the Redactor at boot,
+  and stripped from logs, `config show`, snapshots and migrate output.
+- **Axiom** is experimental: dispatch is time-capped, failures re-run locally,
+  a dead fleet is abandoned for the rest of the run.
+
+## MCP server (`internal/mcp/`)
+
+`reconftw mcp serve` exposes the pipelines as MCP tools over stdio or HTTP
+(`127.0.0.1:<port>`, Bearer `mcp.api_key`). Each session captures its scope
+once; runs are owned by the session that started them (`cancel_scan`), run
+under the config the server booted with, and publish `scan://…` resources
+backed by the workspace JSONL. The OpenAPI schema is embedded from
+`internal/mcp/openapi.json` and served at `/openapi.json`. See `mcp.md`.
+
+## Where the tests live
+
+`go test -race -short ./...` is the per-push ring; `-tags smoke` and the
+`^TestE2E` gate are the integration rings; `make ci` mirrors `ci.yml`;
+`make release-gates` is the cutover sign-off. Contract tests under
+`internal/modules/*_contract_test.go` ratchet the staging, stream and
+silent-success rules above across every task. `CONTRIBUTING.md` has the
+workflow.

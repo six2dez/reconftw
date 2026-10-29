@@ -74,7 +74,12 @@ So a pipeline that reads `Recon/<domain>/subdomains/subdomains.txt` finds
 nothing under the beta, and a pipeline pointed at `_compat/` finds what it
 expects.
 
-Whether v2 should *also* create the top-level `Recon/<domain>/` path is an
+> **Update (post-beta.1):** the decision has been taken. The next beta creates
+> the top-level `Recon/<domain>` symlink to `_compat/` by default, with an
+> opt-out (`output.compat.recon_symlink = false`). `MIGRATION.md` §0 and §2.2
+> describe the behaviour. The paragraph below is kept as the beta.1 record.
+
+Whether v2 should *also* create the top-level `Recon/<domain>/` path was an
 **open decision**, tracked as CUT-08 — not an oversight, and not something the
 beta is quietly hoping to skip. It is open because the answer depends on how
 many people actually script against that path and how, which is exactly what a
@@ -153,5 +158,5 @@ rather than information:
 - `Recon/<domain>/` is not created (CUT-08, above). **Do tell us if it breaks a
   script** — that specific report is wanted.
 - `dnscewl` and `dnstake` do not resolve on macOS in this beta.
-- `dalfox` may exit non-zero on `--no-spinner` if you have dalfox v3.x
-  installed; the pinned argument vector targets v2.9.2.
+- `dalfox`: beta.1 sends `--no-spinner`, which dalfox v3.x rejects, so XSS does
+  not run there. Fixed on `dev-go`; lands in the next beta.

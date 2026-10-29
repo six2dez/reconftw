@@ -113,7 +113,10 @@ workspaces/
 /web/
 /reconftw-web
 # runtime data: SQLite store, master key (SECRET), caches, manifests
-data/
+data/*
+!data/wordlists/
+data/wordlists/*
+!data/wordlists/SOURCES.md
 # stray scratch + local config
 .config/
 .planning.bak-*/

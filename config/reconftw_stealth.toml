@@ -1,0 +1,230 @@
+# reconFTW v2 Stealth profile — minimum noise: passive OSINT and subdomains only, no active scanning.
+# Generated from config/reconftw_stealth.cfg with `reconftw migrate --from-bash config/reconftw_stealth.cfg`.
+# Use:  reconftw --config config/reconftw_stealth.toml recon --target example.com
+# This file is config layer 5 (--config); it overrides ./reconftw.toml and is
+# overridden by secrets.toml, RECONFTW_* env vars and CLI flags.
+#
+# reconftw v2 configuration — migrated from reconftw.cfg by `reconftw migrate`.
+# Mapped v1 keys are live v2-native keys (inline `# was KEY`). Superseded/unknown
+# v1 keys are preserved as comments so this file loads with zero warnings.
+
+[subdomains]
+enabled = true  # was SUBDOMAINS_GENERAL
+
+[subdomains.passive]
+enabled = true  # was SUBPASSIVE
+
+[subdomains.crt]
+enabled = true  # was SUBCRT
+
+[subdomains.analytics]
+enabled = true  # was SUBANALYTICS
+
+[subdomains.brute]
+enabled = false  # was SUBBRUTE
+
+[subdomains.scraping]
+enabled = false  # was SUBSCRAPING
+
+[subdomains.permut]
+enabled = false  # was SUBPERMUTE
+ia_enabled = false  # was SUBIAPERMUTE
+regex_enabled = false  # was SUBREGEXPERMUTE
+
+[subdomains.takeover]
+enabled = false  # was SUBTAKEOVER
+
+[subdomains.recursive]
+passive_enabled = true  # was SUB_RECURSIVE_PASSIVE
+brute_enabled = false  # was SUB_RECURSIVE_BRUTE
+
+[subdomains.zone_transfer]
+enabled = false  # was ZONETRANSFER
+
+[subdomains.s3_buckets]
+enabled = false  # was S3BUCKETS
+
+[subdomains.reverse_ip]
+enabled = false  # was REVERSE_IP
+
+[subdomains.ptr_sweep]
+enabled = false  # was PTR_SWEEP
+
+[subdomains.srv_enum]
+enabled = true  # was SRV_ENUM
+
+[subdomains.ns_delegation]
+enabled = false  # was NS_DELEGATION
+
+[subdomains.scope]
+deep_wildcard_filter = false  # was DEEP_WILDCARD_FILTER
+no_error_check = false  # was SUBNOERROR
+
+[subdomains.tls_pivot]
+enabled = false  # was TLS_IP_PIVOTS
+
+[web.probe]
+enabled = true  # was WEBPROBEFULL
+rate_limit = 5  # was HTTPX_RATELIMIT
+
+[web.screenshots]
+enabled = false  # was WEBSCREENSHOT
+
+[web.virtual_hosts]
+enabled = false  # was VIRTUALHOSTS
+
+[web.favirecon]
+enabled = false  # was FAVIRECON
+
+[web.waf]
+enabled = false  # was WAF_DETECTION
+
+[web.nuclei]
+enabled = true  # was NUCLEICHECK
+rate_limit = 10  # was NUCLEI_RATELIMIT
+severity = "info,low"  # was NUCLEI_SEVERITY
+
+[web.nuclei_dast]
+enabled = false  # was NUCLEI_DAST
+
+[web.fuzz]
+enabled = false  # was FUZZ
+rate_limit = 10  # was FFUF_RATELIMIT
+
+[web.iis_shortname]
+enabled = false  # was IIS_SHORTNAME
+
+[web.cms]
+enabled = false  # was CMS_SCANNER
+
+[web.js]
+enabled = false  # was JSCHECKS
+sub_extract = false  # was JS_SUB_EXTRACT
+
+[web.urls]
+enabled = true  # was URL_CHECK
+passive_enabled = true  # was URL_CHECK_PASSIVE
+active_enabled = false  # was URL_CHECK_ACTIVE
+waymore_timeout = "20m"  # was WAYMORE_TIMEOUT
+waymore_limit = 2000  # was WAYMORE_LIMIT
+gf_patterns = true  # was URL_GF
+ext_classify = true  # was URL_EXT
+
+[web.wellknown]
+enabled = false  # was WELLKNOWN_PIVOTS
+
+[web.wordlist]
+enabled = false  # was WORDLIST
+robots_enabled = false  # was ROBOTSWORDLIST
+password_dict = false  # was PASSWORD_DICT
+
+[web.portscan]
+enabled = true  # was PORTSCANNER
+passive_enabled = true  # was PORTSCAN_PASSIVE
+active_enabled = false  # was PORTSCAN_ACTIVE
+geo_info = true  # was GEO_INFO
+cdn_check = true  # was CDN_IP
+
+[web.graphql]
+enabled = false  # was GRAPHQL_CHECK
+
+[web.param_discovery]
+enabled = false  # was PARAM_DISCOVERY
+
+[web.grpc]
+enabled = false  # was GRPC_SCAN
+
+[web.cloud_enum]
+s3_profile = "optimized"  # was CLOUD_ENUM_S3_PROFILE
+s3_threads = 20  # was CLOUD_ENUM_S3_THREADS
+
+[vulns]
+enabled = false  # was VULNS_GENERAL
+
+[vulns.xss]
+enabled = false  # was XSS
+
+[vulns.sqli]
+enabled = false  # was SQLI
+sqlmap = false  # was SQLMAP
+ghauri = false  # was GHAURI
+
+[vulns.ssrf]
+enabled = false  # was SSRF_CHECKS
+
+[vulns.lfi]
+enabled = false  # was LFI
+
+[vulns.ssti]
+enabled = false  # was SSTI
+
+[vulns.crlf]
+enabled = false  # was CRLF_CHECKS
+
+[vulns.smuggling]
+enabled = false  # was SMUGGLING
+
+[vulns.cmdi]
+enabled = false  # was COMM_INJ
+
+[vulns.cache]
+enabled = false  # was WEBCACHE
+toxicache = false  # was WEBCACHE_TOXICACHE
+
+[vulns.bypass_4xx]
+enabled = false  # was BYPASSER4XX
+
+[vulns.fuzz_params]
+enabled = false  # was FUZZPARAMS
+
+[vulns.spray]
+enabled = false  # was SPRAY
+
+[vulns.broken_links]
+enabled = false  # was BROKENLINKS
+
+[vulns.ssl]
+enabled = false  # was TEST_SSL
+
+[vulns.metadata]
+enabled = false  # was METADATA
+
+[osint]
+enabled = true  # was OSINT
+
+[osint.google_dorks]
+enabled = true  # was GOOGLE_DORKS
+
+[osint.github]
+enabled = true  # was GITHUB_DORKS / GITHUB_REPOS
+
+[osint.cloud]
+enabled = false  # was CLOUD_ENUM
+
+[osint.emails]
+enabled = true  # was EMAILS
+
+[osint.postman]
+enabled = false  # was API_LEAKS_POSTLEAKS
+
+[osint.api_leaks]
+enabled = true  # was API_LEAKS
+
+[osint.swagger]
+enabled = true  # was THIRD_PARTIES
+
+[osint.spoofy]
+enabled = true  # was SPOOF
+
+[osint.mail_hygiene]
+enabled = true  # was MAIL_HYGIENE
+
+[osint.domain_info]
+enabled = true  # was DOMAIN_INFO
+
+[osint.ip_info]
+enabled = true  # was IP_INFO
+
+[osint.ipv6]
+enabled = false  # was IPV6_SCAN
+

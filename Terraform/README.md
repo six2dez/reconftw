@@ -1,5 +1,12 @@
 # reconFTW loves Ansible+Terraform <3
 
+> **This playbook provisions bash v1 (`main`, v4.1).** `reconFTW.yml` clones
+> `reconftw_branch_default: "main"` and runs `install.sh`. To run the Go v2 beta
+> on the instance instead, SSH in and: `git -C /opt/reconftw fetch && git -C
+> /opt/reconftw checkout v5.0.0-beta.1 && cd /opt/reconftw && make build &&
+> ./bin/reconftw install` — then use `reconftw recon --target …` (see
+> `MIGRATION.md`). The two installs do not overwrite each other.
+
 This is an automated script created to work under AWS by using Terraform and Ansible. It allows you to easily deploy it or to easily adapt it into your IaaC strategy.
 
 > Note (best-effort): This Terraform/Ansible setup is provided as a reference. Cloud images, SSH usernames, and

@@ -1,5 +1,12 @@
 # ReconFTW Proxmox LXC Deployment Script
 
+> **This script installs bash v1.** `reconftw_prox_deploy.sh` clones the default
+> branch (`main`, v4.1) and runs `install.sh`. For the Go v2 beta, enter the
+> container afterwards and: `cd reconftw && git fetch --tags && git checkout
+> v5.0.0-beta.1 && make build && ./bin/reconftw install`, then use
+> `reconftw recon --target …` (see `MIGRATION.md`). The `master` branch named in
+> the curl URL below no longer exists; use `main`.
+
 This script automates the deployment of ReconFTW in a Linux Container (LXC) on a Proxmox server. It simplifies the process of setting up a dedicated environment for reconnaissance activities.
 
 ## Prerequisites
@@ -10,7 +17,7 @@ This script automates the deployment of ReconFTW in a Linux Container (LXC) on a
 
 ## Usage
 
-1. Copy the script `bash -c "$(curl -fsSL https://raw.githubusercontent.com/six2dez/reconftw/master/Proxmox/reconftw_prox_deploy.sh)"` to your Proxmox server.
+1. Copy the script `bash -c "$(curl -fsSL https://raw.githubusercontent.com/six2dez/reconftw/main/Proxmox/reconftw_prox_deploy.sh)"` to your Proxmox server.
 
 4. Follow the prompts to configure your LXC container. You'll be asked for:
 - Container ID

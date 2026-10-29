@@ -194,8 +194,9 @@ curl -s -X POST http://127.0.0.1:8765/mcp \
 curl -s http://127.0.0.1:8765/openapi.json | python3 -m json.tool | head -20
 ```
 
-Full HTTP transport schema is available at `/openapi.json`. See also
-[docs/openapi.json](/openapi.json) for the bundled schema.
+The schema the server serves is the one embedded in the binary from
+[`internal/mcp/openapi.json`](../internal/mcp/openapi.json) — that file is the
+single source; there is no separate copy under `docs/`.
 
 **Python MCP client — async tool call + resource subscription:**
 

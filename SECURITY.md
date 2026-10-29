@@ -2,11 +2,13 @@
 
 ## Supported Versions
 
-| Version | Supported          |
-| ------- | ------------------ |
-| dev     | :white_check_mark: |
-| 3.x     | :white_check_mark: |
-| < 3.0   | :x:                |
+| Line | Version | Branch | Supported |
+| --- | --- | --- | --- |
+| Go v2 (beta) | `v5.0.0-beta.x` | `dev-go` | :white_check_mark: security fixes land in the next beta |
+| bash v1 | `v4.1` (`main`) | `main` / `dev` | :white_check_mark: |
+| bash v1 | `< 4.0` | — | :x: |
+
+See `BRANCHES.md` for which branch is which.
 
 ## Reporting a Vulnerability
 
@@ -21,107 +23,118 @@ You should receive a response within 72 hours acknowledging the report. The main
 
 ## Secrets Management
 
-reconFTW handles API keys and credentials in three ways (in order of precedence):
+### v2 (Go binary)
 
-### 1. Environment Variables (recommended)
+Secrets are ordinary config keys whose Go type is `log.Secret`. There are three
+ways to supply them; later layers win:
 
-Set secrets as environment variables before running:
+1. **`secrets.toml`** — config layer 6. Pass it with `--secrets FILE`; the
+   file is gitignored (`secrets.toml`, `secrets.toml.*`) and
+   [`secrets.toml.example`](secrets.toml.example) lists every key the loader
+   understands:
 
-```bash
-export SHODAN_API_KEY="your-key"
-export WHOISXML_API="your-key"
-export XSS_SERVER="your-server"
-export COLLAB_SERVER="your-server"
-./reconftw.sh -d target.com -r
-```
+   ```toml
+   [api_keys]
+   shodan   = "…"
+   whoisxml = "…"
+   pdcp     = "…"
 
-### 2. secrets.cfg File
+   [notifications.slack]
+   webhook_url = "https://hooks.slack.com/…"
+   [notifications.telegram]
+   bot_token = "…"
+   [notifications.discord]
+   webhook_url = "https://discord.com/api/webhooks/…"
 
-Create a `secrets.cfg` file in the reconFTW root directory. It is automatically sourced at startup and is listed in `.gitignore`:
+   [ai]
+   openai_key    = "…"
+   anthropic_key = "…"
 
-```bash
-# secrets.cfg — never commit this file
-SHODAN_API_KEY="your-key"
-WHOISXML_API="your-key"
-XSS_SERVER="your-server"
-COLLAB_SERVER="your-server"
-slack_channel="your-channel"
-slack_auth="xoxb-your-token"
-```
+   [mcp]
+   api_key = "…"
+   ```
 
-### 3. Docker Runtime Secrets
+2. **`RECONFTW_*` environment variables** — config layer 7, e.g.
+   `RECONFTW_API_KEYS_SHODAN`, `RECONFTW_MCP_API_KEY`, `RECONFTW_AI_OPENAI_KEY`.
+   The mapper turns the first underscore after the section name into a dot
+   (`RECONFTW_API_KEYS_SHODAN` → `api_keys.shodan`), so keys in nested tables
+   such as `notifications.slack.webhook_url` cannot be set this way — use the
+   file.
 
-When running via Docker, pass secrets with `-e` flags at runtime. Never bake secrets into the image:
+3. **Docker runtime secrets** — pass `-e RECONFTW_API_KEYS_SHODAN=…` or mount a
+   `secrets.toml` and pass `--secrets /run/secrets/reconftw.toml`. Never bake
+   secrets into the image.
 
-```bash
-docker run -it --rm \
-  -e SHODAN_API_KEY="your-key" \
-  -e COLLAB_SERVER="your-server" \
-  -v "${PWD}/OutputFolder/:/reconftw/Recon/" \
-  six2dez/reconftw:main -d example.com -r
-```
+**Redaction.** Every `log.Secret` value is registered with the log Redactor at
+boot. It is masked in: every log line (`logs/run.log`, `logs/tools.jsonl`),
+`reconftw config show`, the workspace config snapshot, `reconftw migrate
+--dry-run` output and MCP responses. `reconftw migrate` writes the migrated
+`reconftw.toml` with mode `0600` because it carries the real values. Token
+*files* (`paths.github_tokens`, `paths.gitlab_tokens`) are referenced by path and
+must be kept out of version control yourself.
+
+### v1 (bash)
+
+1. **Environment variables**: `SHODAN_API_KEY`, `WHOISXML_API`, `PDCP_API_KEY`,
+   `XSS_SERVER`, `COLLAB_SERVER` are read before `reconftw.cfg`.
+2. **`secrets.cfg`** in the reconFTW root, sourced automatically and gitignored
+   (`secrets.cfg.example` is the template). `register_secret` adds each value to
+   the log redactor.
+3. **Docker**: `-e` flags at runtime against the `six2dez/reconftw:main` (v1)
+   image.
 
 ## Files to Never Commit
 
-The following files may contain secrets and must **never** be committed to version control:
+| File | Line | Purpose |
+|------|------|---------|
+| `secrets.toml` | v2 | Secret material (layer 6); only `secrets.toml.example` is tracked |
+| `reconftw.toml` (repo root) | v2 | Auto-loaded project config; may hold migrated secrets — gitignored |
+| `secrets.cfg` | v1 | Local secrets override file |
+| `reconftw.cfg` (with keys) | v1 | Configuration with API keys filled in |
+| `.env`, `*.tokens`, `.github_tokens`, `.gitlab_tokens` | both | Environment and token files |
 
-| File | Purpose |
-|------|---------|
-| `secrets.cfg` | Local secrets override file |
-| `.env` | Environment variable definitions |
-| `reconftw.cfg` (with keys) | Configuration with API keys filled in |
-| `*.tokens` | GitHub/GitLab token files |
-
-Verify these are covered by `.gitignore` before pushing.
+Verify these are covered by `.gitignore` before pushing (`git check-ignore -v <file>`).
 
 ## Input Sanitization
 
-reconFTW sanitizes all user-supplied input to prevent command injection:
+**v2:** targets go through `appctx.NewTarget` (hostname folded to punycode and
+syntactically validated; IPv4/IPv6/CIDR parsed), every `[paths]` value is
+checked for path traversal, and no tool is ever invoked through a shell:
+`internal/core/backend/local.go` is the only place that may spawn a
+subprocess (enforced by an AST lint test) and it passes argv arrays, never
+strings. Scope is applied again at the artefact write boundary.
 
-| Function | Purpose |
-|----------|---------|
-| `sanitize_domain()` | Strips characters not valid in domain names, converts to lowercase |
-| `sanitize_ip()` | Validates and cleans IP/CIDR input |
-| `sanitize_interlace_input()` | Removes shell metacharacters from interlace arguments |
-| `validate_domain()` | Validates domain format without modification |
-| `validate_ipv4()` | Validates IPv4 address format |
-
-All `eval` usage on user input has been removed. Variables are quoted throughout the codebase to prevent word-splitting and globbing attacks.
+**v1:** `sanitize_domain()`, `sanitize_ip()`, `sanitize_interlace_input()`,
+`validate_domain()`, `validate_ipv4()` in `lib/validation.sh` /
+`modules/utils.sh`; no `eval` on user input; variables quoted throughout.
 
 ## Security Testing
 
-The test suite includes security-focused tests in `tests/security/`:
+- v2: `go test -race -short ./...` includes the raw-subprocess lint, the
+  logging-hygiene sentinel (no secret-shaped string may reach a log), the scope
+  and path-traversal validators and the MCP auth/scope tests. `govulncheck
+  ./...` runs in CI on every push.
+- v1: `make bash-test-security` (injection, pipe/redirect, substitution and
+  path-traversal cases under `tests/security/`).
 
-- Command injection attempts via domain parameter
-- Pipe and redirect injection tests
-- Backtick and dollar substitution tests
-- Path traversal prevention tests
+## Security-Related Configuration (v2)
 
-Run security tests with:
+| Key | Default | Description |
+|---|---|---|
+| `output.min_disk_space_gb` | `0` | Refuse to start below this free space (0 = disabled) |
+| `output.log_rotation.*` | — | Cap log count/age per workspace |
+| `output.structured_logging` | `false` | JSON logs for audit trails |
+| `mcp.enabled` / `mcp.api_key` | `false` / `""` | MCP server is opt-in and always requires a Bearer token; HTTP binds `127.0.0.1` only |
+| `ai.redact` | — | Redact findings before they are sent to an AI provider |
+| `integrations.proxy.*` | off | Route tool traffic through proxychains |
+| `axiom.enabled` | `false` | Provisions billable cloud instances; experimental |
 
-```bash
-make test-security
-```
-
-## Security-Related Configuration
-
-These variables in `reconftw.cfg` control security and operational safety:
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `MIN_DISK_SPACE_GB` | `0` | Minimum disk space (GB) required before scanning starts (0 = disabled) |
-| `MAX_LOG_FILES` | `10` | Maximum log files kept per target (prevents disk exhaustion) |
-| `MAX_LOG_AGE_DAYS` | `30` | Auto-delete logs older than this many days |
-| `STRUCTURED_LOGGING` | `false` | Enable JSON structured logging for audit trails |
-| `SHOW_COMMANDS` | `false` | Log every executed command (may include sensitive data) |
-| `INTRUSIVE` | `false` | Enable intrusive cloud write/CORS tests (dangerous, keep disabled) |
-| `CACHE_MAX_AGE_DAYS` | `30` | Maximum cache age for wordlists/resolvers |
+The v1 equivalents (`MIN_DISK_SPACE_GB`, `MAX_LOG_FILES`, `STRUCTURED_LOGGING`,
+`SHOW_COMMANDS`, `INTRUSIVE`, …) live in `reconftw.cfg`.
 
 ## Docker Security
 
-The Dockerfile follows these security practices:
-
-- Secrets are passed at runtime via environment variables, not embedded at build time
-- A `HEALTHCHECK` directive ensures the container is monitored
-- Non-essential build dependencies are removed in the final image
-- The `--build-arg INSTALL_AXIOM=false` flag skips Axiom tooling when not needed
+The v2 image (`Docker/Dockerfile`) runs as a non-root user with `cap_net_raw`
+granted only to the binaries that need raw sockets, compiles the binary
+in-image per platform, takes secrets only at runtime, and ships a `HEALTHCHECK`
+(`reconftw health-check`). See `Docker/README.md`.

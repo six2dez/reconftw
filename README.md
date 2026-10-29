@@ -8,7 +8,8 @@
 </h1>
 
 <p align="center">
-  <a href="https://github.com/six2dez/reconftw/releases/tag/v2.0.0"><img src="https://img.shields.io/badge/release-v2.0.0-2ea043?style=for-the-badge" alt="Release"></a>
+  <a href="https://github.com/six2dez/reconftw/releases/tag/v4.1"><img src="https://img.shields.io/badge/release-v4.1_(bash)-2ea043?style=for-the-badge" alt="Release"></a>
+  <a href="https://github.com/six2dez/reconftw/releases/tag/v5.0.0-beta.1"><img src="https://img.shields.io/badge/beta-v5.0.0--beta.1_(Go)-f0ad4e?style=for-the-badge" alt="Beta"></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge" alt="License"></a>
   <a href="https://github.com/six2dez/reconftw/issues?q=is%3Aissue+is%3Aclosed"><img src="https://img.shields.io/github/issues-closed-raw/six2dez/reconftw.svg?style=for-the-badge" alt="Closed Issues"></a>
   <a href="https://discord.gg/R5DdXVEdTy"><img src="https://img.shields.io/discord/1048623782912340038.svg?style=for-the-badge&logo=discord&label=discord" alt="Discord"></a>
@@ -191,7 +192,7 @@ reconFTW is packed with features to make reconnaissance thorough and efficient. 
 - **Custom Output**: `-o/--output` selects the workspace root.
 - **Monitor Mode**: `reconftw monitor` re-scans periodically and alerts only on what is new.
 - **Quick Rescan**: `reconftw quick-rescan` re-runs against the last workspace, skipping settled work.
-- **Scope Filtering**: In-scope/out-of-scope enforcement at the artefact write boundary, not just at input.
+- **Scope Filtering**: `--include-file`/`-i` and `--exclude-file`/`-x` take a file of hosts, IPs or CIDRs; in-scope/out-of-scope is enforced at the artefact write boundary, not just at input.
 - **Notifications**: Slack, Discord and Telegram, with burst coalescing.
 - **Faraday Integration**: Exports results to [Faraday](https://github.com/infobyte/faraday).
 - **AI Reporting**: Optional AI summarisation and triage of findings.
@@ -298,7 +299,7 @@ overwrite each other, so you can keep both and fall back at any time.
 **Migrate your config** — v2 reads TOML, not `reconftw.cfg`:
 
 ```bash
-reconftw migrate --in reconftw.cfg --out reconftw.toml
+reconftw migrate --from-bash reconftw.cfg --to reconftw.toml
 ```
 
 Read every `⚠ unknown key` it prints: an unknown key is one the migrator could
@@ -308,13 +309,13 @@ not map, and it is dropped loudly rather than silently. See
 **Before you file anything**, note that these are known and tracked, so there is
 no need to report them:
 
-- **`Recon/<domain>/` is not created.** The bash-shape tree currently lives under
-  the workspace root as `_compat/`. Whether v2 should also create the top-level
-  `Recon/<domain>/` is an open decision — if that breaks a script of yours, say
-  so, because that is the input needed to settle it.
+- **`Recon/<domain>/` is not created by beta.1.** The bash-shape tree lives under
+  the workspace root as `_compat/`. The next beta creates the top-level
+  `Recon/<domain>` symlink to it by default (opt-out:
+  `output.compat.recon_symlink = false`) — see [MIGRATION.md](MIGRATION.md) §2.2.
 - `dnscewl` and `dnstake` do not resolve on macOS in this beta.
-- `dalfox` may exit non-zero on `--no-spinner` if you have dalfox v3.x installed;
-  the pinned arg vector targets v2.9.2.
+- `dalfox`: beta.1 sent `--no-spinner`, which dalfox v3.x rejects, so XSS never ran
+  there. Fixed on `dev-go` (vector valid for v2.9 and v3.x); lands in the next beta.
 
 Feedback goes to the [**v2 beta feedback**](https://github.com/six2dez/reconftw/issues/new?template=v2-beta-feedback.md)
 issue template. Bugs in the bash release still go to the normal Bug report.
@@ -334,18 +335,42 @@ installs what is missing or outdated.
 
 ### Docker
 
+The `main` and `nightly` tags are built from the default branch, which is still
+**bash v4.1** — do not use them for v2. The only image tags that are v2 by
+construction are the ones the release workflow derives from a `v5.*` tag:
+
 ```bash
-docker pull six2dez/reconftw:main
+# v2 beta — same tag on Docker Hub and GHCR
+docker pull six2dez/reconftw:5.0.0-beta.1          # or ghcr.io/six2dez/reconftw:5.0.0-beta.1
 docker run -it --rm \
   -v "$HOME/reconftw-workspaces:/workspaces" \
-  six2dez/reconftw:main recon --target example.com
+  six2dez/reconftw:5.0.0-beta.1 recon --target example.com -o /workspaces
+```
+
+If that tag is not on the registry (the publish job runs on tag push and can be
+re-run by hand), build it yourself from the repo root — the Dockerfile compiles
+the binary in-image and installs every tool:
+
+```bash
+git clone -b dev-go https://github.com/six2dez/reconftw && cd reconftw
+docker build -f Docker/Dockerfile -t reconftw:v2 .
+docker run -it --rm reconftw:v2 recon --target example.com
 ```
 
 ### From source
 
 ```bash
-go install github.com/six2dez/reconftw/cmd/reconftw@latest
+git clone -b dev-go https://github.com/six2dez/reconftw && cd reconftw
+make build                 # → bin/reconftw, stamped with `git describe`
+sudo install -m 755 bin/reconftw /usr/local/bin/reconftw
 ```
+
+`go install github.com/six2dez/reconftw/cmd/reconftw@latest` does **not** give
+you v2: the module path in `go.mod` carries no `/v5` suffix, so Go resolves
+`@latest` to the last `v4.x` tag (`+incompatible`) and never to a `v5` tag.
+Whether the module path becomes `…/reconftw/v5` is an open decision for the
+first stable release (see [MIGRATION.md](MIGRATION.md) §0); until then, clone
+and build.
 
 ---
 
@@ -378,11 +403,13 @@ reconftw all    --target example.com --force   # ignore checkpoints, re-run ever
 reconftw recon  --target example.com --dry-run # print the plan, execute nothing
 reconftw recon  --target example.com -o /data  # workspace root
 reconftw recon  --target example.com -V        # verbose (debug logging)
+reconftw recon  --target example.com -i scope.txt -x out.txt   # scope files
 ```
 
 | Flag | Meaning |
 |---|---|
 | `--target` / `--list` | One domain, or a file with one per line |
+| `-i, --include-file` / `-x, --exclude-file` | Scope files: one host, IP or CIDR per line; enforced when artefacts are written |
 | `--config` / `--secrets` | Explicit config / secrets file |
 | `--force` | Bypass checkpoints and re-run completed tasks |
 | `--dry-run` | Preview every tool invocation without running any |
@@ -415,6 +442,10 @@ Old muscle memory keeps working until v2.2, with a deprecation notice:
 reconftw -d example.com -r      # → reconftw recon --target example.com
 ```
 
+One exception: `-y` is **not** an alias for `deep` any more. It errors and
+points you at `--ai` / `reconftw report`, because in v1 `-y` meant the AI
+report and silently mapping it to the heaviest scan mode was a trap.
+
 ---
 
 ## ⚙️ Configuration
@@ -431,6 +462,15 @@ Configuration is TOML. Values merge from **eight sources**, later winning over e
 | 6 | `secrets.toml` / `--secrets FILE` |
 | 7 | `RECONFTW_*` environment variables |
 | 8 | Command-line flags |
+
+Three presets ship under `config/`, generated from the v1 presets with
+`reconftw migrate` and loaded as layer 5:
+
+```bash
+reconftw --config config/reconftw_quick.toml   recon --target example.com   # fast, passive-leaning
+reconftw --config config/reconftw_stealth.toml recon --target example.com   # minimum noise
+reconftw --config config/reconftw_full.toml    all   --target example.com   # everything on
+```
 
 Drop a `reconftw.toml` next to where you run the tool and it is picked up
 automatically:
@@ -577,7 +617,7 @@ Contributions are welcome — new tasks, tool integrations, bug fixes, docs.
 
 1. Fork the repo and create a branch.
 2. Make your change, with tests (`go test ./...` must stay green).
-3. Run `make check` — format, lint and tests, the same gates CI runs.
+3. Run `make ci` — format check, lint, `go test -race -short` and the coverage gates, the same sequence `.github/workflows/ci.yml` runs (`make check` is the shorter local loop).
 4. Open a PR describing the behaviour change.
 
 Please read [CONTRIBUTING.md](CONTRIBUTING.md) first, and see
@@ -654,7 +694,8 @@ internal/core/
 internal/modules/      the recon work itself
   ├── subdomains/  web/  osint/  vulns/
 internal/mcp/          Model Context Protocol server + shared run handlers
-tools.lock             pinned inventory of every orchestrated external tool
+internal/core/backend/tools.lock   pinned inventory of every orchestrated external tool (the root tools.lock is v1's)
+docs/ARCHITECTURE.md   how the pieces fit; BRANCHES.md says which branch is which
 ```
 
 ### Build and test
@@ -662,7 +703,8 @@ tools.lock             pinned inventory of every orchestrated external tool
 ```bash
 make build     # binary into bin/
 make test      # unit tests
-make check     # format + lint + tests — the gates CI enforces
+make check     # format + lint + tests + E2E smoke — the quick local loop
+make ci        # what .github/workflows/ci.yml runs (adds the coverage gates)
 make fmt       # gofumpt
 go test ./... # everything
 ```
