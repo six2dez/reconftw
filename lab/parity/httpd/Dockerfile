@@ -12,7 +12,11 @@ RUN go mod init lab-httpd >/dev/null 2>&1 \
 
 FROM alpine:3.21
 COPY --from=build /lab-httpd /usr/local/bin/lab-httpd
-EXPOSE 80 443
+# Runs unprivileged on 8080/8443; docker-compose publishes them as 80/443 on
+# the host, which is what the recon engines probe.
+RUN adduser -D -H -u 10001 lab
+USER lab
+EXPOSE 8080 8443
 HEALTHCHECK --interval=5s --timeout=3s --retries=12 \
-    CMD wget -q -O /dev/null --header='Host: www.lab.test' http://127.0.0.1/healthz || exit 1
-ENTRYPOINT ["/usr/local/bin/lab-httpd", "-http", ":80", "-https", ":443"]
+    CMD wget -q -O /dev/null --header='Host: www.lab.test' http://127.0.0.1:8080/healthz || exit 1
+ENTRYPOINT ["/usr/local/bin/lab-httpd", "-http", ":8080", "-https", ":8443"]

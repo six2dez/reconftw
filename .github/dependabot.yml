@@ -1,0 +1,14 @@
+# Keeps the SHA-pinned GitHub Actions and the Go module graph current.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: dev-go
+    schedule:
+      interval: weekly
+  - package-ecosystem: gomod
+    directory: /
+    target-branch: dev-go
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5

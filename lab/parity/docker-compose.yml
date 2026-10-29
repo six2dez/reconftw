@@ -34,6 +34,6 @@ services:
     image: reconftw-lab-httpd:local
     container_name: reconftw-lab-httpd
     ports:
-      - "${LAB_BIND:-127.0.0.1}:80:80"
-      - "${LAB_BIND:-127.0.0.1}:443:443"
+      - "${LAB_BIND:-127.0.0.1}:80:8080"
+      - "${LAB_BIND:-127.0.0.1}:443:8443"
     restart: unless-stopped

@@ -69,8 +69,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: go.mod
           cache: true
@@ -86,11 +86,9 @@ jobs:
           fi
       - name: Install golangci-lint v2.12.2
         run: |
-          # Pin the installer to the SAME tag as the binary. Fetching install.sh from
-          # master while asking for an older release makes the checksum verification
-          # fail ("did not verify"), which took this step down and skipped lint entirely.
-          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/v2.12.2/install.sh | \
-            sh -s -- -b "$(go env GOPATH)/bin" v2.12.2
+          # go install verifies the module against the Go checksum database; the
+          # previous `curl install.sh | sh` ran an unverified script.
+          go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2
       - name: golangci-lint
         run: golangci-lint run --timeout=5m ./...
 
@@ -107,8 +105,8 @@ jobs:
     # govulncheck reports only vulnerabilities that are actually REACHABLE from
     # this code, so a finding here is real exposure, not advisory noise.
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: go.mod
           cache: true
@@ -125,8 +123,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: go.mod
           cache: true
@@ -151,8 +149,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: go.mod
           cache: true
@@ -225,10 +223,10 @@ jobs:
         # SCHEDULE AND BRANCHES note at the top of this file.
         ref: ${{ github.event_name == 'schedule' && fromJSON('["main", "dev-go"]') || fromJSON('[""]') }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ref: ${{ matrix.ref }}
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: go.mod
           cache: true
@@ -248,8 +246,8 @@ jobs:
     # Plan 03-06 landed cmd/reconftw/main.go; Plan 03-07 activates the gate
     # unconditionally. XCUT-02 budget: <50MB stripped (52428800 bytes).
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: go.mod
           cache: true
@@ -272,8 +270,8 @@ jobs:
     # guard inside `make integration-smoke` is the actual fix: a gate that
     # cannot fail is worse than no gate, because it manufactures confidence.
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: go.mod
           cache: true
@@ -348,10 +346,10 @@ jobs:
     # in a green run of this job; scripts/release_gates_test.sh (the step before
     # the gates) proves the flag combination can fail.
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ref: ${{ matrix.ref }}
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: go.mod
           cache: true
@@ -484,7 +482,7 @@ jobs:
           exit 0
       - name: Upload release-gates evidence
         if: always() && steps.collect.outputs.found == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: release-gates-${{ matrix.ref || github.ref_name }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/release-gates-evidence/
@@ -512,8 +510,8 @@ jobs:
     timeout-minutes: 30
     if: github.event_name == 'pull_request' || github.event_name == 'push'
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: go.mod
           cache: true
