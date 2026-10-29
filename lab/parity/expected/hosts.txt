@@ -1,0 +1,24 @@
+# expected/hosts.txt — REQUIRED live-host set: every REQUIRED subdomain whose A
+# record is 127.0.0.1 (the lab httpd answers on :80/:443). Names on 127.0.0.2
+# (mail, ns1, ldap, sip, xmpp) resolve but nothing listens, so they must NOT be
+# required here. Bonus names (subdomains_bonus.txt) are web hosts too and are
+# allowed as "added" — added items never fail a set.
+www.lab.test
+api.lab.test
+shop.lab.test
+blog.lab.test
+admin.lab.test
+dev.lab.test
+staging.lab.test
+docs.lab.test
+support.lab.test
+soft404.lab.test
+misconfig.lab.test
+portal.lab.test
+auth.lab.test
+assets.lab.test
+status.lab.test
+app.lab.test
+static.lab.test
+cdn.lab.test
+beta.lab.test

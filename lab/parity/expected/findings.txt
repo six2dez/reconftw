@@ -1,0 +1,19 @@
+# expected/findings.txt — REQUIRED finding classes (nuclei template-ids) that the
+# default nuclei templates flag on misconfig.lab.test / www.lab.test.
+#
+# !! FREEZE AFTER THE FIRST DOCKER RUN !!  These ids were chosen from the
+# content the lab serves (see httpd/main.go) and the templates' known matchers,
+# but template ids drift between nuclei-templates releases. The first real run
+# must confirm each id (grep the v2 findings.jsonl / v1 nuclei_output) and this
+# file must be edited to the observed, stable set before it is trusted as a gate.
+#
+#   git-config                   misconfig.lab.test/.git/config  ([core] + repositoryformatversion)
+#   phpinfo-files                misconfig.lab.test/phpinfo.php  (PHP Version / PHP Extension)
+#   http-missing-security-headers  every vhost (no HSTS/CSP/X-Frame on misconfig)
+#   apache-detect                misconfig.lab.test  (Server: Apache/2.4.49 …)
+#   robots-txt-endpoint          www.lab.test/robots.txt (Disallow entries)
+git-config
+phpinfo-files
+http-missing-security-headers
+apache-detect
+robots-txt-endpoint

@@ -1,0 +1,7 @@
+# lab/parity/resolvers.txt — the ONLY resolver the lab run may use.
+# Points at the CoreDNS container published on 127.0.0.1:53 by docker-compose.
+# Used as both paths.resolvers and paths.resolvers_trusted (v2) and as
+# $resolvers / $resolvers_trusted (v1 overlay), so puredns, massdns and dnsx
+# never contact a public resolver. The lines must stay resolver-shaped
+# (CountResolverLines in internal/core/resolvers/usable.go counts them).
+127.0.0.1

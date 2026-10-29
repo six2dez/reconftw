@@ -1,0 +1,117 @@
+# Offline parity lab — v2 (Go) against the controlled lab.test target.
+#
+# Dispatch-only on purpose: the lab needs docker, the real recon toolchain and
+# ~20 minutes; the per-push CI stays unit + smoke. The target is local and
+# deterministic, so a FAIL here is a defect or a stale expected/*.txt, never
+# public-site noise. See lab/parity/README.md.
+name: parity-lab
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "v2 subcommand to run (recon = passive+resolve+web; all = +brute/permut/zone-transfer/vulns)"
+        type: choice
+        default: recon
+        options: [recon, all]
+      tolerance:
+        description: "removed-ratio tolerance per set, percent (0 = exact ground truth)"
+        type: string
+        default: "0"
+  # Enable once expected/findings.txt has been frozen from a real run (see README):
+  # schedule:
+  #   - cron: "0 4 * * 1"   # Mondays 04:00 UTC — weekly, like integration-full
+
+permissions:
+  contents: read
+
+jobs:
+  lab:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      LAB_MODE: ${{ inputs.mode || 'recon' }}
+      LAB_TOLERANCE: ${{ inputs.tolerance || '0' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Host packages (jq, dig, curl)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq jq dnsutils curl
+
+      - name: Bring the lab up (CoreDNS lab.test + httpd on 127.0.0.1)
+        run: docker compose -f lab/parity/docker-compose.yml up -d --build
+
+      - name: Route lab.test through the lab DNS for the OS resolver
+        # httpx/nuclei/katana use the system resolver; only puredns/dnsx get the
+        # resolvers file. systemd-resolved refuses `lo`, hence the dummy iface.
+        run: |
+          sudo lab/parity/system-dns.sh install
+          for i in $(seq 1 20); do
+            lab/parity/system-dns.sh check && break
+            sleep 2
+          done
+          lab/parity/system-dns.sh check
+          dig +short @127.0.0.1 www.lab.test A
+          dig +short @127.0.0.1 nonexistent-name.lab.test A   # wildcard -> 127.0.0.99
+
+      - name: Install the minimal tool set (critical tier) + lab extras
+        # `install --profile core` = the critical tier of tools.lock
+        # (subfinder, httpx, dnsx, puredns, massdns, nuclei, gf). The lab's
+        # discovery pivots need four more Go tools.
+        run: |
+          echo "$HOME/go/bin" >> "$GITHUB_PATH"
+          export PATH="$HOME/go/bin:$PATH"
+          go run ./cmd/reconftw install --profile core --non-interactive
+          go install github.com/projectdiscovery/tlsx/cmd/tlsx@latest
+          go install github.com/edoardottt/csprecon/cmd/csprecon@latest
+          go install github.com/projectdiscovery/katana/cmd/katana@latest
+          go install github.com/ffuf/ffuf/v2@latest
+          nuclei -update-templates -silent || true
+          for t in subfinder httpx dnsx puredns massdns nuclei gf tlsx csprecon katana ffuf; do
+            command -v "$t" >/dev/null || { echo "::error::$t missing after install"; exit 1; }
+          done
+
+      - name: Health check (informational)
+        run: go run ./cmd/reconftw health-check || true
+
+      - name: Run the lab (v2 only)
+        id: lab
+        continue-on-error: true
+        run: |
+          lab/parity/run.sh --skip-up --keep-up --mode "$LAB_MODE" --tolerance "$LAB_TOLERANCE"
+
+      - name: Upload lab output (report, logs, v2 workspace)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: parity-lab-out
+          path: lab/parity/out
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Gate on REPORT.md
+        # The gate reads the report, not the step status: a report that says
+        # FAIL fails the job, and a MISSING report fails it too (no silent green).
+        run: |
+          r=lab/parity/out/REPORT.md
+          [ -f "$r" ] || { echo "::error::no REPORT.md produced (run.sh rc=${{ steps.lab.outcome }})"; exit 1; }
+          sed -n '1,40p' "$r"
+          if grep -qE 'Verdict : \*\*FAIL\*\*|\| FAIL|→ FAIL' "$r"; then
+            echo "::error::parity lab FAIL — see the parity-lab-out artifact"
+            exit 1
+          fi
+          grep -q 'Verdict : \*\*PASS\*\*' "$r" || { echo "::error::REPORT.md has no PASS verdict"; exit 1; }
+
+      - name: Tear the lab down
+        if: always()
+        run: |
+          docker compose -f lab/parity/docker-compose.yml logs --no-color > lab/parity/out/compose-containers.log 2>&1 || true
+          docker compose -f lab/parity/docker-compose.yml down || true
+          sudo lab/parity/system-dns.sh remove || true

@@ -1,0 +1,25 @@
+# CoreDNS configuration for the reconftw offline parity lab.
+#
+# Authoritative for the fake zone lab.test (file plugin), AXFR allowed to anyone
+# (zone-transfer code paths), and NXDOMAIN for every other name so no query ever
+# leaves the host. Listens on :53 inside the container; docker-compose maps it to
+# 127.0.0.1:53 (udp+tcp) on the host only.
+lab.test:53 {
+    file /zones/lab.test.db {
+        reload 0
+    }
+    transfer {
+        to *
+    }
+    log
+    errors
+}
+
+.:53 {
+    # Everything that is not lab.test: refuse by name, never forward.
+    template ANY ANY {
+        rcode NXDOMAIN
+    }
+    log
+    errors
+}

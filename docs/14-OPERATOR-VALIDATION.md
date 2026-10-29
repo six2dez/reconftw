@@ -41,6 +41,16 @@ scripts/parity-full.sh <target>        # e.g. a controlled lab target first (pri
   lab target = sign-off.
 - Never wired into CI by design (live/nondeterministic). This is a human-reviewed pass.
 
+> **Offline alternative — `lab/parity/`.** When the public target rate-limits (the 2026-08
+> nuclei divergence was exactly that), run the same three-set diff against a target we
+> control: `lab/parity/run.sh [--with-v1]` brings up a CoreDNS zone `lab.test` (30 fixed
+> A records + a wildcard) and a deterministic httpd (normal / soft-404 / misconfig / api
+> vhosts) on 127.0.0.1, runs v2 (`recon --target lab.test`) with `lab/parity/lab.toml`,
+> optionally v1 with `lab/parity/v1-overlay.cfg`, and writes `lab/parity/out/REPORT.md`
+> with PASS/FAIL per set against the ground truth in `lab/parity/expected/`. It is the
+> only parity check safe to put in CI (`.github/workflows/parity-lab.yml`, dispatch-only).
+> Details and the ground-truth table: `lab/parity/README.md`.
+
 ## 2. Live throughput benchmark — XCUT-01 (HARD gate)
 
 Assert Go v2 runs **within 10 %** of bash v1 on the same ~1000-subdomain target.

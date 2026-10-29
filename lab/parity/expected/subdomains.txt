@@ -1,0 +1,30 @@
+# expected/subdomains.txt — REQUIRED subdomain set for a v2 `recon` pass (the apex
+# lab.test is excluded from every comparison). Discovery path per name:
+#   seed     = in seed.txt and resolves to a non-wildcard answer
+#   tls-san  = SAN of the lab certificate on :443 (tlsx pivot)
+#   csp      = named in the Content-Security-Policy of www.lab.test (csprecon)
+#   srv      = target of an SRV record in the zone (dnsx -srv)
+www.lab.test
+api.lab.test
+shop.lab.test
+blog.lab.test
+admin.lab.test
+dev.lab.test
+staging.lab.test
+docs.lab.test
+support.lab.test
+mail.lab.test
+ns1.lab.test
+soft404.lab.test
+misconfig.lab.test
+portal.lab.test
+auth.lab.test
+assets.lab.test
+status.lab.test
+app.lab.test
+static.lab.test
+cdn.lab.test
+beta.lab.test
+ldap.lab.test
+sip.lab.test
+xmpp.lab.test

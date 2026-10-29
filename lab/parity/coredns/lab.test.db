@@ -1,0 +1,67 @@
+; lab/parity/coredns/lab.test.db — authoritative zone for the offline parity lab.
+;
+; Ground-truth contract (see ../README.md and ../expected/*.txt):
+;   127.0.0.1   = host runs the lab httpd on :80/:443  -> "live web host"
+;   127.0.0.2   = resolves, but nothing listens          -> subdomain only
+;   127.0.0.99  = WILDCARD answer. Any name not listed below resolves here, so
+;                 wildcard filtering must drop random/bogus names while keeping
+;                 the explicit records (their answer differs from the wildcard).
+; The SOA serial is fixed on purpose: the zone must never change between runs.
+$ORIGIN lab.test.
+$TTL 300
+@               IN SOA   ns1.lab.test. hostmaster.lab.test. (
+                            2024010100 ; serial (frozen)
+                            3600       ; refresh
+                            600        ; retry
+                            86400      ; expire
+                            300 )      ; minimum
+@               IN NS    ns1.lab.test.
+@               IN NS    ns2.lab.test.
+@               IN A     127.0.0.1
+@               IN MX    10 mail.lab.test.
+@               IN TXT   "v=spf1 mx -all"
+@               IN TXT   "reconftw-parity-lab"
+
+; --- nameservers (resolve, no web) ---
+ns1             IN A     127.0.0.2
+ns2             IN A     127.0.0.2
+
+; --- web hosts: served by the lab httpd (vhost by Host header) ---
+www             IN A     127.0.0.1
+api             IN A     127.0.0.1
+shop            IN A     127.0.0.1
+blog            IN A     127.0.0.1
+static          IN A     127.0.0.1
+cdn             IN A     127.0.0.1
+admin           IN A     127.0.0.1
+dev             IN A     127.0.0.1
+staging         IN A     127.0.0.1
+docs            IN A     127.0.0.1
+support         IN A     127.0.0.1
+portal          IN A     127.0.0.1
+auth            IN A     127.0.0.1
+soft404         IN A     127.0.0.1
+misconfig       IN A     127.0.0.1
+assets          IN A     127.0.0.1
+status          IN A     127.0.0.1
+app             IN A     127.0.0.1
+beta            IN A     127.0.0.1
+intranet        IN A     127.0.0.1
+git             IN A     127.0.0.1
+ci              IN A     127.0.0.1
+monitor         IN A     127.0.0.1
+help            IN A     127.0.0.1
+
+; --- service hosts: resolve, nothing listens (subdomain set only) ---
+mail            IN A     127.0.0.2
+ldap            IN A     127.0.0.2
+sip             IN A     127.0.0.2
+xmpp            IN A     127.0.0.2
+
+; --- SRV records: the SRV-enumeration pivot discovers their targets ---
+_ldap._tcp      IN SRV   10 10 389  ldap.lab.test.
+_sip._tcp       IN SRV   10 10 5060 sip.lab.test.
+_xmpp-server._tcp IN SRV 10 10 5269 xmpp.lab.test.
+
+; --- wildcard: every other name under the zone ---
+*               IN A     127.0.0.99

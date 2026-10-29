@@ -1,0 +1,209 @@
+# lab/parity/lab.toml — reconFTW v2 configuration TEMPLATE for the offline parity lab.
+#
+# run.sh renders it to out/lab.generated.toml by replacing @LAB_DIR@ with the
+# absolute path of lab/parity (the loader's nopath_traversal validator and the
+# tool arg vectors want absolute paths). Pass the RENDERED file with --config;
+# it is layer 5 of the 8-source chain, so it overrides ./reconftw.toml and the
+# user/system configs for every key set here.
+#
+# Intent: keep every stage that can work against localhost ON, switch every
+# network-only stage OFF (OSINT APIs, axiom, notifications, passive URL
+# archives, AI), pin DNS to the lab resolver, and make rate limits tiny so the
+# run is quick and never races the lab containers.
+
+[concurrency]
+max_jobs = 2
+job_timeout_seconds = 900
+
+[scheduler]
+failure_policy = "best_effort"
+
+# ---------------------------------------------------------------- subdomains
+[subdomains]
+enabled = true
+
+# passive.enabled gates the whole subs-resolve group (active/noerror/dns/srv/tls
+# all return Enabled() = Passive.Enabled), so it MUST stay true. The passive
+# tools themselves find nothing for lab.test; the seed planted by run.sh in
+# <workspace>/inputs/passive.labseed.txt is what the group resolves.
+[subdomains.passive]
+enabled = true
+timeout_minutes = 1
+
+[subdomains.crt]
+enabled = false            # crt.sh — network
+
+[subdomains.analytics]
+enabled = false            # analyticsrelationships — network API
+
+[subdomains.brute]
+enabled = false            # not part of `recon`; enable with --mode all if desired
+
+[subdomains.scraping]
+enabled = true             # subjs/jsluice over workspace URLs (local)
+
+[subdomains.permut]
+enabled = false
+
+[subdomains.takeover]
+enabled = false            # dnstake/nuclei takeover — public fingerprints only
+
+[subdomains.asn]
+enabled = false            # asnmap/mapcidr — network
+
+[subdomains.recursive]
+passive_enabled = false
+brute_enabled = false
+
+[subdomains.zone_transfer]
+enabled = true             # the lab zone allows AXFR (only runs in `all`)
+
+[subdomains.s3_buckets]
+enabled = false            # s3scanner — network
+
+[subdomains.reverse_ip]
+enabled = false            # hakip2host — network
+
+[subdomains.ptr_sweep]
+enabled = false
+
+[subdomains.srv_enum]
+enabled = true             # dnsx -srv against the lab DNS
+
+[subdomains.ns_delegation]
+enabled = true
+
+[subdomains.tls_pivot]
+enabled = true             # tlsx SAN/CN pivot over the lab certificate
+sni_batch_size = 50
+delta_probe = false
+
+[subdomains.scope]
+only_resolved = false
+exclude_sensitive = false
+deep_wildcard_filter = true
+no_error_check = false
+
+[subdomains.dns_resolve]
+resolver = "puredns"       # force the wildcard-filtering path (dnsx -wt is inert without -wd)
+timeout_minutes = 5
+puredns_public_limit = 200
+puredns_trusted_limit = 200
+puredns_wildcardtest_limit = 10
+puredns_wildcardbatch_limit = 1000
+dnsx_threads = 10
+dnsx_rate_limit = 50
+generate_resolvers = false # never run dnsvalidator
+update_resolvers = false   # never download a resolver list — the lab file is the list
+
+# ---------------------------------------------------------------- web
+[web.probe]
+enabled = true
+ports = "80,443"
+rate_limit = 20
+timeout_seconds = 5
+threads = 5
+uncommon_enabled = false
+
+[web.screenshots]
+enabled = false            # headless chromium — slow, not compared
+
+[web.virtual_hosts]
+enabled = false
+
+[web.favirecon]
+enabled = false
+
+[web.waf]
+enabled = false
+
+[web.nuclei]
+enabled = true
+rate_limit = 20
+severity = "info,low,medium,high,critical"
+
+[web.nuclei_dast]
+enabled = false
+
+[web.fuzz]
+enabled = true             # ffuf -ac against soft404.lab.test is the point
+rate_limit = 20
+threads = 5
+max_time_seconds = 120
+recursion_depth = 0
+
+[web.iis_shortname]
+enabled = false
+
+[web.cms]
+enabled = false
+
+[web.js]
+enabled = true
+
+[web.urls]
+enabled = true
+passive_enabled = false    # waymore/urlfinder archives — network
+active_enabled = true      # katana crawl — local
+gf_patterns = true
+ext_classify = true
+
+[web.wellknown]
+enabled = false
+
+[web.wordlist]
+enabled = false
+robots_enabled = false
+password_dict = false
+
+[web.portscan]
+enabled = false
+passive_enabled = false
+active_enabled = false
+geo_info = false
+cdn_check = false
+cdn_bypass = false
+
+[web.graphql]
+enabled = false
+
+[web.param_discovery]
+enabled = false
+
+[web.grpc]
+enabled = false
+
+[web.llm_probe]
+enabled = false
+
+[web.katana]
+headless_profile = "off"
+threads = 5
+
+# ---------------------------------------------------------------- off: network-only
+[vulns]
+enabled = false            # `recon` never runs vulns; explicit for `--mode all`
+
+[osint]
+enabled = false
+
+[notifications]
+enabled = false
+soft_enabled = false
+
+[axiom]
+enabled = false
+
+[ai]
+enabled = false
+
+[adaptive_rate]
+enabled = false
+
+[cache]
+refresh = false
+
+# ---------------------------------------------------------------- paths
+[paths]
+resolvers         = "@LAB_DIR@/resolvers.txt"
+resolvers_trusted = "@LAB_DIR@/resolvers.txt"

@@ -1,0 +1,11 @@
+# expected/subdomains_bonus.txt — names reachable ONLY by crawling HTML links from
+# www.lab.test (katana/scraping pivot) or via NS delegation. A first-pass v2
+# `recon` probes before it crawls, so these are reported but never required:
+# present = noted as bonus, absent = not a FAIL. v1 `-r` crawls, so it usually
+# finds them — a visible, explainable v1/v2 difference, not a regression.
+ns2.lab.test
+intranet.lab.test
+git.lab.test
+ci.lab.test
+monitor.lab.test
+help.lab.test

@@ -1,0 +1,28 @@
+# expected/seed.txt — the "passive feed" injected into BOTH engines before the run.
+#
+# The lab is offline, so passive sources (subfinder, crt.sh, GitHub…) return
+# nothing. run.sh plants this list where each engine merges its passive inputs
+# (v2: <workspace>/inputs/passive.labseed.txt ; v1: Recon/lab.test/.tmp/labseed_subs.txt)
+# so the resolve / wildcard-filter / TLS / CSP / SRV stages have something to
+# work on. It deliberately mixes:
+#   - real zone names (must survive resolution),
+#   - bogus names that only resolve through the *.lab.test wildcard
+#     (must be DROPPED by wildcard filtering — see wildcard_only.txt).
+lab.test
+www.lab.test
+api.lab.test
+shop.lab.test
+blog.lab.test
+admin.lab.test
+dev.lab.test
+staging.lab.test
+docs.lab.test
+support.lab.test
+mail.lab.test
+ns1.lab.test
+soft404.lab.test
+misconfig.lab.test
+wildcard-probe-1.lab.test
+wildcard-probe-2.lab.test
+random-xyz123.lab.test
+zz-not-real.lab.test

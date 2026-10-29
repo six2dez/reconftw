@@ -1,0 +1,39 @@
+# lab/parity/docker-compose.yml — offline parity lab for reconFTW v1 (bash) vs v2 (Go).
+#
+# Two services, both bound to 127.0.0.1 ONLY:
+#   dns    CoreDNS, authoritative for the fake zone lab.test (+ wildcard, + AXFR),
+#          NXDOMAIN for everything else — no query ever leaves the host.
+#   httpd  stdlib-Go HTTP/HTTPS server with the deterministic vhosts
+#          (www / soft404 / misconfig / api / generic) described in README.md.
+#
+# Ports are fixed (53, 80, 443) because the recon engines probe the standard
+# ports and the resolvers file names 127.0.0.1 without a port. Override the bind
+# address with LAB_BIND (default 127.0.0.1) only if you know why.
+#
+# Bring up / down:   docker compose -f lab/parity/docker-compose.yml up -d --build
+#                    docker compose -f lab/parity/docker-compose.yml down
+# Normally driven by lab/parity/run.sh — see README.md.
+name: reconftw-parity-lab
+
+services:
+  dns:
+    image: coredns/coredns:1.12.0
+    container_name: reconftw-lab-dns
+    command: ["-conf", "/etc/coredns/Corefile"]
+    volumes:
+      - ./coredns/Corefile:/etc/coredns/Corefile:ro
+      - ./coredns/lab.test.db:/zones/lab.test.db:ro
+    ports:
+      - "${LAB_BIND:-127.0.0.1}:53:53/udp"
+      - "${LAB_BIND:-127.0.0.1}:53:53/tcp"
+    restart: unless-stopped
+
+  httpd:
+    build:
+      context: ./httpd
+    image: reconftw-lab-httpd:local
+    container_name: reconftw-lab-httpd
+    ports:
+      - "${LAB_BIND:-127.0.0.1}:80:80"
+      - "${LAB_BIND:-127.0.0.1}:443:443"
+    restart: unless-stopped

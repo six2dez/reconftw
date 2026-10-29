@@ -1,0 +1,8 @@
+# expected/wildcard_only.txt — names that exist ONLY through the *.lab.test wildcard.
+# They are planted in seed.txt and resolve to 127.0.0.99 (the wildcard answer).
+# A correct wildcard filter removes them; any of these in the final subdomain set
+# is a "wildcard leak" and FAILS the run.
+wildcard-probe-1.lab.test
+wildcard-probe-2.lab.test
+random-xyz123.lab.test
+zz-not-real.lab.test
