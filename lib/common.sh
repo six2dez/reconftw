@@ -823,13 +823,62 @@ grep_domain() {
 }
 
 ###############################################################################
+# Config Flag Array Helpers
+###############################################################################
+
+# reconftw.sh sets IFS=$'\n\t' process-wide, so a space-separated flag string
+# expanded unquoted ($GOTATOR_FLAGS) reaches the tool as ONE argument. The
+# *_FLAGS / *_EXTRA_ARGS settings in reconftw.cfg are therefore bash arrays
+# and every use site expands them as "${VAR[@]}".
+#
+# _as_array VAR
+#   Backward compatibility for user configs that still assign a plain string
+#   (GOTATOR_FLAGS=" -depth 1 ..."): converts the scalar into an array in place,
+#   splitting on spaces/tabs/newlines with a local IFS. No-op for arrays; an
+#   unset variable becomes an empty array. lib/ cannot hook into reconftw.sh's config-sourcing
+#   sequence, so _normalize_flag_arrays is invoked from start_func (every leaf
+#   function passes through it) and from run_scan; it is idempotent and cheap.
+_as_array() {
+    local _aa_name="$1" _aa_decl _aa_scalar=""
+    if _aa_decl=$(declare -p "$_aa_name" 2>/dev/null); then
+        if [[ "$_aa_decl" =~ ^declare\ -[a-zA-Z]*a ]]; then
+            # Already an array. A string assigned over an existing array
+            # (custom config sourced after reconftw.cfg) only replaces element
+            # 0 and keeps the stale defaults behind it: an element 0 containing
+            # whitespace is such a legacy string, so rebuild from it alone.
+            local -n _aa_cur="$_aa_name"
+            [[ ${#_aa_cur[@]} -gt 0 && "${_aa_cur[0]}" == *[[:space:]]* ]] || return 0
+            _aa_scalar="${_aa_cur[0]}"
+        else
+            _aa_scalar="${!_aa_name}"
+        fi
+    fi
+    local -a _aa_parts=()
+    if [[ -n "$_aa_scalar" ]]; then
+        local IFS=$' \t\n'
+        read -r -d '' -a _aa_parts <<<"$_aa_scalar" || true
+    fi
+    local -n _aa_ref="$_aa_name"
+    _aa_ref=("${_aa_parts[@]}")
+}
+
+# _normalize_flag_arrays
+#   Applies _as_array to every array-typed config setting.
+_normalize_flag_arrays() {
+    local _nfa_var
+    for _nfa_var in GOTATOR_FLAGS NUCLEI_EXTRA_ARGS NUCLEI_DAST_EXTRA_ARGS AXIOM_EXTRA_ARGS; do
+        _as_array "$_nfa_var"
+    done
+}
+
+###############################################################################
 # Axiom/Local Execution Helper
 ###############################################################################
 
 # Run a tool command, automatically choosing between local and axiom-scan
 # Usage: run_scan <input_file> <output_file> <tool_name> [tool_args...]
 # Example: run_scan .tmp/input.txt .tmp/output.txt subfinder -silent
-# With AXIOM: axiom-scan input -m tool args -o output $AXIOM_EXTRA_ARGS
+# With AXIOM: axiom-scan input -m tool args -o output "${AXIOM_EXTRA_ARGS[@]}"
 # Without:    tool args < input > output (or with -o flag)
 run_scan() {
     local input="$1"
@@ -838,7 +887,8 @@ run_scan() {
     shift 3
 
     if [[ ${AXIOM:-false} == true ]]; then
-        axiom-scan "$input" -m "$tool" "$@" -o "$output" $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
+        _as_array AXIOM_EXTRA_ARGS
+        axiom-scan "$input" -m "$tool" "$@" -o "$output" "${AXIOM_EXTRA_ARGS[@]}" 2>>"$LOGFILE" >/dev/null
     else
         "$tool" "$@" -o "$output" <"$input" 2>>"$LOGFILE" >/dev/null
     fi

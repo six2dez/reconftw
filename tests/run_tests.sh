@@ -11,7 +11,7 @@ MODE="${1:---unit}"
 usage() {
     cat <<EOF
 Usage: $0 [--unit|--smoke|--integration|--all]
-  --unit         Run only unit tests
+  --unit         Run unit + security tests
   --smoke        Run integration smoke subset
   --integration  Run full integration suite
   --all          Run unit + full integration suites
@@ -38,8 +38,8 @@ if [[ -z "${BATS_SHELL:-}" ]]; then
 fi
 
 run_unit() {
-    echo "Running unit tests..."
-    "$BATS" "$SCRIPT_DIR"/unit/*.bats
+    echo "Running unit + security tests..."
+    "$BATS" "$SCRIPT_DIR"/unit/*.bats "$SCRIPT_DIR"/security/*.bats
 }
 
 run_smoke() {

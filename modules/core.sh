@@ -264,6 +264,7 @@ function check_version() {
     fi
 }
 
+# shellcheck disable=SC2034  # runtime_cmd_ref is a nameref written for the caller
 resolve_cloud_enum_runtime() {
     local -n runtime_cmd_ref="$1"
     local cloud_enum_python cloud_enum_script cloud_enum_requirements
@@ -293,6 +294,7 @@ resolve_cloud_enum_runtime() {
     return 1
 }
 
+# shellcheck disable=SC2034  # *_ref are namerefs written for the caller
 resolve_cloud_enum_execution_settings() {
     local caller="$1"
     local -n profile_ref="$2"
@@ -352,6 +354,7 @@ resolve_cloud_enum_execution_settings() {
     return 0
 }
 
+# shellcheck disable=SC2034  # cloud_enum_* locals are filled via nameref by resolve_cloud_enum_execution_settings
 build_cloud_enum_command() {
     local -n cmd_ref="$1"
     local caller="$2"
@@ -706,23 +709,6 @@ function log_json() {
     jq_expr+='}'
 
     jq -n "${jq_args[@]}" "$jq_expr" >>"$STRUCTURED_LOG_FILE"
-}
-
-# Convenience wrappers for different log levels
-function log_info() {
-    log_json "INFO" "${FUNCNAME[1]:-main}" "$@"
-}
-
-function log_warn() {
-    log_json "WARN" "${FUNCNAME[1]:-main}" "$@"
-}
-
-function log_error() {
-    log_json "ERROR" "${FUNCNAME[1]:-main}" "$@"
-}
-
-function log_success() {
-    log_json "SUCCESS" "${FUNCNAME[1]:-main}" "$@"
 }
 
 ###############################################################################################################
@@ -1442,6 +1428,8 @@ function start_func() {
     # Mid-run disk-full guard (D-07/D-09): abort BEFORE any state write so the
     # Plan 01-01 EXIT trap clears .inprogress_* with no orphan for this function.
     _check_disk_mid_run || _abort_disk_full
+    # Scalar *_FLAGS/*_EXTRA_ARGS from legacy configs -> arrays (see lib/common.sh)
+    declare -F _normalize_flag_arrays >/dev/null 2>&1 && _normalize_flag_arrays
     local current_date
     current_date=$(date +'%Y-%m-%d %H:%M:%S')
     echo "[$current_date] Start function: ${1} " >>"${LOGFILE}"

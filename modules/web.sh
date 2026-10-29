@@ -187,8 +187,8 @@ function webprobe_full() {
                 -json
                 -o "$probe_out"
             )
-            if [[ ${#AXIOM_EXTRA_ARGS_ARR[@]} -gt 0 ]]; then
-                axiom_cmd+=("${AXIOM_EXTRA_ARGS_ARR[@]}")
+            if [[ ${#AXIOM_EXTRA_ARGS[@]} -gt 0 ]]; then
+                axiom_cmd+=("${AXIOM_EXTRA_ARGS[@]}")
             fi
             run_command "${axiom_cmd[@]}" 2>>"$LOGFILE" >/dev/null
         fi
@@ -328,7 +328,7 @@ function screenshot() {
             fi
         else
             if [[ -s "webs/webs_all.txt" ]]; then
-                run_command axiom-scan webs/webs_all.txt -m nuclei-screenshots -o screenshots "${AXIOM_EXTRA_ARGS_ARR[@]}" 2>>"$LOGFILE" >/dev/null
+                run_command axiom-scan webs/webs_all.txt -m nuclei-screenshots -o screenshots "${AXIOM_EXTRA_ARGS[@]}" 2>>"$LOGFILE" >/dev/null
             fi
         fi
         end_func "Results are saved in $domain/screenshots" "${FUNCNAME[0]}"
@@ -419,7 +419,7 @@ function tls_ip_pivots() {
                 -p "$tls_ports" \
                 -c "$TLSX_THREADS" \
                 -json \
-                -o hosts/tls_ip_certs.jsonl "${AXIOM_EXTRA_ARGS_ARR[@]}" 2>>"$LOGFILE" >/dev/null
+                -o hosts/tls_ip_certs.jsonl "${AXIOM_EXTRA_ARGS[@]}" 2>>"$LOGFILE" >/dev/null
         fi
 
         # Extract hostnames from SAN/CN in JSONL
@@ -494,7 +494,7 @@ function tls_ip_pivots() {
                 run_command axiom-scan subdomains/tls_ip_pivots.txt -m puredns-resolve \
                     -r "${AXIOM_RESOLVERS_PATH}" --resolvers-trusted "${AXIOM_RESOLVERS_TRUSTED_PATH}" \
                     --wildcard-tests "$PUREDNS_WILDCARDTEST_LIMIT" --wildcard-batch "$PUREDNS_WILDCARDBATCH_LIMIT" \
-                    -o .tmp/tls_ip_pivots_resolved.txt "${AXIOM_EXTRA_ARGS_ARR[@]}" 2>>"$LOGFILE" >/dev/null
+                    -o .tmp/tls_ip_pivots_resolved.txt "${AXIOM_EXTRA_ARGS[@]}" 2>>"$LOGFILE" >/dev/null
             fi
 
             if [[ -s ".tmp/tls_ip_pivots_resolved.txt" ]]; then
@@ -774,7 +774,7 @@ function portscan() {
                 else
                     if [[ -s ".tmp/ips_nocdn.txt" ]]; then
                         run_command axiom-scan .tmp/ips_nocdn.txt -m nmapx "${portscan_opts[@]}" \
-                            -oA hosts/portscan_active "${AXIOM_EXTRA_ARGS_ARR[@]}" 2>>"$LOGFILE" >/dev/null
+                            -oA hosts/portscan_active "${AXIOM_EXTRA_ARGS[@]}" 2>>"$LOGFILE" >/dev/null
                     fi
                 fi
             fi
@@ -987,7 +987,9 @@ function waf_checks() {
 	                # Parallelize wafw00f across hosts using interlace for speed
 	                if command -v interlace >/dev/null 2>&1; then
 	                    mkdir -p .tmp/wafs_parts
-	                    run_command interlace -tL "webs/webs_all.txt" -threads "${INTERLACE_THREADS:-10}" \
+	                    # interlace substitutes _target_ into a shell command: feed it a sanitized copy
+	                    sanitize_interlace_input "webs/webs_all.txt" ".tmp/wafw00f_interlace_targets.txt"
+	                    run_command interlace -tL ".tmp/wafw00f_interlace_targets.txt" -threads "${INTERLACE_THREADS:-10}" \
 	                        -c "${TIMEOUT_CMD:+$TIMEOUT_CMD ${WAF_PER_HOST_TIMEOUT:-120}} wafw00f _target_ -o .tmp/wafs_parts/_cleantarget_.txt" 2>>"$LOGFILE" >/dev/null
 	                    cat .tmp/wafs_parts/*.txt >.tmp/wafs.txt 2>/dev/null || true
 	                    rm -rf .tmp/wafs_parts
@@ -996,7 +998,7 @@ function waf_checks() {
 	                fi
 	            else
 	                # Run axiom-scan with wafw00f module on webs_all.txt
-	                run_command axiom-scan "webs/webs_all.txt" -m wafw00f -o ".tmp/wafs.txt" "${AXIOM_EXTRA_ARGS_ARR[@]}" 2>>"$LOGFILE" >/dev/null
+	                run_command axiom-scan "webs/webs_all.txt" -m wafw00f -o ".tmp/wafs.txt" "${AXIOM_EXTRA_ARGS[@]}" 2>>"$LOGFILE" >/dev/null
 	            fi
 
 	            # Process wafs.txt if it exists and is not empty
@@ -1109,20 +1111,19 @@ _nuclei_scan_local() {
     : >".tmp/nuclei_combined_json.txt"
 
     # Non-WAF at default rate
+    _as_array NUCLEI_EXTRA_ARGS
     if [[ -s "$NOWAF_LIST" ]]; then
-        # shellcheck disable=SC2086  # Intentionally allow user-provided nuclei args
         run_with_heartbeat "nuclei (normal targets)" nuclei \
             -l "$NOWAF_LIST" -severity "$all_severities" -nh -rl "$NUCLEI_RATELIMIT" -silent -retries 2 \
-            $NUCLEI_EXTRA_ARGS -t "${NUCLEI_TEMPLATES_PATH}" -j -o ".tmp/nuclei_combined_json.txt"
+            "${NUCLEI_EXTRA_ARGS[@]}" -t "${NUCLEI_TEMPLATES_PATH}" -j -o ".tmp/nuclei_combined_json.txt"
     fi
     # WAF hosts at slower rate
     if [[ -s "$WAF_LIST" ]]; then
         local slow_rl
         slow_rl=$((NUCLEI_RATELIMIT / 3 + 1))
-        # shellcheck disable=SC2086  # Intentionally allow user-provided nuclei args
         run_with_heartbeat "nuclei (waf targets)" nuclei \
             -l "$WAF_LIST" -severity "$all_severities" -nh -rl "$slow_rl" -silent -retries 2 \
-            $NUCLEI_EXTRA_ARGS -t "${NUCLEI_TEMPLATES_PATH}" -j -o ".tmp/nuclei_waf_combined_json.txt"
+            "${NUCLEI_EXTRA_ARGS[@]}" -t "${NUCLEI_TEMPLATES_PATH}" -j -o ".tmp/nuclei_waf_combined_json.txt"
         [[ -s ".tmp/nuclei_waf_combined_json.txt" ]] && cat ".tmp/nuclei_waf_combined_json.txt" >>".tmp/nuclei_combined_json.txt"
     fi
 
@@ -1136,11 +1137,12 @@ _nuclei_scan_axiom() {
     local all_severities="$NUCLEI_SEVERITY"
 
     _print_msg INFO "Running: Axiom Nuclei Severities: ${all_severities}. Check results in nuclei_output folder."
-    # shellcheck disable=SC2086  # Intentionally allow user-provided nuclei args
+    _as_array NUCLEI_EXTRA_ARGS
+    _as_array AXIOM_EXTRA_ARGS
     run_with_heartbeat "axiom nuclei" axiom-scan .tmp/webs_subs.txt -m nuclei \
         --nuclei-templates "$NUCLEI_TEMPLATES_PATH" \
         -severity "$all_severities" -nh -rl "$NUCLEI_RATELIMIT" \
-        -silent -retries 2 $NUCLEI_EXTRA_ARGS -j -o ".tmp/nuclei_combined_json.txt" "${AXIOM_EXTRA_ARGS_ARR[@]}"
+        -silent -retries 2 "${NUCLEI_EXTRA_ARGS[@]}" -j -o ".tmp/nuclei_combined_json.txt" "${AXIOM_EXTRA_ARGS[@]}"
 
     # Split combined results into per-severity files for backward compatibility
     _nuclei_split_by_severity
@@ -1492,10 +1494,15 @@ _fuzz_run_local() {
         ffuf_recursion_flags="-recursion -recursion-depth ${FUZZ_RECURSION_DEPTH:-2}"
     fi
 
+    # interlace runs -c through a shell (shell=True): targets are fed from a
+    # sanitized copy and HEADER is passed via the environment ($FFUF_HEADER is
+    # expanded by the child shell, never interpolated into the command string).
+    local -x FFUF_HEADER="${HEADER}"
     if [[ -s .tmp/webs_normal.txt ]]; then
+        sanitize_interlace_input .tmp/webs_normal.txt .tmp/webs_normal_interlace.txt
         run_with_heartbeat "ffuf normal targets" interlace \
-            -tL .tmp/webs_normal.txt -threads "${INTERLACE_THREADS}" \
-            -c "ffuf ${FFUF_FLAGS} ${ffuf_recursion_flags} -t ${FFUF_THREADS} -rate ${FFUF_RATELIMIT} -H \"${HEADER}\" -w ${fuzz_wordlist} -maxtime ${FFUF_MAXTIME} -u _target_/FUZZ -o _output_/_cleantarget_.json" \
+            -tL .tmp/webs_normal_interlace.txt -threads "${INTERLACE_THREADS}" \
+            -c "ffuf ${FFUF_FLAGS} ${ffuf_recursion_flags} -t ${FFUF_THREADS} -rate ${FFUF_RATELIMIT} -H \"\$FFUF_HEADER\" -w ${fuzz_wordlist} -maxtime ${FFUF_MAXTIME} -u _target_/FUZZ -o _output_/_cleantarget_.json" \
             -o "$dir/.tmp/fuzzing"
     fi
 
@@ -1504,9 +1511,10 @@ _fuzz_run_local() {
         [[ $slow_threads -lt 5 ]] && slow_threads=5
         local slow_rate=$FFUF_RATELIMIT
         [[ ${FFUF_RATELIMIT:-0} -eq 0 ]] && slow_rate=50 || slow_rate=$((FFUF_RATELIMIT / 3 + 1))
+        sanitize_interlace_input .tmp/webs_slow.txt .tmp/webs_slow_interlace.txt
         run_with_heartbeat "ffuf slow targets" interlace \
-            -tL .tmp/webs_slow.txt -threads "${INTERLACE_THREADS}" \
-            -c "ffuf ${FFUF_FLAGS} ${ffuf_recursion_flags} -t ${slow_threads} -rate ${slow_rate} -H \"${HEADER}\" -w ${fuzz_wordlist} -maxtime ${FFUF_MAXTIME} -u _target_/FUZZ -o _output_/_cleantarget_.json" \
+            -tL .tmp/webs_slow_interlace.txt -threads "${INTERLACE_THREADS}" \
+            -c "ffuf ${FFUF_FLAGS} ${ffuf_recursion_flags} -t ${slow_threads} -rate ${slow_rate} -H \"\$FFUF_HEADER\" -w ${fuzz_wordlist} -maxtime ${FFUF_MAXTIME} -u _target_/FUZZ -o _output_/_cleantarget_.json" \
             -o "$dir/.tmp/fuzzing"
     fi
 
@@ -1525,7 +1533,7 @@ _fuzz_run_local() {
 # Run ffuf via axiom-scan and parse per-subdomain results
 _fuzz_run_axiom() {
     cached_download_typed "${fuzzing_remote_list}" ".tmp/fuzzing_remote_list.txt" "onelistforallmicro.txt" "wordlists"
-    run_with_heartbeat "axiom ffuf" axiom-scan webs/webs_all.txt -m ffuf -wL .tmp/fuzzing_remote_list.txt -H "${HEADER}" "$FFUF_FLAGS" -s -maxtime "$FFUF_MAXTIME" -oJ "$dir/.tmp/ffuf-content.json" "${AXIOM_EXTRA_ARGS_ARR[@]}"
+    run_with_heartbeat "axiom ffuf" axiom-scan webs/webs_all.txt -m ffuf -wL .tmp/fuzzing_remote_list.txt -H "${HEADER}" "$FFUF_FLAGS" -s -maxtime "$FFUF_MAXTIME" -oJ "$dir/.tmp/ffuf-content.json" "${AXIOM_EXTRA_ARGS[@]}"
 
     while read -r sub; do
         local sub_out
@@ -1606,8 +1614,9 @@ function iishortname() {
             # Create necessary directory
             mkdir -p "$dir/vulns/iis-shortname-shortscan/"
 
-            # Run shortscan using interlace
-            run_command interlace -tL .tmp/iis_sites.txt -threads "$INTERLACE_THREADS" \
+            # Run shortscan using interlace (sanitized copy: _target_ is substituted into a shell command)
+            sanitize_interlace_input .tmp/iis_sites.txt .tmp/iis_sites_interlace.txt
+            run_command interlace -tL .tmp/iis_sites_interlace.txt -threads "$INTERLACE_THREADS" \
                 -c "shortscan _target_ -F -s -p 1 > _output_/_cleantarget_.txt" \
                 -o "$dir/vulns/iis-shortname-shortscan/" 2>>"$LOGFILE" >/dev/null
 
@@ -1659,6 +1668,9 @@ function swagger_check() {
             # UI shows "Running: sj brute (swagger) | elapsed Xm Ys | ETA: --"
             # every 20s — otherwise swagger_check appears to hang in -l/-z modes
             # where sj brute can run for tens of minutes against 200 targets.
+            # interlace substitutes _target_ into a shell command: feed it a sanitized copy
+            sanitize_interlace_input "$brute_targets" "${brute_targets%.txt}_interlace.txt"
+            brute_targets="${brute_targets%.txt}_interlace.txt"
             local _brute_targets_count
             _brute_targets_count=$(wc -l <"$brute_targets" 2>/dev/null | tr -d ' ' || echo "?")
             run_with_heartbeat_shell "sj brute (swagger, ${_brute_targets_count} targets)" \
@@ -1976,9 +1988,9 @@ function urlchecks() {
                 if [[ $diff_webs != "0" ]] || [[ ! -s ".tmp/katana.txt" ]]; then
                     if [[ $URL_CHECK_ACTIVE == true ]]; then
                         if [[ $DEEP == true ]]; then
-                            run_with_heartbeat "axiom katana (deep)" axiom-scan webs/webs_all.txt -m katana $katana_headless_flags -jc -kf all -d 3 -fs rdn --max-runtime 4h -o .tmp/katana.txt "${AXIOM_EXTRA_ARGS_ARR[@]}"
+                            run_with_heartbeat "axiom katana (deep)" axiom-scan webs/webs_all.txt -m katana $katana_headless_flags -jc -kf all -d 3 -fs rdn --max-runtime 4h -o .tmp/katana.txt "${AXIOM_EXTRA_ARGS[@]}"
                         else
-                            run_with_heartbeat "axiom katana" axiom-scan webs/webs_all.txt -m katana $katana_headless_flags -jc -kf all -d 2 -fs rdn --max-runtime 3h -o .tmp/katana.txt "${AXIOM_EXTRA_ARGS_ARR[@]}"
+                            run_with_heartbeat "axiom katana" axiom-scan webs/webs_all.txt -m katana $katana_headless_flags -jc -kf all -d 2 -fs rdn --max-runtime 3h -o .tmp/katana.txt "${AXIOM_EXTRA_ARGS[@]}"
                         fi
                     fi
                 fi
@@ -2245,7 +2257,7 @@ function jschecks() {
                     | grep -F "$domain" \
                     | grep -aEo 'https?://[^ ]+' | anew -q .tmp/subjslinks.txt || true
             else
-                run_command axiom-scan .tmp/url_extract_js.txt -m subjs -o .tmp/subjslinks.txt "${AXIOM_EXTRA_ARGS_ARR[@]}" 2>>"$LOGFILE" >/dev/null
+                run_command axiom-scan .tmp/url_extract_js.txt -m subjs -o .tmp/subjslinks.txt "${AXIOM_EXTRA_ARGS[@]}" 2>>"$LOGFILE" >/dev/null
             fi
 
                 if [[ -s ".tmp/subjslinks.txt" ]]; then
@@ -2268,7 +2280,7 @@ function jschecks() {
 	                if [[ -s "js/url_extract_js.txt" ]]; then
 	                    run_command axiom-scan js/url_extract_js.txt -m httpx -follow-host-redirects -H "$HEADER" -status-code \
 	                        -threads "$HTTPX_THREADS" -rl "$HTTPX_RATELIMIT" -timeout "$HTTPX_TIMEOUT" -silent \
-	                        -content-type -retries 2 -no-color -o .tmp/js_livelinks.txt "${AXIOM_EXTRA_ARGS_ARR[@]}" 2>>"$LOGFILE" >/dev/null
+	                        -content-type -retries 2 -no-color -o .tmp/js_livelinks.txt "${AXIOM_EXTRA_ARGS[@]}" 2>>"$LOGFILE" >/dev/null
 	                    if [[ -s ".tmp/js_livelinks.txt" ]]; then
 	                        awk '/\\[200\\]/ && /javascript/ {print $1}' .tmp/js_livelinks.txt | anew -q js/js_livelinks.txt || true
 	                    fi
@@ -2329,7 +2341,7 @@ function jschecks() {
                     cat js/js_livelinks.txt | mantra -ua "$HEADER" -s | anew -q js/js_secrets.txt 2>>"$LOGFILE" >/dev/null || true
                 else
                     axiom-exec "go install github.com/brosck/mantra@latest" 2>>"$LOGFILE" >/dev/null
-                    run_command axiom-scan js/js_livelinks.txt -m mantra -ua "$HEADER" -s -o js/js_secrets.txt "${AXIOM_EXTRA_ARGS_ARR[@]}" &>/dev/null
+                    run_command axiom-scan js/js_livelinks.txt -m mantra -ua "$HEADER" -s -o js/js_secrets.txt "${AXIOM_EXTRA_ARGS[@]}" &>/dev/null
                 fi
                 mkdir -p .tmp/sourcemapper/secrets
                 if [[ -s "js/js_secrets.txt" ]]; then
@@ -2467,7 +2479,7 @@ function sub_js_extract() {
                 run_command axiom-scan .tmp/js_extracted_hosts_new.txt -m puredns-resolve \
                     -r "${AXIOM_RESOLVERS_PATH}" --resolvers-trusted "${AXIOM_RESOLVERS_TRUSTED_PATH}" \
                     --wildcard-tests "$PUREDNS_WILDCARDTEST_LIMIT" --wildcard-batch "$PUREDNS_WILDCARDBATCH_LIMIT" \
-                    -o .tmp/js_extracted_hosts_resolved.txt "${AXIOM_EXTRA_ARGS_ARR[@]}" 2>>"$LOGFILE" >/dev/null
+                    -o .tmp/js_extracted_hosts_resolved.txt "${AXIOM_EXTRA_ARGS[@]}" 2>>"$LOGFILE" >/dev/null
             fi
 
             if [[ -s ".tmp/js_extracted_hosts_resolved.txt" ]]; then
@@ -2913,9 +2925,9 @@ function brokenLinks() {
                     # Use axiom-scan for scanning
                     if [[ ! -s ".tmp/katana.txt" ]]; then
                         if [[ $DEEP == true ]]; then
-                            run_command axiom-scan "webs/webs_all.txt" -m katana $katana_legacy_headless -jc -kf all -d 3 --max-runtime 4h -o ".tmp/katana.txt" "${AXIOM_EXTRA_ARGS_ARR[@]}" 2>>"$LOGFILE" >/dev/null
+                            run_command axiom-scan "webs/webs_all.txt" -m katana $katana_legacy_headless -jc -kf all -d 3 --max-runtime 4h -o ".tmp/katana.txt" "${AXIOM_EXTRA_ARGS[@]}" 2>>"$LOGFILE" >/dev/null
                         else
-                            run_command axiom-scan "webs/webs_all.txt" -m katana $katana_legacy_headless -jc -kf all -d 2 --max-runtime 3h -o ".tmp/katana.txt" "${AXIOM_EXTRA_ARGS_ARR[@]}" 2>>"$LOGFILE" >/dev/null
+                            run_command axiom-scan "webs/webs_all.txt" -m katana $katana_legacy_headless -jc -kf all -d 2 --max-runtime 3h -o ".tmp/katana.txt" "${AXIOM_EXTRA_ARGS[@]}" 2>>"$LOGFILE" >/dev/null
                         fi
                         # Remove lines longer than 2048 characters
                         if [[ -s ".tmp/katana.txt" ]]; then

@@ -100,3 +100,79 @@ setup() {
     
     rm -f "$tmpfile" "$scopefile"
 }
+
+# deleteOutScoped anchoring: an out-of-scope entry must match the WHOLE host,
+# never a substring, while still handling URL lists (scheme/port/path).
+@test "deleteOutScoped anchors non-wildcard entries to the whole hostname" {
+    local tmpfile scopefile
+    tmpfile=$(mktemp)
+    scopefile=$(mktemp)
+    echo "dev.example.com" > "$scopefile"
+    printf '%s\n' \
+        "dev.example.com" \
+        "xdev.example.com" \
+        "dev.example.com.cdn.net" \
+        "api.dev.example.com" \
+        "DEV.EXAMPLE.COM" \
+        "inscope.example.com" > "$tmpfile"
+    deleteOutScoped "$scopefile" "$tmpfile"
+    run cat "$tmpfile"
+    [[ "$output" != *$'\n'"dev.example.com"* ]] && [[ "$output" != "dev.example.com"* ]]
+    grep -qx 'xdev.example.com' "$tmpfile"
+    grep -qx 'dev.example.com.cdn.net' "$tmpfile"
+    grep -qx 'api.dev.example.com' "$tmpfile"
+    grep -qx 'inscope.example.com' "$tmpfile"
+    ! grep -qix 'dev.example.com' "$tmpfile"
+    [ "$(wc -l < "$tmpfile" | tr -d ' ')" -eq 4 ]
+    rm -f "$tmpfile" "$scopefile"
+}
+
+@test "deleteOutScoped matches URL lists by host (scheme, port and path tolerated)" {
+    local tmpfile scopefile
+    tmpfile=$(mktemp)
+    scopefile=$(mktemp)
+    echo "dev.example.com" > "$scopefile"
+    printf '%s\n' \
+        "https://dev.example.com" \
+        "http://dev.example.com:8080/admin?x=1" \
+        "https://xdev.example.com/" \
+        "https://dev.example.com.cdn.net:443/" \
+        "https://ok.example.com:8443/dev.example.com" > "$tmpfile"
+    deleteOutScoped "$scopefile" "$tmpfile"
+    [ "$(wc -l < "$tmpfile" | tr -d ' ')" -eq 3 ]
+    grep -qx 'https://xdev.example.com/' "$tmpfile"
+    grep -qx 'https://dev.example.com.cdn.net:443/' "$tmpfile"
+    grep -qx 'https://ok.example.com:8443/dev.example.com' "$tmpfile"
+    rm -f "$tmpfile" "$scopefile"
+}
+
+@test "deleteOutScoped wildcard entries keep suffix semantics but stay host-anchored" {
+    local tmpfile scopefile
+    tmpfile=$(mktemp)
+    scopefile=$(mktemp)
+    echo "*.example.com" > "$scopefile"
+    printf '%s\n' \
+        "a.example.com" \
+        "https://b.example.com:443/x" \
+        "example.com" \
+        "notexample.com" \
+        "a.example.com.evil.net" > "$tmpfile"
+    deleteOutScoped "$scopefile" "$tmpfile"
+    [ "$(wc -l < "$tmpfile" | tr -d ' ')" -eq 3 ]
+    grep -qx 'example.com' "$tmpfile"
+    grep -qx 'notexample.com' "$tmpfile"
+    grep -qx 'a.example.com.evil.net' "$tmpfile"
+    rm -f "$tmpfile" "$scopefile"
+}
+
+@test "deleteOutScoped returns 0 and empties the file when every line is out of scope" {
+    local tmpfile scopefile
+    tmpfile=$(mktemp)
+    scopefile=$(mktemp)
+    printf '%s\n' "a.example.com" "b.example.com" > "$scopefile"
+    printf '%s\n' "a.example.com" "https://b.example.com" > "$tmpfile"
+    run deleteOutScoped "$scopefile" "$tmpfile"
+    [ "$status" -eq 0 ]
+    [ ! -s "$tmpfile" ]
+    rm -f "$tmpfile" "$scopefile"
+}

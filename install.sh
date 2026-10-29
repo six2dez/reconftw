@@ -660,7 +660,7 @@ function install_tools() {
         # Clone the repository (check for .git to detect incomplete clones)
         if [[ ! -d "${dir}/${repo}/.git" ]]; then
             # Remove leftover directory from a previously failed clone attempt
-            [[ -d "${dir}/${repo}" ]] && rm -rf "${dir}/${repo}"
+            [[ -d "${dir}/${repo}" ]] && rm -rf "${dir:?}/${repo:?}"
             msg_run "[$repos_step/${#repos[@]}] $repo (clone)"
             clone_repo "${repos[$repo]}" "${dir}/${repo}"
             exit_status=$?
@@ -818,7 +818,9 @@ function install_tools() {
         [[ ${#failed_pipx_tools[@]} -gt 0 ]] && printf "  uv:    %s\n" "${failed_pipx_tools[*]}"
         [[ ${#failed_repos[@]} -gt 0 ]] && printf "  Repos: %s\n" "${failed_repos[*]}"
         printf "\n%bRe-run install.sh to retry failed items.%b\n" "$yellow" "$reset"
+        return 1
     fi
+    return 0
 }
 
 # Function to reset git proxy settings
@@ -1202,9 +1204,10 @@ function initial_setup() {
         q uv tool update-shell
         export PATH="${HOME}/.local/bin:${PATH}"
 
-        install_tools
+        local _install_rc=0
+        install_tools || _install_rc=$?
         setup_reconftw_venv
-        return
+        return "$_install_rc"
     fi
 
     header "Install/Update"
@@ -1228,7 +1231,8 @@ function initial_setup() {
     # Ensure $HOME/.local/bin is available now even if profile isn't sourced
     export PATH="${HOME}/.local/bin:${PATH}"
 
-    install_tools
+    local _install_rc=0
+    install_tools || _install_rc=$?
     setup_reconftw_venv
 
     # Repositories with special configurations
@@ -1407,8 +1411,13 @@ Remember to set your API keys:
 EOF
     )"
     printf "%b%s%b\n" "$yellow" "$final_reminder" "$reset"
-    printf "%bFinished!%b\n" "$bgreen" "$reset"
+    if [[ $_install_rc -ne 0 ]]; then
+        printf "%bFinished with failed tool installs (see the Tool Installation Summary above).%b\n" "$red" "$reset"
+    else
+        printf "%bFinished!%b\n" "$bgreen" "$reset"
+    fi
     printf "%b#######################################################################%b\n" "$bgreen" "$reset"
+    return "$_install_rc"
 }
 
 # Function to display additional help
@@ -1486,4 +1495,5 @@ function handle_install_arguments() {
 
 # Invoke main functions
 handle_install_arguments "$@"
-initial_setup
+# Exit non-zero when install_tools reported failures (summary is still printed)
+initial_setup || exit $?
