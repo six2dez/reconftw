@@ -42,7 +42,7 @@ const (
 	// than CI and Docker do. TestGoVersionMatchesGoMod enforces the match.
 	//
 	// Changing this REQUIRES regenerating every entry in GoToolchainSHA256.
-	goVersion = "1.26.6"
+	goVersion = "1.26.10"
 
 	// uvVersion pins the astral.sh uv installer to an immutable GitHub release
 	// asset. The previously used https://astral.sh/uv/install.sh is a 301 to
@@ -85,15 +85,15 @@ var supportedPlatforms = []string{
 // platform, so one digest can verify at most one of the five. That is why the
 // previous scalar pin was unusable in principle and not merely unfilled.
 var GoToolchainSHA256 = map[string]string{
-	// go1.26.6, taken from the vendor's own release index
+	// go1.26.10, taken from the vendor's own release index
 	// (https://go.dev/dl/?mode=json&include=all) — the SAME host the bootstrapper
 	// downloads the archive from, which is what makes these a pin rather than a
 	// second copy of the same trust assumption.
-	"linux/amd64":  "708effb774be8237570d0add163225abbdfaf4fca28b2611df167beba4feef89",
-	"linux/arm64":  "d0507e9e9d7fe012aae570108cbd76c15de879e17130ab8cb90d4d7445cb1f2e",
-	"linux/arm":    "e1379a2fe77bd30fa29833074388247e7c65416e09279f746f20de2d5cf4dfea",
-	"darwin/amd64": "08b65a63f244115121ced6c3b55ad38d801a7442acad5c949a17aad84ae6d684",
-	"darwin/arm64": "2dc95ce4675829f2df0e86b28bcef3283635902062a5f0580ca659bf570f3204",
+	"linux/amd64":  "ccfe7ae822d2c2f41f4fe7c956199967a4dac22d0ee0d2b2bfdb440aab3b20c5",
+	"linux/arm64":  "3f4227ce7b206a513e794f1393adb473a07b46e94d18bd15d1c684bbb7319797",
+	"linux/arm":    "7d89fd32259eb0ff647381e8c3465dc32ccfc7f71cb7b9bcd95604c3481f5109",
+	"darwin/amd64": "e820ab780c273ae4a340b79d0f3c4313b74ee029aa3874792145d44b9f4f91da",
+	"darwin/arm64": "0b5183492292ada170f9b561a834863808dd02edba599e4ad0e89899330020b3",
 }
 
 // goDownloadBase is the official Go distribution host.

@@ -22,6 +22,7 @@ import (
 	"database/sql"
 	stderrors "errors"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
@@ -89,11 +90,19 @@ func (s *Store) RawDB() *sql.DB {
 	return s.db
 }
 
+// pragmaName is the only shape QueryPragma accepts.
+var pragmaName = regexp.MustCompile(`^[a-z_]+$`)
+
 // QueryPragma queries a SQLite pragma and scans its value into dest.
 // Helper for verifying WAL mode is active (Test 1). Not used by the
 // Scheduler.
 func (s *Store) QueryPragma(ctx context.Context, name string, dest any) error {
-	row := s.db.QueryRowContext(ctx, fmt.Sprintf("PRAGMA %s;", name))
+	// PRAGMA names cannot be bound as parameters, so the name is formatted into
+	// the statement; restrict it to an identifier so it can never carry SQL.
+	if !pragmaName.MatchString(name) {
+		return fmt.Errorf("checkpoint: invalid pragma name %q", name)
+	}
+	row := s.db.QueryRowContext(ctx, fmt.Sprintf("PRAGMA %s;", name)) // nosemgrep: go.lang.security.audit.database.string-formatted-query.string-formatted-query
 	return row.Scan(dest)
 }
 

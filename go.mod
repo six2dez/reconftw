@@ -12,15 +12,17 @@ module github.com/six2dez/reconftw/v5
 // no 1.25 backport for any of them. Keeping the low floor now means shipping a
 // release binary built against 21 known-reachable vulnerabilities.
 //
-// 1.26.6 (not .7) is the exact version that clears all 21 — it is the highest
-// "Fixed in" across the set, so it is the minimum that closes the gate rather
-// than the newest release for its own sake.
+// 1.26.10 is the exact version that clears the October 2026 stdlib advisories
+// (crypto/x509 is fixed only in .10; net/http, crypto/tls, html/template and
+// net/textproto in .9). It is the highest "Fixed in" across the set, so it is
+// the minimum that closes the gate rather than the newest release for its own
+// sake.
 //
 // CI resolves its toolchain from this file (every `setup-go` step uses
 // `go-version-file: go.mod`), so this is also what the release binary is built
 // with. Raising it raises the source-build floor for users; that cost is real
 // and is accepted deliberately, because the alternative is known vulnerabilities.
-go 1.26.6
+go 1.26.10
 
 require (
 	github.com/go-playground/validator/v10 v10.30.2
@@ -36,10 +38,10 @@ require (
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/pflag v1.0.6
 	go.uber.org/goleak v1.3.0
-	golang.org/x/net v0.58.0
-	golang.org/x/sync v0.22.0
+	golang.org/x/net v0.60.0
+	golang.org/x/sync v0.23.0
 	golang.org/x/time v0.15.0
-	golang.org/x/tools v0.48.0
+	golang.org/x/tools v0.49.0
 	modernc.org/sqlite v1.51.0
 	pgregory.net/rapid v1.3.0
 )
@@ -69,11 +71,11 @@ require (
 	github.com/tklauser/numcpus v0.6.1 // indirect
 	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
-	golang.org/x/crypto v0.55.0 // indirect
-	golang.org/x/mod v0.38.0 // indirect
+	golang.org/x/crypto v0.57.0 // indirect
+	golang.org/x/mod v0.41.0 // indirect
 	golang.org/x/oauth2 v0.35.0 // indirect
-	golang.org/x/sys v0.47.0 // indirect
-	golang.org/x/text v0.41.0 // indirect
+	golang.org/x/sys v0.48.0 // indirect
+	golang.org/x/text v0.42.0 // indirect
 	modernc.org/libc v1.72.3 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
