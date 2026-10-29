@@ -1,0 +1,18 @@
+# coverage-floor ratchet — read by scripts/coverage-floor.sh (`make coverage-floor`).
+#
+# One line per gated package set:   <floor-pct>  <go package pattern>...
+# The floor is the MINIMUM aggregate statement coverage that set may report.
+# A line may only ever be RAISED (that is what a ratchet is); lowering one is a
+# decision that needs a reason in the commit that does it, not a quiet edit.
+#
+# Seeded 2026-10-07 from the measured values below (go1.26, -short, 600s
+# timeout, TestGenResolversCallsDnsvalidator skipped), each minus two points
+# and rounded DOWN so a platform-specific branch cannot flake the gate:
+#
+#   ./internal/modules/...   measured 52.9%  (osint 51.1, subdomains 69.0,
+#                                             sysinfo 66.7, vulns 41.6, web 56.3)
+#   ./internal/store/...     measured 26.6%  (store/sqlc only)
+#
+# Raise a floor whenever a measured run clears the next whole point above it.
+50 ./internal/modules/...
+24 ./internal/store/...

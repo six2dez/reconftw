@@ -12,6 +12,15 @@ on:
   # the Go line this workflow's dev-go version is otherwise never executed. Run
   # it once against dev-go before cutting over, or the first real build of the
   # v2 ARM64 image happens at the worst possible moment.
+  #
+  # WHY THE NIGHTLY DOES NOT FAN OUT TO dev-go THE WAY ci.yml's scheduled jobs
+  # do. This job PUSHES: the `nightly` tag on Docker Hub and ghcr.io is whatever
+  # branch built last. A dev-go nightly would overwrite the bash image's
+  # `nightly` tag with the Go image on alternate nights until the cutover,
+  # which is worse than not running. So: schedule = default branch only, by
+  # design; dev-go = pick the branch in the workflow_dispatch UI. ci.yml's
+  # release-gates job records gate 11 as DELEGATED to this workflow's
+  # `Verify image health (linux/arm64)` step with exactly that instruction.
   workflow_dispatch: {}
   release:
     types:
@@ -25,6 +34,10 @@ on:
 jobs:
   docker:
     runs-on: ubuntu-latest
+    # Multiarch buildx under QEMU plus two pulls and runs: ~25 minutes on a
+    # good night. Bounded so a wedged emulator cannot hold the runner for the
+    # six-hour default.
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
         with:
@@ -174,7 +187,9 @@ jobs:
 
       # ACCEPTANCE GATE 11 lives here: `docker run --platform linux/arm64 <image>
       # version` must work on emulated ARM64. Do not rename this step without
-      # updating the phase gate table that cites it.
+      # updating the phase gate table that cites it — AND scripts/release-gates.sh
+      # `delegation_pointer 11`, which is the text ci.yml's release-gates job
+      # prints on the DELEGATED row for this gate. Both cite this step by name.
       - name: Verify image health (linux/arm64)
         run: |
           set -euo pipefail

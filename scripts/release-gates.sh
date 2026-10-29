@@ -66,6 +66,8 @@
 #
 # Usage:
 #   bash scripts/release-gates.sh [--with-docker] [--fail-fast] [--gates-only]
+#                                 [--require-all] [--delegate <11|13|14b>]...
+#                                 [--logdir DIR]
 #
 #   --with-docker  also run acceptance gate 11 (ARM64 `docker run`). OFF by
 #                  default so the script runs on a machine without Docker/QEMU.
@@ -73,6 +75,24 @@
 #                  never PASS, never omitted.
 #   --fail-fast    stop at the first failing step.
 #   --gates-only   skip the regression guard and run only the gate assertions.
+#   --require-all  a GATE row that did not execute (SKIPPED) makes the exit code
+#                  non-zero, and the summary names every such gate. Optional
+#                  guards (a missing govulncheck/gofumpt) stay SKIPPED-but-not-
+#                  fatal. Also enabled by RELEASE_GATES_REQUIRE_ALL=1. This is
+#                  what CI passes: a green job must not contain an unexecuted
+#                  gate.
+#   --delegate ID  declare that gate ID (11, 13 or 14b) is enforced ELSEWHERE,
+#                  with the pointer printed in the summary. A delegated gate
+#                  that would have been SKIPPED here is reported DELEGATED and
+#                  satisfies --require-all; a delegated gate that CAN run here
+#                  still runs and keeps its real PASS/FAIL verdict — delegation
+#                  never overrides evidence. Repeatable; `--delegate=11` works.
+#   --logdir DIR   write every step's log, and summary.txt, under DIR instead of
+#                  a mktemp directory. DIR is caller-owned and NEVER removed, so
+#                  CI can upload the evidence from a known path on every outcome.
+#
+# Every run ends with the summary on stdout AND in $LOGDIR/summary.txt (the path
+# is printed), whatever the outcome.
 
 set -euo pipefail
 
@@ -82,6 +102,9 @@ cd "$REPO_ROOT"
 WITH_DOCKER=0
 FAIL_FAST=0
 GATES_ONLY=0
+REQUIRE_ALL="${RELEASE_GATES_REQUIRE_ALL:-0}"
+DELEGATED_IDS=""
+OWNED_LOGDIR=""
 CENSUS_VERDICT=0
 CENSUS_RC=0
 GATE_VERDICT=0
@@ -90,11 +113,38 @@ GATE_RC=0
 NUCLEI_COV_VERDICT=0
 NUCLEI_COV_WS=""
 
+# delegate_gate <id> — record a delegation, rejecting ids this script has no
+# pointer for: `--delegate 12` must be a usage error, not a silently honoured
+# claim that some other system covers a gate nothing else runs.
+delegate_gate() {
+    case "$1" in
+        11 | 13 | 14b) DELEGATED_IDS="$DELEGATED_IDS $1 " ;;
+        *)
+            echo "release-gates: --delegate: unknown gate id '$1' (known: 11, 13, 14b)" >&2
+            exit 2
+            ;;
+    esac
+}
+
+PENDING_OPT=""
 for arg in "$@"; do
+    if [ -n "$PENDING_OPT" ]; then
+        case "$PENDING_OPT" in
+            --delegate) delegate_gate "$arg" ;;
+            --logdir) OWNED_LOGDIR="$arg" ;;
+        esac
+        PENDING_OPT=""
+        continue
+    fi
     case "$arg" in
         --with-docker) WITH_DOCKER=1 ;;
         --fail-fast) FAIL_FAST=1 ;;
         --gates-only) GATES_ONLY=1 ;;
+        --require-all) REQUIRE_ALL=1 ;;
+        --delegate) PENDING_OPT="--delegate" ;;
+        --delegate=*) delegate_gate "${arg#--delegate=}" ;;
+        --logdir) PENDING_OPT="--logdir" ;;
+        --logdir=*) OWNED_LOGDIR="${arg#--logdir=}" ;;
         --census-verdict) CENSUS_VERDICT=1 ;;
         # --gate-verdict <-run pattern> [go exit code]: read a `go test -v` log on
         # stdin and print this script's gate verdict for it. Exposed as a mode for
@@ -545,9 +595,43 @@ fi
 STEP_NAMES=()
 STEP_STATUS=()
 STEP_NOTES=()
+# STEP_KIND is `gate` for an acceptance-gate row and `guard` for everything
+# else. The distinction exists for --require-all: a gate that did not execute
+# is a hole in the sign-off, a guard that did not execute (govulncheck absent
+# on a laptop) is a note. Both are still printed as SKIPPED.
+STEP_KIND=()
 FAILED=0
+# Gate rows recorded SKIPPED — what --require-all turns into a non-zero exit.
+UNEXECUTED_GATES=""
 
-LOGDIR="$(mktemp -d "${TMPDIR:-/tmp}/reconftw-release-gates.XXXXXX")"
+if [ -n "$OWNED_LOGDIR" ]; then
+    mkdir -p "$OWNED_LOGDIR"
+    LOGDIR="$(cd "$OWNED_LOGDIR" && pwd)"
+else
+    LOGDIR="$(mktemp -d "${TMPDIR:-/tmp}/reconftw-release-gates.XXXXXX")"
+fi
+SUMMARY_FILE="$LOGDIR/summary.txt"
+
+# is_delegated <id> — whether --delegate named this gate.
+is_delegated() {
+    case "$DELEGATED_IDS" in
+        *" $1 "*) return 0 ;;
+    esac
+    return 1
+}
+
+# delegation_pointer <id> — WHERE the delegated gate is actually enforced. The
+# pointer is the whole value of a DELEGATED row: "not run here" is a skip,
+# "enforced by X, run it with Y" is a verifiable claim. Single source of truth
+# for the three gates this script cannot run on a CI runner.
+delegation_pointer() {
+    case "$1" in
+        11) echo "enforced by .github/workflows/docker_nightly.yml job \`docker\`, step \`Verify image health (linux/arm64)\` (needs buildx + registry push; run it on any branch via workflow_dispatch). Locally: make release-gates-docker" ;;
+        13) echo "delegated to the operator: needs the provisioned tool tree, which CI runners do not have. Run \`make release-gates-provisioned\` (or \`REALTOOLS_REFERENCE=1 make realtools-args\`) on a box with the 70-tool runtime before signing off" ;;
+        14b) echo "delegated to the operator: needs a real scan's workspace. Run \`RECONFTW_WORKSPACE=<workspace> make release-gates-provisioned\` after a real nuclei run before signing off" ;;
+        *) echo "no pointer recorded for gate $1" ;;
+    esac
+}
 
 # cleanup_logdir — RETAIN on failure, remove on a full pass, print the path either
 # way.
@@ -564,6 +648,12 @@ LOGDIR="$(mktemp -d "${TMPDIR:-/tmp}/reconftw-release-gates.XXXXXX")"
 # logs carry tool output and must not become readable to other users of a shared
 # $TMPDIR, so do not add a chmod here.
 cleanup_logdir() {
+    if [ -n "$OWNED_LOGDIR" ]; then
+        # Caller-owned: CI uploads summary.txt and gate13_argvector.log from
+        # here on every outcome, so the directory outlives this process.
+        printf '\nlogs KEPT (caller-owned --logdir): %s\n' "$LOGDIR"
+        return
+    fi
     if [ "$FAILED" -ne 0 ]; then
         printf '\nlogs RETAINED (a step FAILED): %s\n' "$LOGDIR"
         return
@@ -573,10 +663,15 @@ cleanup_logdir() {
 }
 trap cleanup_logdir EXIT
 
+# record <name> <PASS|FAIL|SKIPPED|DELEGATED> [note] [gate|guard]
 record() {
     STEP_NAMES+=("$1")
     STEP_STATUS+=("$2")
     STEP_NOTES+=("${3:-}")
+    STEP_KIND+=("${4:-guard}")
+    if [ "$2" = "SKIPPED" ] && [ "${4:-guard}" = "gate" ]; then
+        UNEXECUTED_GATES="$UNEXECUTED_GATES"$'\n'"$1"
+    fi
     if [ "$2" = "FAIL" ]; then
         FAILED=1
         if [ "$FAIL_FAST" = "1" ]; then
@@ -689,11 +784,11 @@ gate() {
     note="${verdict#* }"
 
     if [ "$status" = "PASS" ]; then
-        record "$label" PASS "$note"
+        record "$label" PASS "$note" gate
         return
     fi
     grep -n 'no tests to run' "$log" || grep -n -- '--- FAIL' "$log" | head -n 20 || tail -n 20 "$log" || true
-    record "$label" FAIL "$note — full log: $log"
+    record "$label" FAIL "$note — full log: $log" gate
 }
 
 # ─── the clean-PATH health-check (CI-break class 1) ─────────────────────────
@@ -757,19 +852,29 @@ gate_clean_path_healthcheck() {
 gate11_docker_arm64() {
     local label="Gate 11: docker run --platform linux/arm64 reconftw version"
 
+    # record_not_run <reason> — SKIPPED, or DELEGATED with its pointer when
+    # --delegate 11 was passed. Delegation applies ONLY on the not-run path:
+    # a build or run that actually happened keeps its PASS/FAIL below.
+    record_not_run() {
+        if is_delegated 11; then
+            record "$label" DELEGATED "$1 — $(delegation_pointer 11)" gate
+        else
+            record "$label" SKIPPED "$1" gate
+        fi
+    }
+
     if [ "$WITH_DOCKER" != "1" ]; then
-        record "$label" SKIPPED \
-            "docker: --with-docker not passed. Enforced in CI by .github/workflows/docker_nightly.yml job \`docker\`, step \`Verify image health (linux/arm64)\`."
+        record_not_run "docker: --with-docker not passed. Enforced in CI by .github/workflows/docker_nightly.yml job \`docker\`, step \`Verify image health (linux/arm64)\`."
         return
     fi
 
     banner "$label"
     if ! command -v docker >/dev/null 2>&1; then
-        record "$label" SKIPPED "docker: the docker CLI is not installed"
+        record_not_run "docker: the docker CLI is not installed"
         return
     fi
     if ! docker info >/dev/null 2>&1; then
-        record "$label" SKIPPED "docker: the CLI is present but the daemon is not reachable"
+        record_not_run "docker: the CLI is present but the daemon is not reachable"
         return
     fi
 
@@ -779,7 +884,7 @@ gate11_docker_arm64() {
         -t reconftw:arm64-gate --load . >"$log" 2>&1 || rc=$?
     if [ "$rc" -ne 0 ]; then
         tail -n 30 "$log"
-        record "$label" FAIL "buildx build failed (exit $rc) — full log: $log"
+        record "$label" FAIL "buildx build failed (exit $rc) — full log: $log" gate
         return
     fi
 
@@ -787,39 +892,61 @@ gate11_docker_arm64() {
     out="$(docker run --rm --platform linux/arm64 reconftw:arm64-gate version 2>&1)" || rc=$?
     printf '%s\n' "$out"
     if [ "$rc" -ne 0 ]; then
-        record "$label" FAIL "docker run exited $rc (an image carrying the wrong architecture fails here with 'exec format error' — which is the point)"
+        record "$label" FAIL "docker run exited $rc (an image carrying the wrong architecture fails here with 'exec format error' — which is the point)" gate
         return
     fi
     if ! printf '%s' "$out" | grep -Eq '^reconftw version [^[:space:]]+$'; then
-        record "$label" FAIL "the arm64 image did not print a version string"
+        record "$label" FAIL "the arm64 image did not print a version string" gate
         return
     fi
     if ! printf '%s' "$out" | grep -Eq '^[[:space:]]*platform:[[:space:]]+linux/arm64$'; then
-        record "$label" FAIL "the image printed a platform other than linux/arm64 — runtime.GOARCH is fixed at COMPILE time, so this is the ARM64 binary check"
+        record "$label" FAIL "the image printed a platform other than linux/arm64 — runtime.GOARCH is fixed at COMPILE time, so this is the ARM64 binary check" gate
         return
     fi
-    record "$label" PASS "arm64 image printed a version and platform: linux/arm64"
+    record "$label" PASS "arm64 image printed a version and platform: linux/arm64" gate
 }
 
 # ─── summary ────────────────────────────────────────────────────────────────
-summary() {
-    local pass=0 fail=0 skip=0 i
-    printf '\n\033[1m═══ release gates summary ═══\033[0m\n\n'
+# summary_text — the plain-text summary, no escape codes, so the same bytes go
+# to stdout and to $SUMMARY_FILE (which CI uploads as an artifact).
+summary_text() {
+    local pass=0 fail=0 skip=0 deleg=0 i
+    printf '═══ release gates summary ═══\n\n'
     for i in "${!STEP_NAMES[@]}"; do
         case "${STEP_STATUS[$i]}" in
             PASS) pass=$((pass + 1)) ;;
             FAIL) fail=$((fail + 1)) ;;
             SKIPPED) skip=$((skip + 1)) ;;
+            DELEGATED) deleg=$((deleg + 1)) ;;
         esac
-        printf '  [%-7s] %s\n' "${STEP_STATUS[$i]}" "${STEP_NAMES[$i]}"
+        printf '  [%-9s] %s\n' "${STEP_STATUS[$i]}" "${STEP_NAMES[$i]}"
         if [ -n "${STEP_NOTES[$i]}" ]; then
-            printf '            %s\n' "${STEP_NOTES[$i]}"
+            printf '              %s\n' "${STEP_NOTES[$i]}"
         fi
     done
-    printf '\n  %d PASS, %d FAIL, %d SKIPPED\n\n' "$pass" "$fail" "$skip"
+    printf '\n  %d PASS, %d FAIL, %d SKIPPED, %d DELEGATED\n\n' "$pass" "$fail" "$skip" "$deleg"
     if [ "$skip" -gt 0 ]; then
         echo "  NOTE: a SKIPPED step was NOT executed. It is not a pass."
     fi
+    if [ "$deleg" -gt 0 ]; then
+        echo "  NOTE: a DELEGATED gate was NOT executed here; its row names where it is enforced."
+    fi
+    if [ -n "$UNEXECUTED_GATES" ]; then
+        if [ "$REQUIRE_ALL" = "1" ]; then
+            echo "  GATES THAT DID NOT EXECUTE (--require-all: this fails the run):"
+        else
+            echo "  GATES THAT DID NOT EXECUTE (pass --require-all to make this fatal):"
+        fi
+        printf '%s\n' "$UNEXECUTED_GATES" | sed '/^$/d; s/^/    - /'
+    fi
+}
+
+# summary — print it, and write the same text to $SUMMARY_FILE. Always both:
+# the file is what survives a CI job, the stdout copy is what a human reads.
+summary() {
+    printf '\n'
+    summary_text | tee "$SUMMARY_FILE"
+    echo "  summary written to: $SUMMARY_FILE"
 }
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -1014,11 +1141,20 @@ gate_argvector() {
     grep 'REALTOOLS_UNRESOLVABLE ' "$log" | sed 's/^ *//' || true
 
     case "$status" in
-        PASS) record "$label" PASS "$note" ;;
-        SKIPPED) record "$label" SKIPPED "$note" ;;
+        PASS) record "$label" PASS "$note" gate ;;
+        SKIPPED)
+            # A box with no tool tree. With --delegate 13 that is the expected
+            # state of a CI runner and the row says WHO runs it instead; a real
+            # PASS or FAIL above is never rewritten by delegation.
+            if is_delegated 13; then
+                record "$label" DELEGATED "$note — $(delegation_pointer 13)" gate
+            else
+                record "$label" SKIPPED "$note" gate
+            fi
+            ;;
         *)
             tail -n 30 "$log"
-            record "$label" FAIL "$note — full log: $log"
+            record "$label" FAIL "$note — full log: $log" gate
             ;;
     esac
 }
@@ -1045,9 +1181,18 @@ gate_nuclei_coverage() {
     echo "  workspace: ${RECONFTW_WORKSPACE:-(none supplied)}"
     echo "  floor    : ${NUCLEI_COVERAGE_MIN_PCT}% of planned requests actually sent"
     case "$status" in
-        PASS) record "$label" PASS "$note" ;;
-        SKIPPED) record "$label" SKIPPED "$note" ;;
-        *) record "$label" FAIL "$note" ;;
+        PASS) record "$label" PASS "$note" gate ;;
+        SKIPPED)
+            # Same rule as gate 13: delegation only stands in for a verdict
+            # that could not be reached here (no workspace); a judged
+            # workspace keeps its PASS/FAIL.
+            if is_delegated 14b; then
+                record "$label" DELEGATED "$note — $(delegation_pointer 14b)" gate
+            else
+                record "$label" SKIPPED "$note" gate
+            fi
+            ;;
+        *) record "$label" FAIL "$note" gate ;;
     esac
 }
 
@@ -1068,4 +1213,12 @@ if [ "$FAILED" -ne 0 ]; then
     echo "release-gates: FAILED — the Phase 14 cutover is not signed off." >&2
     exit 1
 fi
-echo "release-gates: all executed steps passed. Read the SKIPPED list above before signing off."
+if [ "$REQUIRE_ALL" = "1" ] && [ -n "$UNEXECUTED_GATES" ]; then
+    echo "release-gates: --require-all: these gate(s) did not execute and are not delegated —$(printf '%s' "$UNEXECUTED_GATES" | sed '/^$/d; s/^/ [/; s/$/]/' | tr -d '\n'). An unexecuted gate in a green run is a false green." >&2
+    exit 1
+fi
+if [ -n "$UNEXECUTED_GATES" ]; then
+    echo "release-gates: all executed steps passed. Read the SKIPPED list above before signing off."
+else
+    echo "release-gates: all executed steps passed; every gate was executed or explicitly delegated."
+fi

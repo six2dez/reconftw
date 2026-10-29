@@ -5,21 +5,48 @@
 # (tests.yml, semgrep.yml, docker_nightly.yml) — those remain untouched
 # until Phase 12 cutover per CONTEXT.md.
 #
+# `make ci` is the local mirror of this file: same gates, same order. Add a
+# step to one and add it to the other.
+#
+# HONESTY RULES THIS FILE FOLLOWS (task 21-03):
+#   * Every `-run` pattern is preceded by a `go test -list` count guard that
+#     fails on ZERO matches. `go test -run` exits 0 when its pattern matches
+#     nothing, which is how a deleted test kept a gate green for months.
+#   * Every job has `timeout-minutes`. A job with no timeout that hangs on a
+#     blocked UDP/53 socket occupies a runner for six hours and reports nothing.
+#   * release-gates runs with --require-all: a gate is PASS, FAIL, or DELEGATED
+#     with a pointer to where it IS enforced. A SKIPPED gate fails the job.
+#   * The release-gates summary and gate 13's log are uploaded on EVERY
+#     outcome (`if: always()`), from a caller-owned directory the script never
+#     deletes.
+#
 # Jobs (single-platform ubuntu-latest per CONTEXT.md Claude-discretion
 # default (a); XPLAT-05 cross-platform matrix is Phase 11):
 #   - lint        — gofumpt format-check + golangci-lint (errcheck/govet/
 #                   staticcheck/unused/gofumpt enabled)
-#   - unit        — go test -race -short ./...  + XCUT-07 sentinel
-#                   explicit gate step
+#   - govulncheck — reachability scan, pinned
+#   - unit        — go test -race -short ./...  + XCUT-07 sentinel gate
+#                   (make sentinel-gate, zero-match guarded)
 #   - integration — go test -race ./... + XCUT-04 ≥75% coverage gate on
-#                   internal/core/...
-#   - smoke       — go test -race -tags smoke ./...  (PR + scheduled
-#                   only); MANDATORY per plan 03-01 W12 revision iter 1
-#                   for FOUND-04 SIGKILL atomicity + FOUND-09 kill-tree
-#                   tests that the unit ring cannot deliver
-#   - binary-size — XCUT-02 build with -ldflags="-s -w" -trimpath; size
-#                   gate <50MB (52428800 bytes). Skipped via hashFiles()
-#                   until Plan 03-05 lands cmd/reconftw/main.go.
+#                   internal/core/... + coverage-critical (self-tested) +
+#                   coverage-lib + coverage-floor (ratchet)
+#   - smoke       — go test -race -tags smoke ./...  (PR + scheduled only;
+#                   scheduled runs cover main AND dev-go)
+#   - binary-size — XCUT-02 build with -ldflags="-s -w" -trimpath; <50MB
+#   - integration-smoke — hermetic E2E gate + interfaces_check
+#   - release-gates — phase 15 acceptance gates, --require-all
+#   - platform-smoke — build + the smoke-tagged ring ONLY, per platform
+#
+# SCHEDULE AND BRANCHES. GitHub evaluates `schedule` on the default branch
+# only, so a weekly cron on a repo whose active line is dev-go would never
+# exercise dev-go. The two schedule-bearing jobs (smoke, release-gates) carry a
+# `ref` matrix that, on a scheduled run only, checks out main AND dev-go
+# explicitly; on every other event the matrix collapses to the triggering ref.
+# Per-push jobs already cover dev-go through `push: branches: ["**"]`. The ref
+# list is written out in BOTH jobs' matrices, because `strategy.matrix` cannot
+# read the `env` context: when dev-go is deleted after the cutover, drop it
+# from both (a checkout of a missing ref fails, loudly, which is the right
+# failure mode).
 
 name: ci
 
@@ -27,8 +54,10 @@ on:
   push:
     branches: ["**"]
   pull_request: {}
+  workflow_dispatch: {}
   schedule:
-    # Run smoke job weekly on Sundays at 03:17 UTC.
+    # Weekly on Sundays at 03:17 UTC. Runs from the default branch; the smoke
+    # and release-gates jobs fan out to main + dev-go via their ref matrix.
     - cron: "17 3 * * 0"
 
 permissions:
@@ -38,6 +67,7 @@ jobs:
   lint:
     name: Lint + format-check
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -67,6 +97,7 @@ jobs:
   govulncheck:
     name: Vulnerability scan (govulncheck)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     # Reachability-based scan of the stdlib and every dependency. This gate was
     # absent while go.mod pinned 1.25.0, whose stdlib carried reachable
     # TLS/x509, html/template, net/http2 and mail advisories — a security tool
@@ -92,6 +123,7 @@ jobs:
   unit:
     name: Unit + Property tests
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -105,13 +137,19 @@ jobs:
         # step — even though the test is already in the previous step,
         # surfacing it as its own job step prevents accidental rename or
         # deletion regressions.
-        run: |
-          go test -race -run 'TestXCUT07Sentinel|TestSentinel' \
-            ./internal/core/log/...
+        #
+        # This step used to run `-run 'TestXCUT07Sentinel|TestSentinel'`.
+        # `TestSentinel` has never existed in internal/core/log, and `go test
+        # -run` exits 0 on a pattern that matches nothing, so renaming
+        # TestXCUT07Sentinel would have left this step green while it ran no
+        # test at all. `make sentinel-gate` lists the pattern first and fails
+        # on zero matches — the same guard integration-smoke uses.
+        run: make sentinel-gate
 
   integration:
-    name: Integration tests + coverage gate
+    name: Integration tests + coverage gates
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -121,21 +159,11 @@ jobs:
       - name: go test -race ./...
         run: go test -race ./...
       - name: XCUT-04 coverage gate (≥75% on internal/core/...)
-        # XCUT-04 lib-code coverage gate. Phase 3 plan-01 ships only
-        # internal/core/errors/ and internal/core/log/ — both at 90%+
-        # — so the gate passes trivially. Later plans extend the
-        # measured packages while keeping the gate at ≥75%.
-        run: |
-          go test -race -coverprofile=coverage.out -covermode=atomic ./internal/core/...
-          go tool cover -func=coverage.out | tail -1 | awk '{
-            pct=substr($3,1,length($3)-1)+0
-            if (pct < 75.0) {
-              print "Coverage below 75% gate:", $3
-              exit 1
-            } else {
-              print "Coverage:", $3
-            }
-          }'
+        # XCUT-04 lib-code coverage gate on the FULL internal/core tree,
+        # resolvers included — this runner has outbound UDP/53, so the number
+        # that cannot be measured offline is measured here. `make coverage-core`
+        # is the same assertion for a networked local box.
+        run: make coverage-core
       - name: Critical-path coverage gate self-test (proves the gate can fail)
         # Runs BEFORE the gate. scripts/coverage-critical.sh was incapable of
         # failing for its entire life — it averaged per-function percentages
@@ -168,29 +196,55 @@ jobs:
         env:
           REFRESH_COVERAGE: "1"
         run: make coverage-critical
+      - name: Lib-aggregate coverage gate (XCUT-03, resolvers-excluded)
+        # scripts/coverage-lib.sh — ≥75% over internal/core/... minus
+        # resolvers. It was a `make ci` step for a year without ever running
+        # here; it takes ~11s offline, so there was no reason for CI to be the
+        # one place it did not run.
+        run: make coverage-lib
+      - name: Coverage floor ratchet (internal/modules, internal/store)
+        # scripts/coverage-floor.sh with scripts/coverage-floor.ratchet. The
+        # two trees NO other coverage gate looks at: every tool wrapper and
+        # parser, and the sqlc store the report/monitor/SARIF paths read.
+        # Floors are measured-minus-two and may only be raised; see the ratchet
+        # file for the derivation. Skips TestGenResolversCallsDnsvalidator by
+        # name, which otherwise runs the real dnsvalidator to the timeout on a
+        # box that has it.
+        run: make coverage-floor
 
   smoke:
-    name: Smoke tests
+    name: Smoke tests (${{ matrix.ref || 'this ref' }})
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     if: github.event_name == 'pull_request' || github.event_name == 'schedule'
+    strategy:
+      fail-fast: false
+      matrix:
+        # On a scheduled run: main AND dev-go. Otherwise a single empty ref,
+        # which actions/checkout reads as "the triggering ref". See the
+        # SCHEDULE AND BRANCHES note at the top of this file.
+        ref: ${{ github.event_name == 'schedule' && fromJSON('["main", "dev-go"]') || fromJSON('[""]') }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ matrix.ref }}
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
           cache: true
-      - name: go test -race -tags smoke ./...
+      - name: Smoke ring (make test-smoke, count-guarded)
         # Smoke ring per ADR §9 — build-tagged tests that gate atomicity
         # proofs the unit ring cannot deliver (FOUND-04 subprocess SIGKILL
-        # atomicity in Plan 03; FOUND-09 kill-tree in Plan 04). Plan 03-01
-        # ships no smoke tests yet — the suite is empty so this job is a
-        # placeholder that succeeds. Adding `-tags smoke` files lands in
-        # Plans 03-03/04 per W12 revision iter 1.
-        run: go test -race -tags smoke ./...
+        # atomicity; FOUND-09 kill-tree). `make test-smoke` computes the
+        # smoke-only set (tagged minus untagged names) and fails on zero: the
+        # ring was an empty placeholder once, and an empty ring must be a red
+        # step, not a green one.
+        run: make test-smoke
 
   binary-size:
     name: Binary size budget (XCUT-02)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     # Plan 03-06 landed cmd/reconftw/main.go; Plan 03-07 activates the gate
     # unconditionally. XCUT-02 budget: <50MB stripped (52428800 bytes).
     steps:
@@ -199,20 +253,15 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      - name: Build with XCUT-02 strip/trimpath
-        run: go build -ldflags="-s -w" -trimpath -o bin/reconftw ./cmd/reconftw
-      - name: Assert binary <50MB (52428800 bytes)
-        run: |
-          SIZE=$(stat --printf=%s bin/reconftw 2>/dev/null || stat -f%z bin/reconftw)
-          echo "binary size: $SIZE bytes"
-          if [ "$SIZE" -ge 52428800 ]; then
-            echo "::error::binary >=50MB (XCUT-02 gate)"
-            exit 1
-          fi
+      - name: Build with XCUT-02 strip/trimpath + assert <50MB
+        # `make binary-size` is the one copy of the assertion; platform-smoke
+        # below runs the same target per OS.
+        run: make binary-size
 
   integration-smoke:
     name: Integration smoke (E2E)
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     # Hermetic end-to-end gate: drives production record types through the real
     # staging write, merge and scope gate, and asserts artefact CONTENT — not
     # just exit codes. No external tools, no network.
@@ -220,8 +269,8 @@ jobs:
     # This job previously ran `-run TestKernelDemoEndToEnd`, a test deleted in
     # Phase 4. `go test -run` exits 0 when its pattern matches nothing, so the
     # job reported green for months while executing zero tests. The match-count
-    # guard below is the actual fix: a gate that cannot fail is worse than no
-    # gate, because it manufactures confidence.
+    # guard inside `make integration-smoke` is the actual fix: a gate that
+    # cannot fail is worse than no gate, because it manufactures confidence.
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -229,21 +278,12 @@ jobs:
           go-version-file: go.mod
           cache: true
       - name: E2E gate
-        run: |
-          set -euo pipefail
-          PATTERN='^TestE2E'
-          MATCHED=$(go test -list "$PATTERN" ./... 2>/dev/null | grep -c '^TestE2E' || true)
-          echo "E2E tests selected by ${PATTERN}: ${MATCHED}"
-          if [ "$MATCHED" -eq 0 ]; then
-            echo "::error::E2E gate selected ZERO tests. A -run pattern matching nothing exits 0 and produces a false green — failing loudly instead."
-            exit 1
-          fi
-          go test -race -run "$PATTERN" ./...
+        run: make integration-smoke
       - name: interfaces_check (BINDING delta detector)
         # Plan 03-07 upgraded cmd/interfaces_check/main.go to import real
         # packages + compile-time assertions. ADR §5 signature drift now
         # fails this build step.
-        run: go build ./cmd/interfaces_check/...
+        run: make interfaces-check
       # REMOVED: verify-0002.sh (ADR pre-sign gate).
       #
       # It ran `bash .planning/decisions/verify-0002.sh`, which reads
@@ -265,8 +305,14 @@ jobs:
       # Re-adding it to CI means publishing the ADR again — decide that first.
 
   release-gates:
-    name: Release gates (phase 15 acceptance)
+    name: Release gates (${{ matrix.ref || 'this ref' }})
     runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        # Same scheduled fan-out as the smoke job; see the top of this file.
+        ref: ${{ github.event_name == 'schedule' && fromJSON('["main", "dev-go"]') || fromJSON('[""]') }}
     # Phase 15's twelve acceptance gates plus the regression guard, in ONE
     # command. This is the evidence the Phase 14 cutover is signed off against.
     #
@@ -276,15 +322,35 @@ jobs:
     # gates. Folding it into the per-push job would roughly double every push's
     # wall time for a check whose audience is the cutover decision.
     #
-    # ACCEPTANCE GATE 11 IS NOT RUN HERE. Its owner is
-    # .github/workflows/docker_nightly.yml, job `docker`, step
-    # `Verify image health (linux/arm64)`, which builds the multiarch image and
-    # runs it under QEMU. `make release-gates` reports it SKIPPED with that
-    # reason rather than pretending to cover it — so the two workflows do not
-    # duplicate a ~20-minute buildx run, and neither one silently claims the
-    # other's result.
+    # ── WHICH GATES THIS JOB CAN AND CANNOT RUN, decided here, once ───────────
+    #
+    # The job runs with --require-all, so every gate row is PASS, FAIL or
+    # DELEGATED; a SKIPPED gate makes the job red. Three gates cannot execute on
+    # a hosted runner and are DELEGATED with a pointer, by construction:
+    #
+    #   Gate 11 (docker run --platform linux/arm64 … version)
+    #       Needs buildx + QEMU + a registry push and ~20 minutes; `--with-docker`
+    #       here would duplicate a networked build this job has no business
+    #       doing. OWNER: .github/workflows/docker_nightly.yml, job `docker`,
+    #       step `Verify image health (linux/arm64)`. Run it on dev-go via that
+    #       workflow's workflow_dispatch.
+    #   Gate 13 (real-tool arg vectors, REFERENCE mode)
+    #       Needs the provisioned 70-tool tree. The hermetic half still runs
+    #       here (make realtools-args is executed; a NOT_EXECUTED census is what
+    #       turns into DELEGATED, a real FAIL stays FAIL). OWNER: the operator,
+    #       `make release-gates-provisioned` on a provisioned box.
+    #   Gate 14b (a real run's nuclei coverage above the derived floor)
+    #       Needs RECONFTW_WORKSPACE from a real scan. OWNER: the operator,
+    #       `RECONFTW_WORKSPACE=<ws> make release-gates-provisioned`.
+    #
+    # Everything else — gates 1-10, 12, 14a, the regression guard and both
+    # CI-break classes — executes here and is PASS or FAIL. Nothing is SKIPPED
+    # in a green run of this job; scripts/release_gates_test.sh (the step before
+    # the gates) proves the flag combination can fail.
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ matrix.ref }}
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
@@ -362,91 +428,88 @@ jobs:
             fi
           done
           exit "$rc"
-      - name: make release-gates
+      - name: Release-gates self-test (proves --require-all / --delegate can fail)
+        # Same posture as the coverage-critical self-test: before the gates
+        # judge, prove the mechanism that turns a SKIPPED gate into a red job
+        # still works. Stub `go`, no tool tree, ~2 seconds.
+        run: make release-gates-selftest
+      - name: make release-gates-ci (--require-all; 11/13/14b delegated)
         id: gates
-        run: make release-gates
+        env:
+          # Caller-owned log directory: the script never removes it, so the
+          # evidence steps below can read it on every outcome.
+          RELEASE_GATES_LOGDIR: ${{ runner.temp }}/release-gates-logs
+        run: make release-gates-ci
 
-      # ── gate 13 evidence ──────────────────────────────────────────────────
-      # scripts/release-gates.sh writes every gate's log into a `mktemp -d`
-      # directory (line 532) and `cleanup_logdir` RETAINS it only when a gate
-      # recorded a FAIL. That directory never reaches the job log, so gate 13's
-      # verdict has so far been arbitrated by reading the script rather than by
-      # reading the log the script wrote. These two steps carry
-      # `gate13_argvector.log` -- and nothing else out of LOGDIR, which holds
-      # unrelated tool output and would become public on this public repo --
-      # into a downloadable artifact.
+      # ── evidence ──────────────────────────────────────────────────────────
+      # Two files, and ONLY two, leave the log directory: summary.txt (every
+      # row with its verdict and note) and gate13_argvector.log (the census
+      # that decided gate 13). The rest of the directory is other gates' tool
+      # output and is not staged for a public artifact on a public repo.
       #
-      # The three conditions are chosen together. `failure()` scopes both steps
-      # to the only case where the log directory can still exist: on a full pass
-      # cleanup_logdir deletes it, and an unconditional `if-no-files-found:
-      # error` would then fail the job on the very success this is driving
-      # toward. The `steps.collect.outputs.found` guard closes the inverse hole:
-      # without it a job that dies before any gate runs -- checkout, setup-go or
-      # an install step -- reddens the upload step for having nothing to upload,
-      # and the job's most visible failure becomes the artifact step instead of
-      # the step that actually broke. With both in place `if-no-files-found:
-      # error` keeps all of its teeth for the case it was written for: the
-      # collect step said it staged a log and the upload then finds none.
-      - name: Collect gate 13 evidence
+      # `if: always()` on both steps: a summary that is only uploaded on
+      # failure cannot show a reader that a green run had every gate executed
+      # or delegated, which is the whole claim this job now makes. The collect
+      # step exits 0 by design — it is a reporter, so a job that died before
+      # the gates ran keeps exactly one red step, the one that broke.
+      - name: Collect release-gates evidence
         id: collect
-        if: failure()
+        if: always()
         shell: bash
+        env:
+          RELEASE_GATES_LOGDIR: ${{ runner.temp }}/release-gates-logs
         run: |
-          shopt -s nullglob
-          tmproot="${TMPDIR:-/tmp}"
-          dest="${{ runner.temp }}/release-gates-logs"
+          dest="${{ runner.temp }}/release-gates-evidence"
           mkdir -p "$dest"
-          dirs=("$tmproot"/reconftw-release-gates.*)
           staged=0
-          for d in "${dirs[@]}"; do
-            [ -d "$d" ] || continue
-            # ONLY this filename. The rest of LOGDIR is other gates' tool output
-            # and is not staged for a public artifact.
-            log="$d/gate13_argvector.log"
-            [ -f "$log" ] || continue
-            cp "$log" "$dest/$(basename "$d")-gate13_argvector.log"
-            staged=$((staged + 1))
+          for f in summary.txt gate13_argvector.log; do
+            if [ -f "$RELEASE_GATES_LOGDIR/$f" ]; then
+              cp "$RELEASE_GATES_LOGDIR/$f" "$dest/$f"
+              staged=$((staged + 1))
+            fi
           done
           if [ "$staged" -gt 0 ]; then
             echo "found=true" >> "$GITHUB_OUTPUT"
-            echo "staged $staged gate13_argvector.log file(s):"
+            echo "staged $staged evidence file(s):"
             ls -l "$dest"
+            echo "::group::release-gates summary"
+            cat "$dest/summary.txt" 2>/dev/null || echo "(no summary.txt)"
+            echo "::endgroup::"
             exit 0
           fi
           echo "found=false" >> "$GITHUB_OUTPUT"
-          if [ "${#dirs[@]}" -eq 0 ]; then
-            echo "No $tmproot/reconftw-release-gates.* directory exists."
-            echo "release-gates.sh retains its log directory only when a gate recorded"
-            echo "a FAIL, so this job failed BEFORE any gate ran. The step that actually"
-            echo "broke is above this one."
-          else
-            echo "A retained log directory exists but carries no gate13_argvector.log,"
-            echo "so gate 13 did not run. The step that actually broke is above this one."
-          fi
-          echo "This step is a reporter, not a gate: it exits 0 on purpose so that a"
-          echo "pre-gate failure leaves exactly one red step, the one that broke."
+          echo "No summary.txt or gate13_argvector.log under $RELEASE_GATES_LOGDIR:"
+          echo "the gates step never ran (checkout, setup-go or an install step"
+          echo "above is the one that broke). This step is a reporter, not a gate."
           exit 0
-      - name: Upload gate 13 evidence
-        if: failure() && steps.collect.outputs.found == 'true'
+      - name: Upload release-gates evidence
+        if: always() && steps.collect.outputs.found == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: release-gates-gate13
-          path: ${{ runner.temp }}/release-gates-logs/
+          name: release-gates-${{ matrix.ref || github.ref_name }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/release-gates-evidence/
           if-no-files-found: error
           retention-days: 14
 
   platform-smoke:
     name: Platform smoke (${{ matrix.os }})
-    # XPLAT-05: build + smoke-test the binary on every supported platform on
-    # each PR/push (Linux + macOS; Apple Silicon via macos-latest, Intel x86_64
-    # via macos-15-intel — macos-13 was retired 2025-12-04 and jobs targeting a
+    # XPLAT-05: build + the SMOKE RING on every supported platform on each
+    # PR/push (Linux + macOS; Apple Silicon via macos-latest, Intel x86_64 via
+    # macos-15-intel — macos-13 was retired 2025-12-04 and jobs targeting a
     # retired label queue forever. macos-15-intel is supported until Aug 2027).
-    # The weekly integration-full run lives in the scheduled jobs above.
+    #
+    # This job used to run the WHOLE suite under -race on all four platforms —
+    # four extra copies of what `unit` and `integration` already run, on the
+    # slowest runners. It now builds the binary and runs ONLY the tests that
+    # exist under `-tags smoke` (the FOUND-04 SIGKILL atomicity and FOUND-09
+    # kill-tree proofs, which are the platform-sensitive ones). The full -race
+    # suite stays with the unit/integration jobs.
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, ubuntu-22.04, macos-latest, macos-15-intel]
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     if: github.event_name == 'pull_request' || github.event_name == 'push'
     steps:
       - uses: actions/checkout@v4
@@ -454,16 +517,11 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      - name: Build
-        run: go build -ldflags="-s -w" -trimpath -o bin/reconftw ./cmd/reconftw
-      - name: Smoke test
-        run: go test -race -tags smoke ./...
-      - name: Binary size gate (XCUT-02)
-        shell: bash
-        run: |
-          SIZE=$(stat --printf=%s bin/reconftw 2>/dev/null || stat -f%z bin/reconftw)
-          echo "binary size: $SIZE bytes"
-          if [ "$SIZE" -ge 52428800 ]; then
-            echo "::error::binary >=50MB (XCUT-02 gate)"
-            exit 1
-          fi
+      - name: Build + binary size gate (XCUT-02)
+        run: make binary-size
+      - name: Smoke-tagged tests only (make test-smoke, count-guarded)
+        # The smoke-only set is COMPUTED inside the target, not hardcoded: the
+        # names listed under `-tags smoke` minus the names listed without it.
+        # A hardcoded list would rot the first time a smoke test was added or
+        # renamed, and `-run` on a rotted list exits 0 having run nothing.
+        run: make test-smoke

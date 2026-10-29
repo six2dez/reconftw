@@ -2,13 +2,25 @@ name: Semgrep
 
 # Replaces the previous CodeQL workflow, which was configured for JavaScript
 # and Python — neither language exists in this repo. Semgrep covers bash and
-# other languages reconFTW actually ships.
+# other languages reconFTW actually ships — and, since the v2 cutover line,
+# Go: p/golang (semgrep's Go ruleset) and p/gosec (the gosec rules ported to
+# semgrep) cover cmd/ and internal/.
+#
+# FAILURE POLICY. One scan, two consumers:
+#   * the full SARIF (every severity) is ALWAYS uploaded to the security tab,
+#     so warnings and info findings stay visible for burn-down;
+#   * ERROR-severity findings fail the job. Semgrep's own `--error` flag fails
+#     on ANY finding, which would make the job red on the warning backlog, and
+#     `--severity ERROR` would drop the warnings from the SARIF — so the
+#     high-severity gate is a second step that reads the SARIF this scan wrote
+#     and counts `level: error` results. Zero means green; the count and the
+#     rule ids are printed either way.
 
 on:
   push:
-    branches: [main, dev]
+    branches: [main, dev, dev-go]
   pull_request:
-    branches: [main, dev]
+    branches: [main, dev, dev-go]
   schedule:
     - cron: '46 8 * * 3'
   workflow_dispatch:
@@ -21,18 +33,20 @@ jobs:
   semgrep:
     name: Semgrep SAST
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     container:
       image: semgrep/semgrep:latest
     steps:
       - uses: actions/checkout@v4
 
       - name: Run Semgrep
-        # No --error so the job does not fail CI on findings; results are
-        # uploaded to the GitHub security tab for review. Flip to --error
-        # once the backlog is burned down.
+        # No --error here ON PURPOSE (see FAILURE POLICY above): this step's
+        # job is to produce the complete SARIF. The verdict is the next step.
         run: |
           semgrep scan \
             --config p/bash \
+            --config p/golang \
+            --config p/gosec \
             --config p/security-audit \
             --config p/secrets \
             --config p/dockerfile \
@@ -47,3 +61,40 @@ jobs:
         with:
           sarif_file: semgrep.sarif
           category: semgrep
+
+      - name: Fail on ERROR-severity findings
+        # Runs AFTER the upload so a red verdict never costs the security tab
+        # its data. A SARIF result's level is on the result itself, or
+        # inherited from its rule's defaultConfiguration — both are checked,
+        # because semgrep sets the rule-level default and a result that omits
+        # `level` would otherwise read as "no severity" and slip through.
+        if: always()
+        run: |
+          python3 - <<'EOF'
+          import json, sys
+          try:
+              sarif = json.load(open("semgrep.sarif"))
+          except FileNotFoundError:
+              print("::error::semgrep.sarif was not written — the scan step above broke before producing output")
+              sys.exit(1)
+          errors = []
+          total = 0
+          for run in sarif.get("runs", []):
+              rule_level = {}
+              for rule in run.get("tool", {}).get("driver", {}).get("rules", []):
+                  rule_level[rule.get("id")] = rule.get("defaultConfiguration", {}).get("level", "warning")
+              for res in run.get("results", []):
+                  total += 1
+                  level = res.get("level") or rule_level.get(res.get("ruleId"), "warning")
+                  if level == "error":
+                      loc = res.get("locations", [{}])[0].get("physicalLocation", {})
+                      path = loc.get("artifactLocation", {}).get("uri", "?")
+                      line = loc.get("region", {}).get("startLine", "?")
+                      errors.append(f"{res.get('ruleId')} at {path}:{line}")
+          print(f"semgrep results: {total} total, {len(errors)} at ERROR severity")
+          for e in errors:
+              print(f"::error::{e}")
+          if errors:
+              print("ERROR-severity semgrep findings fail this job; warnings are in the security tab.")
+              sys.exit(1)
+          EOF

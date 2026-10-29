@@ -5,27 +5,27 @@
 # Sources: .planning/decisions/0002-architecture-v2.md §9, RESEARCH.md §"Stack Snapshot",
 #   spike/go/Makefile (Phase 1 winner — port).
 #
-# v1 bash targets (transitional, preserved until Phase 12 cutover): bash-lint,
-#   bash-fmt, bash-test, bash-test-unit, bash-test-integration-smoke,
-#   bash-test-integration-full, bash-test-security, bash-test-all,
-#   bash-test-release-gate, bash-setup-dev, sync, upload, bootstrap, rm.
+# v1 bash targets (bash-*, bootstrap, sync, upload, rm) live in Makefile.legacy,
+# included below so they keep resolving while staying off this surface.
+#
+# `make ci` is the local mirror of .github/workflows/ci.yml — the same gates in
+# the same order (see the `ci` target). When a step is added to one it is added
+# to the other; the two drifting apart is how the repo got a gate that CI
+# enforced on 5 files while the script enforced 13.
 #
 # XCUT-02 binary-size rationale: -ldflags="-s -w" strips symbols + DWARF debug info
 # (per goreleaser convention); -trimpath removes the build host's filesystem paths
 # from panic stacks and embedded build-id metadata (reproducibility + smaller binary).
 
-GH_CLI := $(shell command -v gh 2> /dev/null)
-# PRIV_REPO is read from the environment by each recipe below (not interpolated
-# via $(shell ...) so that shell metacharacters stay as data rather than syntax).
-# Default: reconftw-data.
-
 .PHONY: help \
-        build test test-integration test-smoke integration-smoke lint fmt fmt-check check coverage coverage-critical coverage-critical-selftest coverage-lib ci clean \
-        release-gates release-gates-docker \
-        sync upload bootstrap rm \
-        bash-lint bash-lint-fix bash-fmt bash-test bash-test-unit bash-test-integration-smoke \
-        bash-test-integration-full bash-test-security bash-test-all bash-test-release-gate \
-        bash-setup-dev
+        build test test-integration test-smoke integration-smoke lint fmt fmt-check check \
+        coverage coverage-core coverage-critical coverage-critical-selftest coverage-lib coverage-floor \
+        govulncheck binary-size sentinel-gate ci clean \
+        release-gates release-gates-selftest release-gates-ci release-gates-docker release-gates-provisioned
+
+# Legacy bash targets (bash-*, bootstrap, sync, upload, rm). `-include` so a
+# checkout without the file still builds; see `make help-legacy`.
+-include Makefile.legacy
 
 help:
 	@echo "reconFTW v2 — Primary Go (kernel) targets"
@@ -39,32 +39,24 @@ help:
 	@echo "  make fmt                - gofumpt -w ."
 	@echo "  make fmt-check          - gofumpt -d . (non-zero on any diff)"
 	@echo "  make check              - fmt-check + lint + test (composite local gate)"
-	@echo "  make coverage           - go test -coverprofile on internal/core/..."
+	@echo "  make coverage           - go test -coverprofile on internal/core/... (prints, does not gate)"
+	@echo "  make coverage-core      - XCUT-04 ≥75% gate on internal/core/... (incl. resolvers; needs UDP/53)"
 	@echo "  make coverage-critical  - XCUT-03 per-file ≥90% gate on critical paths"
 	@echo "  make coverage-critical-selftest - Prove the critical gate can actually fail"
 	@echo "  make coverage-lib       - XCUT-03 ≥75% lib-aggregate gate (resolvers-excluded)"
-	@echo "  make ci                 - fmt-check + lint + test + gate self-test + both coverage gates (matches CI)"
-	@echo "  make release-gates      - Phase 15: the 12 acceptance gates + the regression guard"
+	@echo "  make coverage-floor     - ratchet floors for internal/modules + internal/store (scripts/coverage-floor.ratchet)"
+	@echo "  make govulncheck        - reachability vuln scan (loud SKIP when govulncheck is not installed)"
+	@echo "  make sentinel-gate      - XCUT-07 logging-hygiene sentinel, with a zero-match guard"
+	@echo "  make binary-size        - XCUT-02 <50MB stripped-binary gate"
+	@echo "  make ci                 - every ci.yml gate, in ci.yml order (see the target)"
+	@echo "  make release-gates      - Phase 15: the 12 acceptance gates + the regression guard (lenient: SKIPPED is not fatal)"
+	@echo "  make release-gates-selftest - Prove --require-all / --delegate can fail (stub go, ~2s)"
+	@echo "  make release-gates-ci   - what ci.yml runs: --require-all, gates 11/13/14b DELEGATED with pointers"
 	@echo "  make release-gates-docker - release-gates plus acceptance gate 11 (ARM64 docker run)"
+	@echo "  make release-gates-provisioned - --require-all on a provisioned box (tool tree + RECONFTW_WORKSPACE); 11 delegated"
 	@echo "  make clean              - rm -rf bin/ coverage.out"
 	@echo ""
-	@echo "reconFTW v1 — Transitional bash targets (until Phase 12 cutover)"
-	@echo ""
-	@echo "  make bash-test          - bats unit tests"
-	@echo "  make bash-test-unit     - bats unit tests"
-	@echo "  make bash-test-integration-smoke - bats smoke tests"
-	@echo "  make bash-test-integration-full  - bats full integration tests"
-	@echo "  make bash-test-release-gate - bats release-quality gate"
-	@echo "  make bash-test-all      - bats unit + integration"
-	@echo "  make bash-test-security - bats security tests"
-	@echo "  make bash-lint          - shellcheck (error level)"
-	@echo "  make bash-lint-fix      - shellcheck (warning, gcc-format)"
-	@echo "  make bash-fmt           - shfmt -bn -ci -i 4"
-	@echo "  make bash-setup-dev     - pre-commit install"
-	@echo ""
-	@echo "  make bootstrap          - Create private data repo"
-	@echo "  make sync               - Sync with upstream"
-	@echo "  make upload             - Upload data to private repo"
+	@echo "  make help-legacy        - v1 bash targets (Makefile.legacy)"
 
 # =============================================================================
 # v2 Go targets (primary; Phase 3 Foundation Kernel)
@@ -87,6 +79,48 @@ build:
 # test: Ring 1 (unit) + Ring 4 (property-based). Fast (<90s budget per push).
 test:
 	go test -race -short ./...
+
+# sentinel-gate: the XCUT-07 logging-hygiene sentinel as a NAMED step, so a
+# rename or deletion is visible in CI as its own red row rather than as one
+# fewer line in `go test ./...`.
+#
+# ci.yml used to run `-run 'TestXCUT07Sentinel|TestSentinel'`; `TestSentinel`
+# never existed, and `go test -run` exits 0 on a pattern that matches nothing,
+# so the step could only ever go red by the OTHER name failing. The -list
+# count guard below is the same one integration-smoke uses: zero matches is a
+# failure, not a pass.
+SENTINEL_PATTERN ?= ^TestXCUT07Sentinel$$
+SENTINEL_PKG ?= ./internal/core/log/
+
+sentinel-gate:
+	@matched=$$(go test -list '$(SENTINEL_PATTERN)' $(SENTINEL_PKG) 2>/dev/null | grep -c '^Test' || true); \
+	echo "sentinel tests selected by $(SENTINEL_PATTERN) in $(SENTINEL_PKG): $$matched"; \
+	if [ "$$matched" -eq 0 ]; then \
+		echo "ERROR: the sentinel gate selected ZERO tests — a -run pattern matching nothing exits 0 and is a false green."; \
+		exit 1; \
+	fi
+	go test -race -count=1 -run '$(SENTINEL_PATTERN)' $(SENTINEL_PKG)
+
+# govulncheck: reachability-based scan, pinned in ci.yml. Locally the scanner
+# may be absent; that is reported LOUDLY as a skip, never as a pass, and `make
+# ci` prints the install line. CI always has it installed, so there it is a
+# gate.
+govulncheck:
+	@if command -v govulncheck >/dev/null 2>&1; then \
+		govulncheck ./...; \
+	else \
+		echo "SKIPPED govulncheck: not installed — this step was NOT executed."; \
+		echo "        install the CI pin:  go install golang.org/x/vuln/cmd/govulncheck@v1.6.0"; \
+	fi
+
+# binary-size: XCUT-02. The same assertion ci.yml's binary-size job makes.
+binary-size: build
+	@size=$$(stat --printf=%s bin/reconftw 2>/dev/null || stat -f%z bin/reconftw); \
+	echo "binary size: $$size bytes"; \
+	if [ "$$size" -ge 52428800 ]; then \
+		echo "ERROR: binary >=50MB (XCUT-02 gate)"; \
+		exit 1; \
+	fi
 
 # realtools-args: run the real-tool ARG-VECTOR smoke test.
 #
@@ -215,9 +249,36 @@ realtools-args:
 test-integration:
 	go test -race ./...
 
-# test-smoke: Ring 3 (smoke; build-tagged). Weekly cron + every PR.
+# test-smoke: Ring 3 (smoke; build-tagged). Weekly cron + every PR, and the
+# per-platform job. Runs ONLY the tests that exist under `-tags smoke`, in the
+# packages that declare them, and COMPUTES that set: names listed under the tag
+# minus names listed without it. Counting `go test -tags smoke -list . ./...`
+# would count every untagged test too and could never reach zero, and a
+# hardcoded name list rots the first time a smoke test is renamed — both are
+# the `-run` false green this repo keeps re-finding. Zero smoke-only tests is a
+# failure.
+#
+# Package discovery goes through `go list`, not `grep -r`: go list ignores
+# directories starting with `.` or `_` and testdata/, so a stray worktree under
+# .claude/ or a vendored copy cannot be picked up as a package (grep -rl did
+# exactly that on the first run of this target).
 test-smoke:
-	go test -race -tags smoke ./...
+	@set -e; \
+	tmp=$$(mktemp -d); trap 'rm -rf "$$tmp"' EXIT; \
+	go list -tags smoke -f '{{.ImportPath}} {{.TestGoFiles}} {{.XTestGoFiles}}' ./... | sort > "$$tmp/pkgs-tagged"; \
+	go list -f '{{.ImportPath}} {{.TestGoFiles}} {{.XTestGoFiles}}' ./... | sort > "$$tmp/pkgs-untagged"; \
+	pkgs=$$(comm -13 "$$tmp/pkgs-untagged" "$$tmp/pkgs-tagged" | awk '{print $$1}'); \
+	if [ -z "$$pkgs" ]; then echo "ERROR: no package gains a test file under -tags smoke — the smoke ring is empty"; exit 1; fi; \
+	echo "packages with smoke-tagged tests:"; echo "$$pkgs"; \
+	go test -tags smoke -list . $$pkgs | grep '^Test' | sort -u > "$$tmp/tagged"; \
+	go test -list . $$pkgs | grep '^Test' | sort -u > "$$tmp/untagged"; \
+	comm -13 "$$tmp/untagged" "$$tmp/tagged" > "$$tmp/smoke"; \
+	count=$$(grep -c '^Test' "$$tmp/smoke" || true); \
+	echo "smoke-only tests: $$count"; cat "$$tmp/smoke"; \
+	if [ "$$count" -eq 0 ]; then echo "ERROR: ZERO smoke-only tests computed — refusing to report success."; exit 1; fi; \
+	pattern="^($$(paste -sd'|' - < "$$tmp/smoke"))$$"; \
+	echo "running: go test -race -count=1 -tags smoke -run '$$pattern'"; \
+	go test -race -count=1 -tags smoke -run "$$pattern" -v $$pkgs
 
 # integration-smoke: hermetic end-to-end gate.
 # Drives production record types through the real staging write, merge and
@@ -250,10 +311,24 @@ fmt-check:
 # Plan 07: includes integration-smoke (Phase 3 acceptance integration test).
 check: fmt-check lint test integration-smoke
 
-# coverage: Phase 3 XCUT-04 gate (≥75% on lib code; ≥90% on critical paths per XCUT-03).
+# coverage: Phase 3 XCUT-04 profile on internal/core/... — prints the total,
+# does not gate. Includes internal/core/resolvers, whose tests need outbound
+# UDP/53 and hang offline; use coverage-lib for the offline figure.
 coverage:
 	go test -race -coverprofile=coverage.out -covermode=atomic ./internal/core/...
 	go tool cover -func=coverage.out | tail -1
+
+# coverage-core: the XCUT-04 ≥75% gate exactly as ci.yml's integration job
+# asserts it (same package set, same threshold). Needs UDP/53 for the same
+# reason as `coverage`; `make ci` runs it because CI does.
+COVERAGE_CORE_GATE ?= 75.0
+
+coverage-core:
+	go test -race -coverprofile=coverage.out -covermode=atomic ./internal/core/...
+	@go tool cover -func=coverage.out | tail -1 | awk -v gate='$(COVERAGE_CORE_GATE)' '{ \
+		pct = substr($$3, 1, length($$3) - 1) + 0; \
+		if (pct < gate + 0) { print "Coverage below " gate "% gate:", $$3; exit 1 } \
+		else { print "Coverage:", $$3 } }'
 
 # coverage-critical: XCUT-03 per-file ≥90% gate on the kernel critical paths.
 # Files seeded across Plan 03 plans 01-05; see scripts/coverage-critical.sh.
@@ -285,20 +360,41 @@ coverage-critical-selftest:
 
 # coverage-lib: XCUT-03 ≥75% lib-aggregate gate. Excludes internal/core/resolvers
 # (UDP/53 hang offline) — the full lib-wide figure incl. resolvers is a tracked
-# risk measured on a network host. See scripts/coverage-lib.sh.
+# risk measured on a network host. See scripts/coverage-lib.sh. ~11s offline,
+# which is why ci.yml's integration job runs it too.
 coverage-lib:
 	@bash ./scripts/coverage-lib.sh
 
-# ci: composite gate matching the .github/workflows/ci.yml pipeline.
-# Both XCUT-03 coverage gates run here (they replace the bare, non-gating
-# `coverage` target, which additionally hangs on resolvers offline). Both gates
-# are resolvers-excluded and therefore runnable offline.
+# coverage-floor: ratchet floors for internal/modules/... and internal/store/...
+# — the two trees no other coverage gate looks at. Floors live in
+# scripts/coverage-floor.ratchet; the script holds no number. ~12s offline.
+coverage-floor:
+	@bash ./scripts/coverage-floor.sh
+
+# ci: the .github/workflows/ci.yml pipeline, job by job, in the same order.
+#
+#   lint job          fmt-check lint
+#   govulncheck job   govulncheck            (loud SKIP if not installed locally)
+#   unit job          test sentinel-gate
+#   integration job   test-integration coverage-core coverage-critical-selftest
+#                     coverage-critical coverage-lib coverage-floor
+#   integration-smoke integration-smoke + the interfaces_check build
+#   binary-size job   binary-size
+#   release-gates job release-gates-selftest release-gates-ci  (--require-all; 11/13/14b DELEGATED)
+#
+# The smoke and platform-smoke jobs are `make test-smoke`; they are not in `ci`
+# because CI runs them per-PR / per-platform rather than per push. Running
+# `make ci` is the pre-push answer to "will CI be green".
 #
 # coverage-critical-selftest runs immediately before coverage-critical, in the
-# same order as ci.yml: verify the gate can still fail, then let it judge. It is
-# deliberately NOT in `make test` or `make check` — those are the per-push loop,
-# and the self-test only guards edits to the gate itself.
-ci: fmt-check lint test coverage-critical-selftest coverage-critical coverage-lib
+# same order as ci.yml: verify the gate can still fail, then let it judge. The
+# self-tests are deliberately NOT in `make test` or `make check` — those are
+# the per-push loop, and a self-test only guards edits to its gate.
+ci: fmt-check lint govulncheck test sentinel-gate test-integration coverage-core coverage-critical-selftest coverage-critical coverage-lib coverage-floor integration-smoke interfaces-check binary-size release-gates-selftest release-gates-ci
+
+.PHONY: interfaces-check
+interfaces-check:
+	go build ./cmd/interfaces_check/...
 
 # release-gates: phase 15's cutover sign-off gate.
 #
@@ -318,153 +414,36 @@ ci: fmt-check lint test coverage-critical-selftest coverage-critical coverage-li
 release-gates:
 	@bash ./scripts/release-gates.sh
 
+# release-gates-selftest: proves --require-all and --delegate can FAIL. Drives
+# the real script with a stub `go` and no tool tree (the shape of a CI runner)
+# and asserts exit codes and summary wording. Runs in ci.yml immediately before
+# the gates themselves, same posture as coverage-critical-selftest.
+release-gates-selftest:
+	@bash ./scripts/release_gates_test.sh
+
+# release-gates-ci: EXACTLY what ci.yml's release-gates job runs. Every gate is
+# PASS, FAIL or DELEGATED-with-a-pointer; a SKIPPED gate fails the run. The
+# three delegations are the three gates a CI runner cannot execute:
+#   11  ARM64 docker run     -> docker_nightly.yml `Verify image health (linux/arm64)`
+#   13  real-tool arg vectors -> make release-gates-provisioned (operator, tool tree)
+#   14b real nuclei coverage  -> make release-gates-provisioned (operator, RECONFTW_WORKSPACE)
+# RELEASE_GATES_LOGDIR, when set, is a caller-owned directory the script never
+# removes; ci.yml uploads summary.txt and gate13_argvector.log from it.
+release-gates-ci:
+	@bash ./scripts/release-gates.sh --require-all --delegate 11 --delegate 13 --delegate 14b \
+		$${RELEASE_GATES_LOGDIR:+--logdir "$$RELEASE_GATES_LOGDIR"}
+
 release-gates-docker:
 	@bash ./scripts/release-gates.sh --with-docker
 
+# release-gates-provisioned: the operator's half of the sign-off, on a box with
+# the 70-tool runtime and, for gate 14b, RECONFTW_WORKSPACE exported to a real
+# run's workspace. --require-all with ONLY gate 11 delegated: 13 and 14b must
+# execute here or the run fails. This is the named target the DELEGATED rows in
+# CI point at.
+release-gates-provisioned:
+	@bash ./scripts/release-gates.sh --require-all --delegate 11 \
+		$${RELEASE_GATES_LOGDIR:+--logdir "$$RELEASE_GATES_LOGDIR"}
+
 clean:
 	rm -rf bin/ coverage.out coverage-lib.out
-
-# =============================================================================
-# v1 bash targets (transitional; preserved until Phase 12 cutover)
-# =============================================================================
-
-# bootstrap a private repo to store data
-#
-# All repo/branch values are validated and quoted inside each recipe so shell
-# metacharacters in PRIV_REPO env or in the remote's HEAD ref name cannot be
-# interpreted by /bin/sh (cmd injection mitigation).
-bootstrap:
-	@if [ -z "$(GH_CLI)" ]; then echo "github cli is missing. please install"; exit 2; fi
-	@repo="$${PRIV_REPO:-reconftw-data}"; \
-	case "$$repo" in (*[!A-Za-z0-9._/-]*|'') echo "invalid repo name: $$repo"; exit 2;; esac; \
-	gh repo create "$$repo" --private && \
-	gh repo clone "$$repo" "$$HOME/$$repo" && \
-	cd "$$HOME/$$repo" && \
-	branch=$$(git symbolic-ref --short refs/remotes/origin/HEAD | sed 's@^origin/@@') && \
-	git check-ref-format --branch "$$branch" >/dev/null || { echo "invalid default branch: $$branch"; exit 1; } && \
-	git commit --allow-empty -m "Empty commit" && \
-	git remote add upstream https://github.com/six2dez/reconftw && \
-	git fetch upstream && \
-	git rebase upstream/main "$$branch" && \
-	mkdir Recon && \
-	git push origin "$$branch" && \
-	echo "Done!" && \
-	echo "Initialized private repo: $$repo"
-	@echo "bootstrap complete"
-
-rm:
-	@repo="$${PRIV_REPO:-reconftw-data}"; \
-	case "$$repo" in (*[!A-Za-z0-9._/-]*|'') echo "invalid repo name: $$repo"; exit 2;; esac; \
-	gh repo delete "$$repo" --yes && \
-	rm -rf -- "$$HOME/$$repo"
-
-sync:
-	@repo="$${PRIV_REPO:-reconftw-data}"; \
-	case "$$repo" in (*[!A-Za-z0-9._/-]*|'') echo "invalid repo name: $$repo"; exit 2;; esac; \
-	cd "$$HOME/$$repo" && \
-	git fetch upstream && \
-	branch=$$(git symbolic-ref --short refs/remotes/origin/HEAD | sed 's@^origin/@@') && \
-	git check-ref-format --branch "$$branch" >/dev/null || { echo "invalid default branch: $$branch"; exit 1; } && \
-	git rebase upstream/main "$$branch"
-
-upload:
-	@repo="$${PRIV_REPO:-reconftw-data}"; \
-	case "$$repo" in (*[!A-Za-z0-9._/-]*|'') echo "invalid repo name: $$repo"; exit 2;; esac; \
-	cd "$$HOME/$$repo" && \
-	git add . && \
-	git commit -m "Data upload" && \
-	branch=$$(git symbolic-ref --short refs/remotes/origin/HEAD | sed 's@^origin/@@') && \
-	git check-ref-format --branch "$$branch" >/dev/null || { echo "invalid default branch: $$branch"; exit 1; } && \
-	git push origin "$$branch"
-
-bash-lint:
-	@if command -v shellcheck >/dev/null 2>&1; then \
-		shellcheck -S error reconftw.sh modules/*.sh lib/*.sh install.sh; \
-	else \
-		echo "shellcheck not found. Install: https://www.shellcheck.net/"; \
-		exit 1; \
-	fi
-
-bash-lint-fix:
-	@if command -v shellcheck >/dev/null 2>&1; then \
-		shellcheck -S warning -f gcc reconftw.sh modules/*.sh lib/*.sh install.sh; \
-	else \
-		echo "shellcheck not found. Install: https://www.shellcheck.net/"; \
-		exit 1; \
-	fi
-
-bash-fmt:
-	@if command -v shfmt >/dev/null 2>&1; then \
-		shfmt -w -i 4 -bn -ci install.sh reconftw.sh modules/*.sh lib/*.sh; \
-	else \
-		echo "shfmt not found. Install: https://github.com/mvdan/sh"; \
-		exit 1; \
-	fi
-
-bash-test:
-	@if command -v bats >/dev/null 2>&1; then \
-		./tests/run_tests.sh --unit; \
-	else \
-		echo "bats-core not found. Install: https://github.com/bats-core/bats-core"; \
-		exit 1; \
-	fi
-
-bash-test-unit:
-	@if command -v bats >/dev/null 2>&1; then \
-		./tests/run_tests.sh --unit; \
-	else \
-		echo "bats-core not found. Install: https://github.com/bats-core/bats-core"; \
-		exit 1; \
-	fi
-
-bash-test-integration-smoke:
-	@if command -v bats >/dev/null 2>&1; then \
-		./tests/run_tests.sh --smoke; \
-	else \
-		echo "bats-core not found. Install: https://github.com/bats-core/bats-core"; \
-		exit 1; \
-	fi
-
-bash-test-integration-full:
-	@if command -v bats >/dev/null 2>&1; then \
-		./tests/run_tests.sh --integration; \
-	else \
-		echo "bats-core not found. Install: https://github.com/bats-core/bats-core"; \
-		exit 1; \
-	fi
-
-bash-test-security:
-	@if command -v bats >/dev/null 2>&1; then \
-		bats tests/security/*.bats; \
-	else \
-		echo "bats-core not found. Install: https://github.com/bats-core/bats-core"; \
-		exit 1; \
-	fi
-
-bash-test-all:
-	@if command -v bats >/dev/null 2>&1; then \
-		./tests/run_tests.sh --all; \
-	else \
-		echo "bats-core not found. Install: https://github.com/bats-core/bats-core"; \
-		exit 1; \
-	fi
-
-bash-test-release-gate:
-	@bash -n reconftw.sh modules/*.sh lib/*.sh
-	@./tests/run_tests.sh --unit
-	@./tests/run_tests.sh --smoke
-	@if [ -f Recon/*/.log/perf_summary.json ]; then \
-		latest=$$(ls -1t Recon/*/.log/perf_summary.json | head -n1); \
-		tests/bench/compare_baseline.sh tests/bench/baseline_metrics.json "$$latest"; \
-	else \
-		echo "[INFO] No perf summary found under Recon/*/.log; skipping perf regression gate"; \
-	fi
-
-bash-setup-dev:
-	@if command -v pre-commit >/dev/null 2>&1; then \
-		pre-commit install; \
-		echo "Pre-commit hooks installed!"; \
-	else \
-		echo "pre-commit not found. Install: pip install pre-commit"; \
-		exit 1; \
-	fi
