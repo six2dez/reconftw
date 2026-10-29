@@ -1,4 +1,4 @@
-// parity_test.go — Frozen-replay parity harness for the vulns pipeline (D-V9, VULN-14).
+// parity_test.go — Frozen-replay parity harness for the vulns pipeline (VULN-14).
 //
 // Purpose: detect porting bugs by replaying v1-captured (or synthetic) tool
 // output through v2 vulns pipeline logic and asserting per-category behaviour
@@ -12,13 +12,11 @@
 //     crlfuzz_fixture.txt): committed right now. Tests backed by these
 //     MUST PASS (no t.Skip).
 //   - dalfox_poc_fixture.txt uses clearly-fake marker "FAKE_XSS_MARKER_AAAA"
-//     to verify redaction without committing real payloads (T-06-09-01).
+//     to verify redaction without committing real payloads.
 //
 // NOTE ON PACKAGE: this file uses package vulns (not vulns_test) to access
 // unexported parse functions (parseCRLFuzzOutput, parseURLLines). The package-
 // external DAG test is in dag_test.go (package vulns_test).
-//
-// Source: .planning/phases/06-vulnerability-scanning-e2e/06-09-PLAN.md Task 1.
 package vulns
 
 import (
@@ -49,7 +47,7 @@ func vulnsParitySkip(t *testing.T, fixtureBytes []byte, fixturePath string) {
 			continue
 		}
 		if strings.HasPrefix(line, "# TODO:") {
-			t.Skipf("fixture not captured yet (stub header): %s — populate via vulns E2E lab run", fixturePath)
+			vulnsParityStub(t, fixturePath, line)
 		}
 		return
 	}
@@ -59,6 +57,33 @@ func vulnsParitySkip(t *testing.T, fixtureBytes []byte, fixturePath string) {
 // vulnsFixturesBase returns the path to the testdata/fixtures directory
 // relative to this test file's package directory.
 func vulnsFixturesBase() string { return filepath.Join("testdata", "fixtures") }
+
+// vulnsParityStub is the one place a "# TODO: capture from: <cmd>" stub decides
+// between skip and failure.
+//
+// These stubs have made the parity subtests skip for a long time, and a skip is
+// not a pass. By default the subtest still skips — but the skip message now
+// names the exact capture command from the stub header, so the remedy is in the
+// test output rather than in a plan file. With PARITY_FIXTURES_REQUIRED=1 (the
+// provisioned-box / sign-off setting) the same stub is a FAILURE: a sign-off run
+// must not be able to report green over fixtures nobody captured.
+func vulnsParityStub(t *testing.T, fixturePath, headerLine string) {
+	t.Helper()
+	cmd := strings.TrimSpace(strings.TrimPrefix(headerLine, "# TODO:"))
+	cmd = strings.TrimSpace(strings.TrimPrefix(cmd, "capture from:"))
+	if cmd == "" {
+		cmd = "(the stub header names no capture command — write one)"
+	}
+	if os.Getenv("PARITY_FIXTURES_REQUIRED") == "1" {
+		t.Fatalf("fixture NOT captured: %s\n"+
+			"  PARITY_FIXTURES_REQUIRED=1 forbids skipping over a stub. Capture it with:\n"+
+			"    %s\n"+
+			"  then replace the stub header with `# captured-from: <argv> | date: <YYYY-MM-DD> | version: <v>`.",
+			fixturePath, cmd)
+	}
+	t.Skipf("fixture not captured yet (stub header): %s — NOT a pass; capture with: %s "+
+		"(set PARITY_FIXTURES_REQUIRED=1 to make this a failure)", fixturePath, cmd)
+}
 
 // readVulnsTestFixture reads a fixture file and fatals if missing.
 func readVulnsTestFixture(t *testing.T, relPath string) []byte {
@@ -71,49 +96,49 @@ func readVulnsTestFixture(t *testing.T, relPath string) []byte {
 }
 
 // -------------------------------------------------------------------------
-// TestVulnsConfigDefaults — asserts REAL field names from config.go (D-V6).
+// TestVulnsConfigDefaults — asserts REAL field names from config.go.
 // Uses config.Defaults() — NOT a zero-value Config{} which has no defaults.
 // -------------------------------------------------------------------------
 
 // TestVulnsConfigDefaults asserts that the config.Defaults() values for all
-// Phase 6 D-V6 WAF-friendly caps and D-V7 master-gate default are correct.
+// vulns WAF-friendly caps and master-gate default are correct.
 // Any wrong field name here is a COMPILE ERROR — these are real struct fields.
 func TestVulnsConfigDefaults(t *testing.T) {
 	cfg := config.Defaults()
 
-	// D-V7: master gate default off — composite `all` mode must not auto-run vulns.
+	// master gate default off — composite `all` mode must not auto-run vulns.
 	if cfg.Vulns.Enabled != false {
-		t.Errorf("Vulns.Enabled: got %v, want false (D-V7 master gate default off)", cfg.Vulns.Enabled)
+		t.Errorf("Vulns.Enabled: got %v, want false (master gate default off)", cfg.Vulns.Enabled)
 	}
 
-	// D-V6: sqlmap on / ghauri off (opt-in; more invasive).
+	// sqlmap on / ghauri off (opt-in; more invasive).
 	// Field is "Ghauri", NOT "GhauriEnabled" — compile error if wrong.
 	if cfg.Vulns.SQLi.Ghauri != false {
-		t.Errorf("SQLi.Ghauri: got %v, want false (D-V6 conservative default; opt-in only)", cfg.Vulns.SQLi.Ghauri)
+		t.Errorf("SQLi.Ghauri: got %v, want false (conservative default; opt-in only)", cfg.Vulns.SQLi.Ghauri)
 	}
 	if cfg.Vulns.SQLi.SQLMap != true {
-		t.Errorf("SQLi.SQLMap: got %v, want true (D-V6 default engine)", cfg.Vulns.SQLi.SQLMap)
+		t.Errorf("SQLi.SQLMap: got %v, want true (default engine)", cfg.Vulns.SQLi.SQLMap)
 	}
 
-	// D-V6: WAF-friendly dalfox thread cap (reduced from v1 AVAILABLE_CORES*15).
+	// WAF-friendly dalfox thread cap (reduced from v1 AVAILABLE_CORES*15).
 	// Field is "Threads" inside VulnXSS — compile error if wrong.
 	if cfg.Vulns.XSS.Threads != 5 {
-		t.Errorf("XSS.Threads: got %v, want 5 (D-V6 WAF-friendly cap)", cfg.Vulns.XSS.Threads)
+		t.Errorf("XSS.Threads: got %v, want 5 (WAF-friendly cap)", cfg.Vulns.XSS.Threads)
 	}
 
-	// D-V6: cap at 150 LFI candidates per target (v1 LFI_MAX_URLS=150).
+	// cap at 150 LFI candidates per target (v1 LFI_MAX_URLS=150).
 	// Field is "MaxURLs" inside VulnLFI — compile error if wrong.
 	if cfg.Vulns.LFI.MaxURLs != 150 {
-		t.Errorf("LFI.MaxURLs: got %v, want 150 (D-V6 cap, v1 LFI_MAX_URLS=150)", cfg.Vulns.LFI.MaxURLs)
+		t.Errorf("LFI.MaxURLs: got %v, want 150 (cap, v1 LFI_MAX_URLS=150)", cfg.Vulns.LFI.MaxURLs)
 	}
 
-	// D-V6: fray WAF-aware payload cap (reduced for WAF-friendly runs).
+	// fray WAF-aware payload cap (reduced for WAF-friendly runs).
 	// Field is "MaxPayloads" inside VulnFray — compile error if wrong.
 	if cfg.Vulns.Fray.MaxPayloads != 20 {
-		t.Errorf("Fray.MaxPayloads: got %v, want 20 (D-V6 WAF-friendly cap)", cfg.Vulns.Fray.MaxPayloads)
+		t.Errorf("Fray.MaxPayloads: got %v, want 20 (WAF-friendly cap)", cfg.Vulns.Fray.MaxPayloads)
 	}
 
-	t.Logf("TestVulnsConfigDefaults: PASS — all D-V6/D-V7 defaults verified")
+	t.Logf("TestVulnsConfigDefaults: PASS — all defaults verified")
 }
 
 // -------------------------------------------------------------------------
@@ -251,7 +276,7 @@ func TestVulnsParityDalfoxParse(t *testing.T) {
 // TestVulnsParityDalfoxRedaction — XCUT-07 synthetic check.
 // -------------------------------------------------------------------------
 
-// TestVulnsParityDalfoxRedaction (XCUT-07 / T-06-09-01 / plan requirement):
+// TestVulnsParityDalfoxRedaction (XCUT-07 / plan requirement):
 // Feed fixture with realistic PoC URL string; assert no record field contains
 // the raw URL value. PayloadRedacted=="***", PoCRedacted=="***".
 func TestVulnsParityDalfoxRedaction(t *testing.T) {
@@ -383,13 +408,13 @@ func TestVulnsParitySQLMapParse(t *testing.T) {
 // VulnFindingRecord construction path. This avoids the need for a live dalfox
 // binary or MockBackend interception of exec.CommandContext calls.
 //
-// This test verifies the invariants that matter for D-V9:
+// This test verifies the invariants that matter for
 //  1. VulnClass is correctly assigned ("crlf" from parseCRLFuzzOutput output).
 //  2. Severity is non-empty on every record.
 //  3. XCUT-07 redaction: PayloadRedacted == "***", PoCRedacted == "***".
 //
 // For XSSTask's dalfox pipeline, see TestVulnsParityDalfoxParse, which verifies
-// the record construction logic. Phase 18 moved dalfox onto Runner.StreamOpts;
+// the record construction logic. The Runner move put dalfox onto Runner.StreamOpts;
 // this synthetic test remains focused on classification rather than dispatch.
 func TestVulnsParityClassifyToFindings(t *testing.T) {
 	fixturePath := filepath.Join(vulnsFixturesBase(), "crlfuzz", "crlfuzz_fixture.txt")

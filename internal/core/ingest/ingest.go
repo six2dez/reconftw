@@ -14,7 +14,6 @@
 package ingest
 
 import (
-	"bufio"
 	"context"
 	"crypto/sha256"
 	"database/sql"
@@ -33,6 +32,7 @@ import (
 	// modernc.org/sqlite registers the "sqlite" driver name (pure-Go, CGO-free).
 	_ "modernc.org/sqlite"
 
+	"github.com/six2dez/reconftw/internal/core/output"
 	sqlcgen "github.com/six2dez/reconftw/internal/store/sqlc"
 )
 
@@ -637,28 +637,17 @@ func recordObservation(ctx context.Context, q *sqlcgen.Queries, scanID, target, 
 }
 
 // forEachJSONL calls fn for every non-blank line of a JSONL file. A missing file
-// is silently skipped (an absent artefact just means that pipeline did not run).
+// is silently skipped (an absent artefact just means that pipeline did not run);
+// any other read failure — including a line past maxJSONLLine, which the old
+// inline scanner ended on silently — is logged at Debug. The walk itself is
+// output.ForEachJSONLLine, the one JSONL reader.
 func forEachJSONL(path string, logger *slog.Logger, fn func(line []byte)) {
-	f, err := os.Open(path) //nolint:gosec // path built from workDir, not user input
-	if err != nil {
-		if !errors.Is(err, os.ErrNotExist) && logger != nil {
-			logger.Debug("ingest: open artefact failed", "path", path, "err", err)
-		}
-		return
-	}
-	defer f.Close() //nolint:errcheck
-
-	sc := bufio.NewScanner(f)
-	sc.Buffer(make([]byte, 0, 64<<10), maxJSONLLine)
-	for sc.Scan() {
-		line := sc.Bytes()
-		if len(strings.TrimSpace(string(line))) == 0 {
-			continue
-		}
-		// Copy: Scanner reuses its buffer across iterations.
-		cp := make([]byte, len(line))
-		copy(cp, line)
-		fn(cp)
+	err := output.ForEachJSONLLine(path, maxJSONLLine, func(line []byte) error {
+		fn(line)
+		return nil
+	})
+	if err != nil && logger != nil {
+		logger.Debug("ingest: read artefact failed", "path", path, "err", err)
 	}
 }
 

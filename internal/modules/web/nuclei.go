@@ -3,7 +3,7 @@
 // NucleiTask runs nuclei against probed hosts, writes findings to the
 // SARIF-compatible findings.jsonl artefact (unchanged schema from Phase 4).
 //
-// DEPENDENCY (D-W12): DependsOn ["web.httpx", "web.wafw00f"] so that
+// DEPENDENCY: DependsOn ["web.httpx", "web.wafw00f"] so that
 // waf.jsonl exists for WAF rate-halving (v1 web.sh:969→1149 sequencing).
 // best_effort: a disabled/empty wafw00f still lets nuclei run — the step-b
 // fallback runs all hosts at normal rate when waf.jsonl is absent or empty.
@@ -12,15 +12,13 @@
 // WAF hosts detected in artefacts/waf.jsonl run at rl = NucleiRateLimit/3.
 // Non-WAF hosts run at rl = NucleiRateLimit (default 150).
 //
-// ARG VECTOR (RESEARCH §nuclei — verbatim v1 form):
+// ARG VECTOR (verbatim v1 form):
 //
 //	nuclei -l <hostsfile> -severity <sev> -nh -rl <n> -retries 2 -stats -sj -si 30
 //	       -t <templates> -j -o <stagingFile>
 //
-// T-05-04 mitigation: nuclei stdout routed to run.log via app.Tools.Stream;
-// never logged at INFO terminal (GAP-3 pattern).
-//
-// Source: .planning/phases/05-web-pipeline-e2e/05-02-PLAN.md Task 1.
+// nuclei stdout routed to run.log via app.Tools.Stream;
+// never logged at INFO terminal.
 package web
 
 import (
@@ -42,7 +40,6 @@ import (
 )
 
 // nucleiLine is the subset of nuclei JSONL output fields we parse.
-// Source: RESEARCH §Code Examples: nucleiLine struct.
 type nucleiLine struct {
 	TemplateID  string `json:"template-id"`
 	MatcherName string `json:"matcher-name"`
@@ -55,9 +52,9 @@ type nucleiLine struct {
 	Host             string   `json:"host"`
 }
 
-// FindingRecord is the SARIF-compatible findings.jsonl schema for Phase 5.
+// FindingRecord is the SARIF-compatible findings.jsonl schema.
 // Extends the Phase-4 TakeoverRecord shape with nuclei-specific fields.
-// D-W11: findings.jsonl schema is UNCHANGED (extends Phase 4, never removes).
+// findings.jsonl only ever gains fields; none are removed.
 type FindingRecord struct {
 	Type             string   `json:"type"`
 	Host             string   `json:"host"`
@@ -99,33 +96,27 @@ func (t *NucleiTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resu
 	cfg := app.Cfg
 
 	// Resolve templates path from config: cfg.Web.Nuclei.TemplatesPath falls
-	// back to cfg.Paths.NucleiTemplates (ADR §2 legacy alias pattern).
+	// back to cfg.Paths.NucleiTemplates (legacy alias pattern).
 	templatesPath := cfg.Web.Nuclei.TemplatesPath
 	if templatesPath == "" {
 		templatesPath = cfg.Paths.NucleiTemplates
 	}
 
-	// Pitfall 3: check templates path before invoking nuclei.
+	// Check templates path before invoking nuclei.
 	if templatesPath == "" {
-		if app.Log != nil {
-			app.Log.Info("web.nuclei: templates path not configured — skipping")
-		}
+		app.Log.Info("web.nuclei: templates path not configured — skipping")
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 	if _, err := os.Stat(templatesPath); err != nil {
-		if app.Log != nil {
-			app.Log.Info("web.nuclei: templates path not accessible — skipping",
-				"path", templatesPath, "err", err)
-		}
+		app.Log.Info("web.nuclei: templates path not accessible — skipping",
+			"path", templatesPath, "err", err)
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
 	// Read all probed hosts from artefacts/hosts.jsonl.
 	allHosts, err := readHostURLsFromJSONL(app)
 	if err != nil || len(allHosts) == 0 {
-		if app.Log != nil {
-			app.Log.Info("web.nuclei: no hosts in hosts.jsonl — skipping")
-		}
+		app.Log.Info("web.nuclei: no hosts in hosts.jsonl — skipping")
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
@@ -182,16 +173,14 @@ func (t *NucleiTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resu
 		findings, err := runNucleiGroup(ctx, app, toolName, normalHosts,
 			severity, rl, templatesPath, extraArgs, "normal", inputsDir, artefactsDir)
 		if err != nil {
-			// F6: a TERMINAL error means nuclei ran and ended badly, so its
+			// A TERMINAL error means nuclei ran and ended badly, so its
 			// output is partial. Discard everything accumulated so far —
 			// publishing half a scan as a complete result is precisely the
 			// failure this closes — and fail the task.
 			if isTerminalStreamError(err) {
 				return task.Result{Status: task.StatusErrored}, err
 			}
-			if app.Log != nil {
-				app.Log.Debug("web.nuclei: normal group error", "err", err)
-			}
+			app.Log.Debug("web.nuclei: normal group error", "err", err)
 		}
 		allFindings = append(allFindings, findings...)
 	}
@@ -204,9 +193,7 @@ func (t *NucleiTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resu
 			if isTerminalStreamError(err) {
 				return task.Result{Status: task.StatusErrored}, err
 			}
-			if app.Log != nil {
-				app.Log.Debug("web.nuclei: waf group error", "err", err)
-			}
+			app.Log.Debug("web.nuclei: waf group error", "err", err)
 		}
 		allFindings = append(allFindings, findings...)
 	}
@@ -214,7 +201,7 @@ func (t *NucleiTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resu
 	// Stage findings into inputs/findings.nuclei.jsonl (staging contract).
 	// MergeAllWebArtefacts is the single app.Tree.Append caller for findings.
 	//
-	// F3 (phase 15): staged UNCONDITIONALLY — StageJSONL removes the staging
+	// Staged UNCONDITIONALLY — StageJSONL removes the staging
 	// file when this scan produced no findings, so a remediated vulnerability
 	// from a previous run cannot reappear in the merged findings artefact.
 	// Reaching here means nuclei RAN; every "not configured / no hosts" path
@@ -228,14 +215,12 @@ func (t *NucleiTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resu
 		lines = append(lines, b)
 	}
 	stagingPath := filepath.Join(app.Target.WorkDir, "inputs", "findings.nuclei.jsonl")
-	if wErr := output.StageJSONL(stagingPath, lines); wErr != nil && app.Log != nil {
+	if wErr := output.StageJSONL(stagingPath, lines); wErr != nil {
 		app.Log.Debug("web.nuclei: staging write failed",
 			"path", stagingPath, "err", wErr)
 	}
 
-	if app.Log != nil {
-		app.Log.Debug("web.nuclei: completed", "findings", len(allFindings))
-	}
+	app.Log.Debug("web.nuclei: completed", "findings", len(allFindings))
 
 	return task.Result{
 		Status: task.StatusDone,
@@ -244,7 +229,7 @@ func (t *NucleiTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resu
 }
 
 // runNucleiGroup runs nuclei for a host group, returning parsed FindingRecords.
-// Uses Backend.Stream (XCUT-09 heartbeat — nuclei can run 30+ minutes).
+// Uses Backend.Stream (heartbeat — nuclei can run 30+ minutes).
 func runNucleiGroup(ctx context.Context, app *appctx.AppContext, toolName string,
 	hosts []string, severity string, rateLimit int, templatesPath string,
 	extraArgs []string, groupLabel, inputsDir, artefactsDir string,
@@ -258,7 +243,7 @@ func runNucleiGroup(ctx context.Context, app *appctx.AppContext, toolName string
 
 	stagingFile := filepath.Join(artefactsDir, "nuclei."+groupLabel+".jsonl.tmp")
 
-	// Build arg vector (RESEARCH §nuclei verbatim v1 form, plus the 17-05
+	// Build arg vector (verbatim v1 form, plus the
 	// accounting flags).
 	//
 	// `-silent` IS GONE, DELIBERATELY. It suppressed nuclei's own
@@ -274,7 +259,7 @@ func runNucleiGroup(ctx context.Context, app *appctx.AppContext, toolName string
 	// accounting change, not a coverage change.
 	//
 	// `-stats -sj -si` writes one JSON accounting object per interval, and a
-	// final one at scan end, to stderr. T-17-05-06 (volume): at 30 s the web
+	// final one at scan end, to stderr. at 30 s the web
 	// group's 23-minute banked runtime yields ~46 objects of ~200 bytes — under
 	// 10 KB, and ~24 KB/hour in the worst case. Bounded, and asserted bounded by
 	// TestNucleiCoverageRecordStaysSmall.
@@ -301,7 +286,7 @@ func runNucleiGroup(ctx context.Context, app *appctx.AppContext, toolName string
 	// never 0 — because a listing failure must not fail the scan.
 	cov.FilterSelected = nucleiFilterSelected(ctx, app, toolName, severity, templatesPath)
 
-	// Use Backend.Stream for XCUT-09 heartbeat (T-05-04 mitigation: raw
+	// Use Backend.Stream for the heartbeat (raw
 	// nuclei output routed to run.log via stream drain, never to terminal).
 	eventCh, err := app.Tools.Stream(ctx, toolName, args)
 	if err != nil {
@@ -311,7 +296,7 @@ func runNucleiGroup(ctx context.Context, app *appctx.AppContext, toolName string
 		return nil, fmt.Errorf("nuclei stream %s: %w", groupLabel, err)
 	}
 
-	// F6 (phase 15): consume the TERMINAL error. This is the highest-value site
+	// Consume the TERMINAL error. This is the highest-value site
 	// in the sweep — the very next statement reads stagingFile, so a nuclei
 	// killed by OOM or a template panic used to lead straight to parsing a
 	// TRUNCATED file, or (when it died before writing anything) the file a
@@ -377,10 +362,8 @@ func nucleiFilterSelected(ctx context.Context, app *appctx.AppContext, toolName,
 		// here would be invisible on a normal run — and the thing being reported
 		// is that the run cannot say how many templates its filter selected,
 		// which is half of what this plan exists to make visible.
-		if app.Log != nil {
-			app.Log.Warn("web.nuclei: template listing failed — filter_selected will be UNKNOWN",
-				"err", err)
-		}
+		app.Log.Warn("web.nuclei: template listing failed — filter_selected will be UNKNOWN",
+			"err", err)
 		return nil
 	}
 	return parseNucleiTemplateList(res.Stdout)
@@ -392,7 +375,7 @@ func finishNucleiCoverage(app *appctx.AppContext, cov *NucleiCoverage) {
 	if app == nil || app.Target == nil || app.Target.WorkDir == "" {
 		return
 	}
-	if err := writeNucleiCoverage(app.Target.WorkDir, cov); err != nil && app.Log != nil {
+	if err := writeNucleiCoverage(app.Target.WorkDir, cov); err != nil {
 		// Warn: a run whose coverage record did not get written is a run that
 		// cannot account for what it scanned, which is the 2026-08-24 state.
 		app.Log.Warn("web.nuclei: coverage record write FAILED — this run cannot account "+
@@ -442,27 +425,18 @@ func parseNucleiOutput(data []byte) []FindingRecord {
 }
 
 // readHostURLsFromJSONL reads artefacts/hosts.jsonl and returns the list of
-// host URLs for nuclei input (url field from D-W11 HostRecord schema).
+// host URLs for nuclei input (url field from HostRecord schema).
+
 func readHostURLsFromJSONL(app *appctx.AppContext) ([]string, error) {
 	hostsPath := filepath.Join(app.Target.WorkDir, "artefacts", "hosts.jsonl")
-	data, err := os.ReadFile(hostsPath) //nolint:gosec // path within WorkDir
-	if err != nil {
-		return nil, fmt.Errorf("read hosts.jsonl: %w", err)
-	}
 	var hosts []string
-	scanner := bufio.NewScanner(bytes.NewReader(data))
-	scanner.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
-	for scanner.Scan() {
-		line := bytes.TrimSpace(scanner.Bytes())
-		if len(line) == 0 {
-			continue
-		}
+	err := output.ForEachJSONLLine(hostsPath, 0, func(line []byte) error {
 		var rec struct {
 			URL  string `json:"url"`
 			Host string `json:"host"`
 		}
 		if err := json.Unmarshal(line, &rec); err != nil {
-			continue
+			return nil // malformed record: skipped, as before
 		}
 		h := rec.URL
 		if h == "" {
@@ -471,39 +445,38 @@ func readHostURLsFromJSONL(app *appctx.AppContext) ([]string, error) {
 		if h != "" {
 			hosts = append(hosts, h)
 		}
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("read hosts.jsonl: %w", err)
 	}
 	return hosts, nil
 }
 
 // readWAFHostsSet reads artefacts/waf.jsonl and returns a set of WAF hosts
 // (keyed by normalised host string). Returns empty map when file is absent.
+
 func readWAFHostsSet(app *appctx.AppContext) map[string]struct{} {
 	wafPath := filepath.Join(app.Target.WorkDir, "artefacts", "waf.jsonl")
-	data, err := os.ReadFile(wafPath) //nolint:gosec // path within WorkDir
-	if err != nil {
-		return map[string]struct{}{} // step-b fallback: treat as no WAF data
-	}
 	set := make(map[string]struct{})
-	scanner := bufio.NewScanner(bytes.NewReader(data))
-	for scanner.Scan() {
-		line := bytes.TrimSpace(scanner.Bytes())
-		if len(line) == 0 {
-			continue
-		}
+	// A missing or unreadable waf.jsonl is "no WAF data": every host gets the
+	// full template set rather than none.
+	_ = output.ForEachJSONLLine(wafPath, 0, func(line []byte) error {
 		var rec struct {
 			Host string `json:"host"`
 		}
 		if err := json.Unmarshal(line, &rec); err == nil && rec.Host != "" {
 			set[normalizeHost(rec.Host)] = struct{}{}
 		}
-	}
+		return nil
+	})
 	return set
 }
 
 // normalizeHost strips scheme, path, and port from a URL/host string for WAF
 // set lookup.
 //
-// IN-04: kept byte-for-byte behavior-equivalent to extract/waf.normalizeHost
+// Kept byte-for-byte behavior-equivalent to extract/waf.normalizeHost
 // (waf.go:131) — including port stripping with an IPv6 guard. nuclei keys the
 // WAF-host set produced from waf.jsonl with this function; if those two
 // implementations diverged on port handling, WAF rate-halving would

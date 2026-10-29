@@ -334,9 +334,7 @@ var legacyAliasMap = map[string]string{
 	"FFUF_FLAGS":                   "advanced.tools.ffuf.flags",
 	"GOTATOR_FLAGS":                "advanced.tools.gotator.flags",
 	"TLSX_THREADS":                 "advanced.tools.tlsx.threads",
-	"XNLINKFINDER_DEPTH":           "advanced.tools.xnlinkfinder.depth",
 	"DNSVALIDATOR_THREADS":         "advanced.tools.dnsvalidator.threads",
-	"INTERLACE_THREADS":            "advanced.tools.interlace.threads",
 	"TInjA_RATELIMIT":              "advanced.tools.tinja.rate_limit",
 	"TInjA_TIMEOUT":                "advanced.tools.tinja.timeout",
 	"SSTIMAP_LEVEL":                "advanced.tools.sstimap.level",
@@ -440,7 +438,7 @@ var supersededKeys = map[string]supersededInfo{
 	"KATANA_THREADS":              {reason: "v2 auto-scales katana threads (0 = auto)", pin: "web.katana.threads"},
 	"BRUTESPRAY_CONCURRENCE":      {reason: "v2 auto-scales brutespray concurrence (0 = auto)", pin: "advanced.tools.brutespray.concurrence"},
 	"DNSTAKE_THREADS":             {reason: "v2 auto-scales dnstake threads (0 = auto)", pin: "advanced.tools.dnstake.threads"},
-	"DALFOX_THREADS":              {reason: "v2 auto-scales dalfox threads (0 = auto)", pin: "advanced.tools.dalfox.threads"},
+	"DALFOX_THREADS":              {reason: "v2 auto-scales dalfox threads (0 = auto); dalfox -w reads vulns.xss.threads", pin: "vulns.xss.threads"},
 	"ARJUN_THREADS":               {reason: "v2 auto-scales arjun threads (0 = auto)", pin: "advanced.tools.arjun.threads"},
 
 	// File-read / ${VAR}-assembled port lists — v2 reads the config files directly.
@@ -476,6 +474,13 @@ var supersededKeys = map[string]supersededInfo{
 	"LFI_FFUF_TIMEOUT":      {reason: "no v2 analog (LFI ffuf request timeout)", pin: ""},
 	"LFI_FFUF_MAXTIME":      {reason: "no v2 analog (LFI ffuf max time)", pin: ""},
 	"LFI_FOLLOW_REDIRECTS":  {reason: "no v2 analog (LFI follow-redirects flag)", pin: ""},
+
+	// Knobs for tools v2 does not dispatch. These used to map to live
+	// advanced.tools.* fields that NO production code read — a migrated config
+	// looked honoured and was not. Superseded with the honest reason instead.
+	"XNLINKFINDER_DEPTH": {reason: "v2 does not dispatch xnLinkFinder; link discovery is katana/jsluice/urlfinder", pin: ""},
+	"INTERLACE_THREADS":  {reason: "v2 has no interlace; its only v1 consumer ported (github repo cloning) reads osint.github.threads", pin: "osint.github.threads"},
+	"AXIOM_POST_START":   {reason: "v2 has no axiom post-start hook (see internal/core/backend/axiom.go)", pin: ""},
 
 	// Misc v1-only knobs with no v2 field.
 	"CMSSCAN_TIMEOUT":         {reason: "no v2 analog (CMSeeK scan timeout)", pin: ""},

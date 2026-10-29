@@ -1,4 +1,4 @@
-// wellknown_test.go — behavior tests for WebWellKnownTask (13-04 Task 2).
+// wellknown_test.go — behavior tests for WebWellKnownTask .
 //
 // Internal (package web) to reach the unexported helpers. An httptest server
 // stands in for the real .well-known endpoints; scope + userinfo guards are
@@ -57,6 +57,7 @@ func newWellknownApp(t *testing.T, enabled bool) *appctx.AppContext {
 	cfg := &config.Config{}
 	cfg.Web.WellKnown = config.WebWellKnown{Enabled: enabled, MaxTargets: 200}
 	return &appctx.AppContext{
+		Log: appctx.NopLogger(),
 		Cfg: cfg,
 		Target: &appctx.Target{
 			Domain:  "example.com",
@@ -142,7 +143,7 @@ func TestWebWellKnownExtractsInScopeHosts(t *testing.T) {
 }
 
 // TestWebWellKnownScopeAndUserinfoGuard proves off-scope + userinfo targets are
-// NEVER fetched (SSRF/scope guard, T-13-04-01).
+// NEVER fetched (SSRF/scope guard).
 func TestWebWellKnownScopeAndUserinfoGuard(t *testing.T) {
 	srv, hits := wellknownTestServer(t)
 	app := newWellknownApp(t, true)
@@ -214,7 +215,7 @@ func TestWebWellKnownNoTargetsSkips(t *testing.T) {
 	}
 }
 
-// TestWellknownHTTPClientRefusesRedirect proves the SSRF-pivot guard (CR-13-01):
+// TestWellknownHTTPClientRefusesRedirect proves the SSRF-pivot guard:
 // wellknownHTTPClient must NOT follow redirects. The Run-time scope/userinfo check
 // covers only the initial target URL, so an in-scope but attacker-influenceable
 // response that 302-redirects toward internal space (169.254.169.254 cloud

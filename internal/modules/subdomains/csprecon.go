@@ -8,14 +8,13 @@
 //
 // This task MIRRORS internal/modules/web/csprecon.go (CspreconTask) but for the
 // subdomains package + resolved staging: the same `csprecon -s -l <file>` arg
-// vector and the same extract/csp.Extract anchored in-scope filter (T-13-02-01 —
-// reuse, no re-implement). It reuses the scraping gate (cfg.Subdomains.Scraping.
+// vector and the same extract/csp.Extract anchored in-scope filter (reuse, no
+// re-implement). It reuses the scraping gate (cfg.Subdomains.Scraping.
 // Enabled) — csprecon is a scraping-class discovery source; no new config field.
 //
-// WIRING NOTE: this task self-registers via init() and is built into the DAG but
-// remains UNSELECTED until 13-08 adds the "subdomains.csprecon" prefix to the
-// discovery stage list (subs.go/composite.go/stub_subcommands.go). This plan does
-// NOT edit any stage list; the unit test exercises Run directly.
+// WIRING: this task self-registers via init() and is selected by the discovery
+// stage list (subs.go/composite.go/stub_subcommands.go). The unit test exercises
+// Run directly.
 //
 // bash reference (modules/subdomains.sh:1222-1246, sub_scraping):
 //
@@ -24,8 +23,6 @@
 // The Backend/Runner seam has no stdin channel (doc.go / reverseip.go), so — like
 // web/csprecon.go — the host list is passed via -l <file> instead of bash's stdin
 // pipe. csprecon (edoardottt/csprecon) is a LocalBackend tool already in tools.lock.
-//
-// Source: .planning/phases/13-domain-parity/13-02-PLAN.md Task 1.
 package subdomains
 
 import (
@@ -76,9 +73,7 @@ func (SubCspreconTask) Run(ctx context.Context, app *appctx.AppContext) (task.Re
 	inputFile := passiveMergedPath(app)
 	hosts, err := readLines(inputFile)
 	if err != nil || len(hosts) == 0 {
-		if app.Log != nil {
-			app.Log.Info("subdomains.csprecon: no passive.merged input — skipping")
-		}
+		app.Log.Info("subdomains.csprecon: no passive.merged input — skipping")
 		return cspreconEmptyDone(app, toolName)
 	}
 
@@ -100,10 +95,8 @@ func (SubCspreconTask) Run(ctx context.Context, app *appctx.AppContext) (task.Re
 	res, execErr := app.Tools.Run(ctx, toolName, []string{"-s", "-l", hostsFile})
 	if execErr != nil {
 		// Aux best-effort degrade: log + empty staging, StatusDone (never abort).
-		if app.Log != nil {
-			app.Log.Warn("subdomains.csprecon: csprecon failed (non-fatal degrade)",
-				"tool", toolName, "error", execErr.Error())
-		}
+		app.Log.Warn("subdomains.csprecon: csprecon failed (non-fatal degrade)",
+			"tool", toolName, "error", execErr.Error())
 		return cspreconEmptyDone(app, toolName)
 	}
 
@@ -113,7 +106,7 @@ func (SubCspreconTask) Run(ctx context.Context, app *appctx.AppContext) (task.Re
 	}
 
 	// extract/csp.Extract applies the anchored domain-suffix in-scope filter
-	// (T-13-02-01 mitigation — reuse, no re-implement). Source field is "csp".
+	// (reuse, no re-implement). Source field is "csp".
 	hostResults, _ := csp.Extract(rawOutput, domain)
 	hostnames := make([]string, 0, len(hostResults))
 	for _, r := range hostResults {
@@ -126,9 +119,7 @@ func (SubCspreconTask) Run(ctx context.Context, app *appctx.AppContext) (task.Re
 	if werr != nil {
 		return task.Result{Status: task.StatusErrored}, werr
 	}
-	if app.Log != nil {
-		app.Log.Debug("subdomains.csprecon: completed", "csprecon_hostnames", len(hostnames))
-	}
+	app.Log.Debug("subdomains.csprecon: completed", "csprecon_hostnames", len(hostnames))
 	return task.Result{
 		Status:  task.StatusDone,
 		Outputs: []string{stagingPath},

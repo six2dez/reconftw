@@ -6,15 +6,13 @@
 // files to raw/sourcemaps/<host>/ directories. Output is written by
 // sourcemapper itself; JsluiceTask reads from these directories.
 //
-// ARG VECTOR (RESEARCH §sourcemapper — verbatim v1 forms, web.sh:2289, 2302):
+// ARG VECTOR (verbatim v1 form, web.sh:2289, 2302):
 //
 //	sourcemapper -jsurl <url> -output raw/sourcemaps/<host>/
 //
 // Fan-out: goroutines bounded by a semaphore (safe concurrency for sourcemapper).
 //
-// Axiom: LocalBackend only (D-W13).
-//
-// Source: .planning/phases/05-web-pipeline-e2e/05-04-PLAN.md Task 2.
+// Axiom: LocalBackend only.
 package web
 
 import (
@@ -52,9 +50,7 @@ func (t *SourcemapperTask) Run(ctx context.Context, app *appctx.AppContext) (tas
 	// Read JS URLs from artefacts/urls.jsonl.
 	jsURLs, err := readJSURLsFromJSONL(app)
 	if err != nil || len(jsURLs) == 0 {
-		if app.Log != nil {
-			app.Log.Info("web.sourcemapper: no JS URLs in urls.jsonl — skipping")
-		}
+		app.Log.Info("web.sourcemapper: no JS URLs in urls.jsonl — skipping")
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
@@ -66,7 +62,7 @@ func (t *SourcemapperTask) Run(ctx context.Context, app *appctx.AppContext) (tas
 	}
 
 	// Fan-out: bounded goroutines per JS URL.
-	// WR-04: derive from config rather than hardcoded 5.
+	// Derived from config rather than a hardcoded 5.
 	maxConcurrency := app.Cfg.Concurrency.MaxJobs
 	if maxConcurrency <= 0 {
 		maxConcurrency = 5
@@ -74,6 +70,7 @@ func (t *SourcemapperTask) Run(ctx context.Context, app *appctx.AppContext) (tas
 	sem := make(chan struct{}, maxConcurrency)
 	var wg sync.WaitGroup
 	var totalRan int
+	var firstErr error // the first per-URL tool error, for the final verdict
 	var mu sync.Mutex
 
 	for _, jsURL := range jsURLs {
@@ -84,7 +81,7 @@ func (t *SourcemapperTask) Run(ctx context.Context, app *appctx.AppContext) (tas
 			defer wg.Done()
 			defer func() { <-sem }()
 
-			// Derive output dir: raw/sourcemaps/<host>/ (v2 ADR §3 mapping).
+			// Derive output dir: raw/sourcemaps/<host>/.
 			host := extractURLHost(jsURL)
 			if host == "" {
 				return
@@ -100,10 +97,13 @@ func (t *SourcemapperTask) Run(ctx context.Context, app *appctx.AppContext) (tas
 			_, runErr := app.Tools.Run(ctx, toolName, args)
 			if runErr != nil {
 				// best_effort: log at debug and continue.
-				if app.Log != nil {
-					app.Log.Debug("web.sourcemapper: run failed",
-						"url", jsURL, "err", runErr)
+				app.Log.Debug("web.sourcemapper: run failed",
+					"url", jsURL, "err", runErr)
+				mu.Lock()
+				if firstErr == nil {
+					firstErr = runErr
 				}
+				mu.Unlock()
 				return
 			}
 			mu.Lock()
@@ -113,16 +113,21 @@ func (t *SourcemapperTask) Run(ctx context.Context, app *appctx.AppContext) (tas
 	}
 	wg.Wait()
 
-	if totalRan == 0 && app.Log != nil {
-		app.Log.Info("web.sourcemapper: binary absent or all URLs failed — skipping")
-		return task.Result{Status: task.StatusSkipped}, nil
+	if totalRan == 0 {
+		// Absent-vs-failed policy (task.ClassifyToolErr) on the first error seen:
+		// a sourcemapper that never started is "tool absent"; one that ran and
+		// failed on every URL is degraded with its own account of why.
+		status, reason := task.StatusSkipped, "no runnable JS URLs"
+		if firstErr != nil {
+			status, reason = task.ClassifyToolErr(firstErr)
+		}
+		app.Log.Info("web.sourcemapper: nothing extracted — skipping", "reason", reason)
+		return task.Result{Status: status, Reason: reason}, nil
 	}
 
-	if app.Log != nil {
-		app.Log.Debug("web.sourcemapper: completed",
-			"js_input_urls", len(jsURLs),
-			"successful_runs", totalRan)
-	}
+	app.Log.Debug("web.sourcemapper: completed",
+		"js_input_urls", len(jsURLs),
+		"successful_runs", totalRan)
 
 	return task.Result{
 		Status: task.StatusDone,

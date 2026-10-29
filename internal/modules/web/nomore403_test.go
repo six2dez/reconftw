@@ -1,5 +1,5 @@
 // nomore403_test.go — the proof that web.nomore403 came home to backend.Runner
-// (18-05) using ALL THREE of 18-01's capabilities at once: an executable
+// using ALL THREE of the seam's capabilities at once: an executable
 // resolved from a repo clone, that clone as the working directory, and the
 // candidate URLs on standard input.
 //
@@ -36,7 +36,7 @@ import (
 )
 
 // nomore403WantArgv is the PRE-MOVE arg vector: EMPTY. nomore403 takes its
-// target from standard input and the pre-18-05 dispatch passed no arguments at
+// target from standard input and the pre-move dispatch passed no arguments at
 // all. tools.lock declares default_args = [] and no clone_interpreter for this
 // row, so applyToolContract must prepend nothing.
 var nomore403WantArgv []string
@@ -143,6 +143,7 @@ func newNomore403TestApp(t *testing.T, workDir, toolsRoot string, timeout ...tim
 	cfg := config.Defaults()
 	cfg.Vulns.Bypass4xx.Enabled = true
 	return &appctx.AppContext{
+		Log:    appctx.NopLogger(),
 		Tools:  backend.NewRunner(&backend.LocalBackend{}, reg, nil),
 		Cfg:    cfg,
 		Target: &appctx.Target{Domain: "example.com", WorkDir: workDir},
@@ -236,7 +237,7 @@ func readRecordedArgv2(t *testing.T, dir string) []string {
 }
 
 // TestNomore403IsRecorded asserts the invocation lands in logs/tools.jsonl —
-// which it never did before 18-05, this file having dispatched outside the
+// which it never did before the move, this file having dispatched outside the
 // Runner for its whole life.
 //
 // PRESENCE FIRST, then content. An absence-or-content assertion over a file
@@ -306,7 +307,7 @@ func TestNomore403IsRecorded(t *testing.T) {
 // TestNomore403SkipsWhenUnresolvable pins the FAILURE POLICY across the move.
 //
 // With an empty tools root AND an empty PATH the tool cannot be resolved at
-// all. Before 18-05 the os.Stat probe returned StatusSkipped; after it the
+// all. Before the move the os.Stat probe returned StatusSkipped; after it the
 // Runner returns a typed dispatch failure. The STATUS must be identical —
 // a best-effort task that starts returning errored aborts the pipeline.
 func TestNomore403SkipsWhenUnresolvable(t *testing.T) {
@@ -328,6 +329,7 @@ func TestNomore403SkipsWhenUnresolvable(t *testing.T) {
 	cfg := config.Defaults()
 	cfg.Vulns.Bypass4xx.Enabled = true
 	app := &appctx.AppContext{
+		Log:    appctx.NopLogger(),
 		Tools:  backend.NewRunner(&backend.LocalBackend{}, reg, nil),
 		Cfg:    cfg,
 		Target: &appctx.Target{Domain: "example.com", WorkDir: workDir},
@@ -346,7 +348,7 @@ func TestNomore403SkipsWhenUnresolvable(t *testing.T) {
 	}
 
 	// And nothing was staged: a run in which nomore403 never ran must not clear
-	// a previous run's bypasses (F3 did-not-run).
+	// a previous run's bypasses (did-not-run).
 	if _, statErr := os.Stat(filepath.Join(workDir, "inputs", "findings.nomore403.jsonl")); statErr == nil {
 		t.Errorf("a staging file was written for a run in which nomore403 never dispatched")
 	}

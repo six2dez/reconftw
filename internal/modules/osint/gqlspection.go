@@ -4,20 +4,18 @@
 // modules/web.sh:1256: gqlspection -t <ep> -o <out>) to perform deep schema
 // introspection on each reachable GraphQL endpoint — surfacing the exposed types,
 // queries, and mutations. Each introspected endpoint becomes an informational
-// OSINTFindingRecord (D-O4, Category graphql-introspection).
+// OSINTFindingRecord (Category graphql-introspection).
 //
-// OPPORTUNISTIC ENRICHMENT (D-O2): gqlspection is a v1 web.sh function (URL-corpus
+// OPPORTUNISTIC ENRICHMENT: gqlspection is a v1 web.sh function (URL-corpus
 // seeded — it runs only on endpoints another stage discovered). It reads candidate
 // GraphQL endpoint URLs from the workspace artefacts (artefacts/urls.jsonl or
 // artefacts/hosts.jsonl) IF present. When NO workspace URLs exist it logs an Info
 // note and returns StatusSkipped — it NEVER fails or bootstraps subs/web
-// (best_effort, D-O1/D-O2). URLs are scope-filtered by Phase 5 (T-07-05-05).
+// (best_effort). URLs are scope-filtered by the web stage.
 //
-// SEEDING (D-O1): no DependsOn edges — the workspace-URL enrichment is
+// SEEDING: no DependsOn edges — the workspace-URL enrichment is
 // opportunistic, not a DAG edge.
-// FAILURE POLICY (D-O8, ARCH-09): best_effort.
-//
-// Source: .planning/phases/07-osint-e2e/07-05-PLAN.md Task 2.
+// FAILURE POLICY (ARCH-09): best_effort.
 package osint
 
 import (
@@ -33,8 +31,8 @@ import (
 	"github.com/six2dez/reconftw/internal/core/task"
 )
 
-// gqlMaxEndpoints bounds the opportunistic per-URL gqlspection loop (D-O8
-// conservative cap against attacker-influenced workspace URLs — T-07-05-05).
+// gqlMaxEndpoints bounds the opportunistic per-URL gqlspection loop
+// (conservative cap against attacker-influenced workspace URLs).
 const gqlMaxEndpoints = 100
 
 // GQLSpectionTask runs gqlspection for OSINT-13 (GraphQL introspection).
@@ -56,26 +54,24 @@ func (t *GQLSpectionTask) Enabled(cfg *config.Config) bool {
 	return cfg.OSINT.GraphQL.Enabled
 }
 
-// DependsOn returns nil — the workspace-URL enrichment (D-O2) is OPPORTUNISTIC,
+// DependsOn returns nil — the workspace-URL enrichment is OPPORTUNISTIC,
 // not a DAG edge.
 func (t *GQLSpectionTask) DependsOn() []string { return nil }
 
-// Run executes gqlspection per workspace GraphQL endpoint (D-O2 opportunistic).
+// Run executes gqlspection per workspace GraphQL endpoint (opportunistic).
 //
 // Steps:
-//  1. D-O2: read candidate GraphQL endpoint URLs from workspace artefacts IF
+//  1. read candidate GraphQL endpoint URLs from workspace artefacts IF
 //     present; absent → log Info + StatusSkipped (best_effort, NO fail/bootstrap).
 //  2. Loop gqlspection per endpoint (LITERAL web.sh:1256 arg vector -t <ep> -o).
 //  3. Parse introspection output into informational records.
 //  4. Write inputs/findings.gqlspection.jsonl (multi-writer staging).
 func (t *GQLSpectionTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result, error) {
-	// Step 1: D-O2 opportunistic URL read, filtered to likely GraphQL endpoints.
+	// Step 1: opportunistic URL read, filtered to likely GraphQL endpoints.
 	urls := graphqlEndpoints(readWorkspaceHosts(app.Target.WorkDir))
 	if len(urls) == 0 {
-		// D-O2: log-skip when absent — best_effort, NOT an error/bootstrap.
-		if app.Log != nil {
-			app.Log.Info("osint.gqlspection: no workspace GraphQL endpoints (artefacts/urls.jsonl|hosts.jsonl) — skipping (D-O2)")
-		}
+		// log-skip when absent — best_effort, NOT an error/bootstrap.
+		app.Log.Info("osint.gqlspection: no workspace GraphQL endpoints (artefacts/urls.jsonl|hosts.jsonl) — skipping")
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
@@ -88,14 +84,14 @@ func (t *GQLSpectionTask) Run(ctx context.Context, app *appctx.AppContext) (task
 	_ = os.MkdirAll(osintDir, 0o755) //nolint:errcheck // best_effort
 
 	if len(urls) > gqlMaxEndpoints {
-		urls = urls[:gqlMaxEndpoints] // conservative cap (D-O8)
+		urls = urls[:gqlMaxEndpoints] // conservative cap
 	}
 
 	var records []OSINTFindingRecord
 	// gqlRan records whether AT LEAST ONE endpoint was actually probed, and
 	// cancelled records an interrupted loop. Neither an absent gqlspection nor a
 	// cancelled run observed the corpus, so neither may clear a previous run's
-	// staging (F3 did-not-run — see writeOSINTStaging).
+	// staging (did-not-run rule — see writeOSINTStaging).
 	gqlRan := false
 	cancelled := false
 	for i, ep := range urls {
@@ -107,9 +103,7 @@ func (t *GQLSpectionTask) Run(ctx context.Context, app *appctx.AppContext) (task
 		outFile := filepath.Join(osintDir, fmt.Sprintf("introspection_%d.json", i))
 		res, err := app.Tools.Run(ctx, "gqlspection", []string{"-t", ep, "-o", outFile})
 		if err != nil {
-			if app.Log != nil {
-				app.Log.Debug("osint.gqlspection: gqlspection run failed (best_effort)", "endpoint", ep, "err", err)
-			}
+			app.Log.Debug("osint.gqlspection: gqlspection run failed (best_effort)", "endpoint", ep, "err", err)
 			continue
 		}
 		gqlRan = true
@@ -127,17 +121,15 @@ func (t *GQLSpectionTask) Run(ctx context.Context, app *appctx.AppContext) (task
 	}
 
 	// Step 4: write staging JSONL (multi-writer contract).
-	// F3: a run in which no endpoint answered introspection REMOVES the staging
+	// Run isolation: a run in which no endpoint answered introspection REMOVES the staging
 	// file rather than republishing an endpoint that has since been locked down.
 	if gqlRan && !cancelled {
 		writeOSINTStaging(app, inputsDir, "findings.gqlspection.jsonl", records)
-	} else if app.Log != nil {
-		app.Log.Debug("osint.gqlspection: gqlspection did not probe the endpoints — staging preserved (F3 did-not-run)")
+	} else {
+		app.Log.Debug("osint.gqlspection: gqlspection did not probe the endpoints — staging preserved (did-not-run rule)")
 	}
 
-	if app.Log != nil {
-		app.Log.Info("osint.gqlspection: completed", "findings", len(records), "endpoints", len(urls))
-	}
+	app.Log.Info("osint.gqlspection: completed", "findings", len(records), "endpoints", len(urls))
 	return task.Result{
 		Status: task.StatusDone,
 		Stats:  map[string]int{"findings": len(records), "endpoints": len(urls)},

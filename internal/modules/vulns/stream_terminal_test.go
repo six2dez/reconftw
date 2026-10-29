@@ -1,9 +1,9 @@
-// stream_terminal_test.go — behavioural proof of the F6 terminal-error contract
-// for the vulns package (acceptance gate 5, plan 15-14 Task 2).
+// stream_terminal_test.go — behavioural proof of the terminal-error contract
+// for the vulns package (acceptance gate 5).
 //
 // The stream-contract AST ratchet proves the Drain/Collect helper is CALLED at
 // every site. It cannot prove the result is ACTED ON: `_ = backend.Drain(ch)`
-// satisfies shape 1 (recorded as a detector limitation in the 15-13 SUMMARY).
+// satisfies shape 1 (recorded as a detector limitation in the silent-success sweep).
 // These tests are what actually pin the behaviour, and they are written in both
 // directions on purpose:
 //
@@ -95,7 +95,7 @@ func TestSmugglingUnaffectedByStreamContract(t *testing.T) {
 // TestSQLiSqlmapExitSevenErrorsAndDiscardsPartial is gate 5 through a HELPER
 // that returns (records, error) into a Run which logs scanner errors
 // best-effort. Without the errToolStreamEnded marker the error would have been
-// swallowed exactly as before F6 and the ratchet would have gone green with no
+// swallowed exactly as before the terminal-error contract and the ratchet would have gone green with no
 // behavioural change at all.
 func TestSQLiSqlmapExitSevenErrorsAndDiscardsPartial(t *testing.T) {
 	cfg := &config.Config{}
@@ -118,7 +118,7 @@ func TestSQLiSqlmapExitSevenErrorsAndDiscardsPartial(t *testing.T) {
 	mustBePreserved(t, staging, "sqlmap exited 7")
 }
 
-// TestSSTITInjAExitSevenErrorsAndDoesNotReadReports is T-15-14-01: the highest
+// TestSSTITInjAExitSevenErrorsAndDoesNotReadReports is the highest
 // consequence site in the vulns sweep. runTInjA drains and then reads the TInjA
 // report DIRECTORY, whose contents are not cleared between runs — so a TInjA
 // killed mid-scan used to have LAST run's reports parsed and published as this
@@ -159,7 +159,7 @@ func TestSSTITInjAExitSevenErrorsAndDoesNotReadReports(t *testing.T) {
 	}
 	if strings.Contains(string(body), "stale-tinja.example.com") {
 		t.Fatalf("a crashed TInjA published the PREVIOUS run's report as this run's "+
-			"finding — the exact F6 failure gate 5 exists to stop:\n%s", body)
+			"finding — the exact failure gate 5 exists to stop:\n%s", body)
 	}
 }
 

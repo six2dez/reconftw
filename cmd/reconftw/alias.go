@@ -9,7 +9,8 @@
 //     MarkDeprecated still emits its one-time stderr warning (MODE-09).
 //   - If args[0] is already a known v2 subcommand, skip mode-flag injection
 //     but still translate -d / -l / -v (Pitfall 4 double-insertion guard).
-//   - Global flag rewrites: -d X → --target X, -l X → --list X, -v → --axiom.
+//   - Global flag rewrites: -d X → --target X, -l X → --list X, -v → --axiom,
+//     -i X → --include-file X, -x X → --exclude-file X.
 //   - On multiple mode flags (e.g. --recon --all), first-wins.
 
 package main
@@ -25,7 +26,44 @@ var v1SubcommandFlags = map[string]string{
 	"--vulns": "vulns",
 	"--osint": "osint", "-n": "osint",
 	"--zen": "zen", "-z": "zen",
-	"--deep": "deep", "-y": "deep",
+	"--deep": "deep",
+	// NO "-y": in v1 `-y` was --ai (generate the AI report), not deep. Mapping
+	// it to deep started a full deep scan when the operator asked for a report.
+	// rejectRemovedV1Flags refuses it with a pointer to the right command.
+}
+
+// removedV1Flags are v1 short flags whose v1 meaning has no safe v2 rewrite.
+// Each maps to the message the operator sees; run() refuses the invocation
+// before cobra parses, so none of these can start a scan.
+var removedV1Flags = map[string]string{
+	"-y": "v1 `-y` meant --ai (AI report), not deep mode. Use `reconftw report --target <domain>` " +
+		"for the AI report, or the explicit `reconftw deep --target <domain>` for a deep scan.",
+}
+
+// rejectRemovedV1Flags returns a *removedFlagError for the first argv token in
+// removedV1Flags. Tokens after a bare "--" are positional and ignored.
+func rejectRemovedV1Flags(args []string) error {
+	for _, a := range args {
+		if a == "--" {
+			return nil
+		}
+		if msg, ok := removedV1Flags[a]; ok {
+			return &removedFlagError{flag: a, msg: msg}
+		}
+	}
+	return nil
+}
+
+// removedFlagError is returned by rejectRemovedV1Flags; main() prints it and
+// exits 1 (it is deliberately NOT an exitCodeError, so the plain error path
+// renders "Error: …" and the usage hint).
+type removedFlagError struct {
+	flag string
+	msg  string
+}
+
+func (e *removedFlagError) Error() string {
+	return "flag " + e.flag + " is not supported: " + e.msg
 }
 
 // knownSubcmds is the set of all v2 subcommand names. When args[0] already
@@ -52,7 +90,8 @@ var knownSubcmds = map[string]bool{
 //     found, prepend the v2 subcommand name before all original args. The
 //     original flag is left in place so MarkDeprecated fires (MODE-09).
 //  4. Global alias rewrites over the result slice:
-//     -d X → --target X, -l X → --list X, -v (boolean) → --axiom.
+//     -d X → --target X, -l X → --list X, -v (boolean) → --axiom,
+//     -i X → --include-file X, -x X → --exclude-file X.
 //  5. When multiple mode flags are present, first-wins.
 func translateV1Args(args []string) []string {
 	if len(args) == 0 {
@@ -107,6 +146,12 @@ func translateV1Args(args []string) []string {
 			i++
 		case a == "-v":
 			result = append(result, "--axiom")
+		case a == "-i" && i+1 < len(out):
+			result = append(result, "--include-file", out[i+1])
+			i++
+		case a == "-x" && i+1 < len(out):
+			result = append(result, "--exclude-file", out[i+1])
+			i++
 		default:
 			result = append(result, a)
 		}

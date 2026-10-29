@@ -1,4 +1,4 @@
-// stream_terminal.go — the web package's half of the F6 terminal-error contract.
+// stream_terminal.go — the web package's half of the terminal-error contract.
 //
 // Backend.Stream has TWO independent failure channels and they mean opposite
 // things (see the package comment on internal/core/backend/stream.go):
@@ -26,8 +26,6 @@
 // helper is indistinguishable from "this host produced nothing" and would be
 // swallowed exactly as before. errToolStreamEnded is that marker: helpers wrap
 // it, Run tests for it with errors.Is and escalates to StatusErrored.
-//
-// Source: .planning/phases/15-release-gates-run-isolation-store-integrity/15-13-PLAN.md
 package web
 
 import (

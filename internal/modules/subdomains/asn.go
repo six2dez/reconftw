@@ -3,8 +3,6 @@
 // SINGLE-WRITER CONTRACT: SubASNTask is the ONLY writer for the "asns"
 // artefact. Since no concurrent Task writes to "asns", direct
 // app.Tree.Append is safe (no REPLACE-overwrite race).
-//
-// Source: .planning/phases/04-subdomains-e2e-axiom-integration/04-05-PLAN.md Task 1.
 package subdomains
 
 import (
@@ -52,10 +50,8 @@ func (SubASNTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result,
 
 	res, err := app.Tools.Run(ctx, toolName, args)
 	if err != nil {
-		if app.Log != nil {
-			app.Log.Debug("asnmap run failed or tool not registered",
-				"tool", toolName, "err", err.Error())
-		}
+		app.Log.Debug("asnmap run failed or tool not registered",
+			"tool", toolName, "err", err.Error())
 		return task.Result{
 			Status: task.StatusDone,
 			Stats:  map[string]int{"asns_found": 0},
@@ -117,10 +113,8 @@ func (SubASNTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result,
 
 	if len(records) > 0 {
 		if err := app.Tree.Append("asns", records); err != nil {
-			if app.Log != nil {
-				app.Log.Debug("asnmap: Tree.Append(asns) failed",
-					"err", err.Error(), "records", len(records))
-			}
+			app.Log.Debug("asnmap: Tree.Append(asns) failed",
+				"err", err.Error(), "records", len(records))
 			return task.Result{Status: task.StatusErrored},
 				fmt.Errorf("asnmap: Tree.Append(asns): %w", err)
 		}

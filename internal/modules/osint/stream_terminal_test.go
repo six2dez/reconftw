@@ -1,5 +1,5 @@
-// stream_terminal_test.go — behavioural proof of the F6 terminal-error contract
-// for the osint package (acceptance gate 5, plan 15-14 Task 2).
+// stream_terminal_test.go — behavioural proof of the terminal-error contract
+// for the osint package (acceptance gate 5).
 //
 // osint has exactly two app.Tools.Stream call sites — CloudEnumTask.Run and
 // GitHubLeaksTask.Run — and both are followed by work that treats whatever is on
@@ -114,7 +114,7 @@ func TestGitHubLeaksExitSevenErrorsAndDoesNotReadReport(t *testing.T) {
 	}
 }
 
-// withGitHubToken satisfies the D-O8 key gate so the task reaches its scanner
+// withGitHubToken satisfies the key gate so the task reaches its scanner
 // rather than returning StatusSkipped at the gate.
 func withGitHubToken(t *testing.T, app *appctx.AppContext) {
 	t.Helper()

@@ -120,6 +120,24 @@ func addPersistentGlobalFlags(root *cobra.Command) {
 	root.PersistentFlags().BoolP("verbose", "V", false, "Verbose mode (alias for --log-level=debug)")
 	root.PersistentFlags().StringP("output", "o", "workspaces", "Output workspace directory root")
 	root.PersistentFlags().Bool("no-color", false, "Disable ANSI color output")
+	// v1 -i / -x scope lists (translateV1Args rewrites the short forms).
+	root.PersistentFlags().String("include-file", "", "In-scope list file (one host, *.wildcard, IP or CIDR per line); restricts output to matching hosts")
+	root.PersistentFlags().String("exclude-file", "", "Out-of-scope list file (same syntax); matching hosts are dropped at the output boundary")
+}
+
+// scopeFileFlags returns the --include-file / --exclude-file values, falling
+// back to the inherited persistent flags the way resolveTarget does for --target.
+func scopeFileFlags(cmd *cobra.Command) (includeFile, excludeFile string) {
+	lookup := func(name string) string {
+		if v, err := cmd.Flags().GetString(name); err == nil && v != "" {
+			return v
+		}
+		if pf := cmd.InheritedFlags().Lookup(name); pf != nil {
+			return pf.Value.String()
+		}
+		return ""
+	}
+	return lookup("include-file"), lookup("exclude-file")
 }
 
 // addV1DeprecatedAliases wires every v1 alias per ADR §8.3 + CONTEXT D-03.
@@ -137,13 +155,13 @@ func addPersistentGlobalFlags(root *cobra.Command) {
 // Counts (D-03 spec):
 //   - 9 long-flag aliases:  --recon, --all, --passive, --subdomains, --web,
 //     --vulns, --osint, --monitor, --health-check
-//   - 8 short-flag aliases: -r, -a, -p, -s, -w, -n, -z, -y
+//   - 7 short-flag aliases: -r, -a, -p, -s, -w, -n, -z  (no -y: in v1 it was --ai)
 //   - 3 global aliases:     -d (target), -l (list), -v (axiom — "vps")
 //
 // (No -v/--vulns because cobra reserves -v for --verbose; ADR §8.3 line 2148
 // resolves the collision by NOT aliasing vulns to a short flag.)
 //
-// Total: 9 + 8 + 3 = 20 deprecated alias entries.
+// Total: 9 + 7 + 3 = 19 deprecated alias entries.
 func addV1DeprecatedAliases(root *cobra.Command) {
 	pf := root.PersistentFlags()
 
@@ -174,7 +192,10 @@ func addV1DeprecatedAliases(root *cobra.Command) {
 	pf.BoolP("zen", "z", false, "DEPRECATED: use `reconftw zen` instead")
 	mustMarkDeprecated(pf, "zen", "use subcommand 'zen' instead: `reconftw zen --target example.com`")
 
-	pf.BoolP("deep", "y", false, "DEPRECATED: use `reconftw deep` instead")
+	// --deep has NO short alias: v1's -y was --ai (AI report), never deep. A
+	// `-y` on argv is rejected before cobra runs (rejectRemovedV1Flags) so it
+	// can never start a scan under a different mode.
+	pf.Bool("deep", false, "DEPRECATED: use `reconftw deep` instead")
 	mustMarkDeprecated(pf, "deep", "use subcommand 'deep' instead: `reconftw deep --target example.com`")
 
 	pf.Bool("monitor", false, "DEPRECATED: use `reconftw monitor` instead")

@@ -1,4 +1,4 @@
-// parity_test.go — Frozen-replay parity harness (D-03, D-04, SUBD-11).
+// parity_test.go — Frozen-replay parity harness (SUBD-11).
 //
 // Purpose: detect porting bugs by replaying REAL v1-captured tool output
 // through v2 and asserting per-category counts match exactly (deterministic
@@ -24,14 +24,15 @@
 //	  example.com subfinder: >= 50 unique subdomains
 //	  example.com puredns:   >= 30 resolved subdomains
 //	  example.net subfinder:     >= 100 unique subdomains
-//	If capture is not available: leave the TODO header. Tests will t.Skip.
+//	If capture is not available: leave the TODO header. Tests will t.Skip and
+//	name the capture command; PARITY_FIXTURES_REQUIRED=1 turns that skip into a
+//	failure. NOTE for this box: outbound UDP/53 is blocked, so puredns /
+//	dnstake captures cannot be made here — capture on the provisioned host.
 //	NEVER substitute CT-log data, certificate transparency data, or synthetic
 //	hand-authored subdomains (B4 fix).
 //
 // TestLiveSignoff (PARITY_LIVE=1): manual gate — run after capturing real
 // fixtures and performing live bash v1 vs v2 back-to-back comparison.
-//
-// Source: .planning/phases/04-subdomains-e2e-axiom-integration/04-07-PLAN.md Task 1.
 package subdomains_test
 
 import (
@@ -56,6 +57,33 @@ import (
 // skipLiveRun gates TestLiveSignoff — set PARITY_LIVE=1 to run it manually.
 var skipLiveRun = os.Getenv("PARITY_LIVE") == ""
 
+// subdomainsParityStub is the one place a "# TODO: capture from: <cmd>" stub decides
+// between skip and failure.
+//
+// These stubs have made the parity subtests skip for a long time, and a skip is
+// not a pass. By default the subtest still skips — but the skip message now
+// names the exact capture command from the stub header, so the remedy is in the
+// test output rather than in a plan file. With PARITY_FIXTURES_REQUIRED=1 (the
+// provisioned-box / sign-off setting) the same stub is a FAILURE: a sign-off run
+// must not be able to report green over fixtures nobody captured.
+func subdomainsParityStub(t *testing.T, fixturePath, headerLine string) {
+	t.Helper()
+	cmd := strings.TrimSpace(strings.TrimPrefix(headerLine, "# TODO:"))
+	cmd = strings.TrimSpace(strings.TrimPrefix(cmd, "capture from:"))
+	if cmd == "" {
+		cmd = "(the stub header names no capture command — write one)"
+	}
+	if os.Getenv("PARITY_FIXTURES_REQUIRED") == "1" {
+		t.Fatalf("fixture NOT captured: %s\n"+
+			"  PARITY_FIXTURES_REQUIRED=1 forbids skipping over a stub. Capture it with:\n"+
+			"    %s\n"+
+			"  then replace the stub header with `# captured-from: <argv> | date: <YYYY-MM-DD> | version: <v>`.",
+			fixturePath, cmd)
+	}
+	t.Skipf("fixture not captured yet (stub header): %s — NOT a pass; capture with: %s "+
+		"(set PARITY_FIXTURES_REQUIRED=1 to make this a failure)", fixturePath, cmd)
+}
+
 // -------------------------------------------------------------------------
 // provenanceCheck — B4 fix: reject CT-log fixtures at test time.
 // -------------------------------------------------------------------------
@@ -73,7 +101,7 @@ func provenanceCheck(t *testing.T, fixtureBytes []byte, fixtureFile string) {
 	t.Helper()
 
 	if len(fixtureBytes) == 0 {
-		t.Skip("fixture not captured yet — see FIXTURE CAPTURE INSTRUCTIONS in parity_test.go: " + fixtureFile)
+		subdomainsParityStub(t, fixtureFile, "# TODO: capture from: (empty placeholder — see FIXTURE CAPTURE INSTRUCTIONS in parity_test.go)")
 	}
 
 	// Extract first non-empty line.
@@ -88,7 +116,7 @@ func provenanceCheck(t *testing.T, fixtureBytes []byte, fixtureFile string) {
 	}
 
 	if strings.HasPrefix(line1, "# TODO:") {
-		t.Skip("fixture not captured yet — see FIXTURE CAPTURE INSTRUCTIONS in parity_test.go: " + fixtureFile)
+		subdomainsParityStub(t, fixtureFile, line1)
 	}
 
 	if !strings.HasPrefix(line1, "# captured-from:") {
@@ -185,6 +213,7 @@ func buildParityApp(t *testing.T, workDir string, mb *testutil.MockBackend) (*ap
 	cfg.Advanced.Tools.Subfinder.TimeoutMinutes = 3
 
 	app := &appctx.AppContext{
+		Log:   appctx.NopLogger(),
 		Tools: runner,
 		Tree:  tree,
 		Target: &appctx.Target{
@@ -474,6 +503,7 @@ func TestResolveParity(t *testing.T) {
 			cfg.Subdomains.DNSResolve.PurednsPublicLimit = 5000
 
 			app := &appctx.AppContext{
+				Log:   appctx.NopLogger(),
 				Tools: runner,
 				Tree:  outTree,
 				Target: &appctx.Target{
@@ -545,7 +575,7 @@ func TestTakeoverParity(t *testing.T) {
 // TestLiveSignoff — manual gate (PARITY_LIVE=1 required)
 // -------------------------------------------------------------------------
 
-// TestLiveSignoff is the D-03 manual phase acceptance gate. It is always
+// TestLiveSignoff is the manual acceptance gate. It is always
 // skipped in CI (no PARITY_LIVE=1 env var). To run:
 //
 //	PARITY_LIVE=1 go test ./internal/modules/subdomains/... -run TestLiveSignoff -v

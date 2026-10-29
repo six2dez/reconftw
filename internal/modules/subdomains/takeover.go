@@ -2,18 +2,16 @@
 //
 // FINDINGS STAGING CONTRACT (doc.go B2 fix):
 // Both TakeoverSubzyTask and TakeoverDNSTakeTask run CONCURRENTLY in the
-// enrichment RunStage (plan-06). Since OutputTree.Append is REPLACE semantics,
+// enrichment RunStage. Since OutputTree.Append is REPLACE semantics,
 // if both called Append("findings") the second would destroy the first's results.
-// Therefore BOTH Tasks write to private staging files; the command layer in
-// plan-06 merges them and calls Append("findings", merged) exactly ONCE after
+// Therefore BOTH Tasks write to private staging files; the command layer
+// merges them and calls Append("findings", merged) exactly ONCE after
 // RunStage returns.
 //
 //	TakeoverSubzyTask → inputs/takeover.subzy.jsonl
 //	TakeoverDNSTakeTask → inputs/takeover.dnstake.jsonl
 //
 // DO NOT call app.Tree.Append("findings", ...) here.
-//
-// Source: .planning/phases/04-subdomains-e2e-axiom-integration/04-05-PLAN.md Task 1.
 package subdomains
 
 import (
@@ -24,6 +22,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
 	"github.com/six2dez/reconftw/internal/core/config"
@@ -80,9 +79,8 @@ func (TakeoverSubzyTask) Run(ctx context.Context, app *appctx.AppContext) (task.
 	// (`subzy run --help`, v1.2.0 on this box, v2.0.4 in knownToolFlags) and
 	// exits `Error: unknown flag: --verify-ssl` on the hyphenated one, so subzy
 	// takeover detection produced ZERO results for as long as that vector
-	// existed. Found by 16-04 Task 1, fixed here with a real-tool acceptance
-	// check (17-04 Task 2) and the knownBadArgVectors entry deleted in the same
-	// change.
+	// existed. Fixed here with a real-tool acceptance check and the
+	// knownBadArgVectors entry deleted in the same change.
 	args := []string{
 		"run",
 		"--targets", resolvedFile,
@@ -94,12 +92,10 @@ func (TakeoverSubzyTask) Run(ctx context.Context, app *appctx.AppContext) (task.
 		// RULE B1, same shape as the dnstake branch below: the tool FAILED, and
 		// reporting that as StatusDone/takeovers_found:0 is indistinguishable from
 		// a clean target. WARN so it is visible at the default log level.
-		if app.Log != nil {
-			app.Log.Warn("subzy: tool failed — takeover detection did not run",
-				"event", "takeover_tool_failed",
-				"tool", toolName, "err", err.Error())
-		}
-		// Still write the empty staging file so the plan-06 merge does not fail.
+		app.Log.Warn("subzy: tool failed — takeover detection did not run",
+			"event", "takeover_tool_failed",
+			"tool", toolName, "err", err.Error())
+		// Still write the empty staging file so the command-layer merge does not fail.
 		stagingPath, wErr := writeTakeoverStagingFile(app, stagingName, nil)
 		if wErr != nil {
 			return task.Result{Status: task.StatusErrored}, wErr
@@ -111,33 +107,31 @@ func (TakeoverSubzyTask) Run(ctx context.Context, app *appctx.AppContext) (task.
 	// Parse subzy JSON output. Subzy writes one JSON object per line when
 	// using --output; each line has fields: subdomain, vulnerable, service.
 	var records []TakeoverRecord
-	if data, err := os.ReadFile(tmpOutFile); err == nil {
-		scanner := bufio.NewScanner(bytes.NewReader(data))
-		for scanner.Scan() {
-			line := bytes.TrimSpace(scanner.Bytes())
-			if len(line) == 0 {
-				continue
-			}
-			var entry struct {
-				Subdomain  string `json:"subdomain"`
-				Vulnerable bool   `json:"vulnerable"`
-				Service    string `json:"service"`
-			}
-			if err := json.Unmarshal(line, &entry); err != nil {
-				continue
-			}
-			if !entry.Vulnerable {
-				continue
-			}
-			records = append(records, TakeoverRecord{
-				Type:       "subdomain-takeover",
-				Host:       entry.Subdomain,
-				Service:    entry.Service,
-				Confidence: "high",
-				Severity:   "high",
-				Refs:       []string{},
-			})
+	// ForEachJSONLLine, not ForEachJSONL: a line subzy writes that is not a JSON
+	// object (its own progress text) is skipped, not reported. A missing output
+	// file is an empty result, as before.
+	readErr := output.ForEachJSONLLine(tmpOutFile, 0, func(line []byte) error {
+		var entry struct {
+			Subdomain  string `json:"subdomain"`
+			Vulnerable bool   `json:"vulnerable"`
+			Service    string `json:"service"`
 		}
+		if err := json.Unmarshal(line, &entry); err != nil || !entry.Vulnerable {
+			return nil
+		}
+		records = append(records, TakeoverRecord{
+			Type:       "subdomain-takeover",
+			Host:       entry.Subdomain,
+			Service:    entry.Service,
+			Confidence: "high",
+			Severity:   "high",
+			Refs:       []string{},
+		})
+		return nil
+	})
+	if readErr != nil {
+		app.Log.Warn("subzy: output file read stopped early — takeover list may be partial",
+			"file", tmpOutFile, "error", readErr.Error())
 	}
 
 	stagingPath, err := writeTakeoverStagingFile(app, stagingName, records)
@@ -196,6 +190,11 @@ func (TakeoverDNSTakeTask) Run(ctx context.Context, app *appctx.AppContext) (tas
 	// "-c N -s" (modules/subdomains.sh:2084); -t accepts a file, so it is the
 	// direct equivalent of the file-based call here.
 	args := []string{"-t", resolvedFile, "-s"}
+	// advanced.tools.dnstake.threads → "-c/--concurrent" (the same flag v1 passes
+	// as "-c N"); 0 keeps the tool default.
+	if n := app.Cfg.Advanced.Tools.Dnstake.Threads; n > 0 {
+		args = append(args, "-c", strconv.Itoa(n))
+	}
 
 	res, err := app.Tools.Run(ctx, toolName, args)
 	if err != nil {
@@ -207,11 +206,9 @@ func (TakeoverDNSTakeTask) Run(ctx context.Context, app *appctx.AppContext) (tas
 		// for months while every run reported success.
 		//
 		// WARN, not Debug: an operator running at the default level must see it.
-		if app.Log != nil {
-			app.Log.Warn("dnstake: tool failed — takeover detection did not run",
-				"event", "takeover_tool_failed",
-				"tool", toolName, "err", err.Error())
-		}
+		app.Log.Warn("dnstake: tool failed — takeover detection did not run",
+			"event", "takeover_tool_failed",
+			"tool", toolName, "err", err.Error())
 		// Still write the (empty) staging file: the merge contract is unchanged.
 		stagingPath, wErr := writeTakeoverStagingFile(app, stagingName, nil)
 		if wErr != nil {
@@ -278,7 +275,7 @@ func (TakeoverDNSTakeTask) Run(ctx context.Context, app *appctx.AppContext) (tas
 // staging file at filepath.Join(app.Target.WorkDir, "inputs", name), or REMOVES
 // that file when records is empty. Returns the staging path in both cases.
 //
-// F3 (phase 15): write-or-REMOVE via output.StageJSONL. It previously wrote an
+// Write-or-REMOVE via output.StageJSONL. It previously wrote an
 // EMPTY file for zero records, which is one step short: an empty file still
 // exists, and "the scanner found nothing" stayed indistinguishable from "the
 // scanner did not run" for anything that stats the path.

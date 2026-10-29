@@ -1,10 +1,10 @@
-// portscan_test.go — behavior tests for WebPortscanTask (13-03 Task 1 + Task 2).
+// portscan_test.go — behavior tests for WebPortscanTask .
 //
 // Internal (package web) because the tests override the unexported
 // shodanInternetDBGet seam and exercise unexported helpers (portscanNmapXMLURLs,
 // portscanParseGnmap). A name-dispatching fake backend records the exact
 // arg-vectors passed to each tool so the naabu/nmap/nerva argument fidelity
-// (T-13-03-02/03) is asserted without a real binary.
+// is asserted without a real binary.
 package web
 
 import (
@@ -105,6 +105,7 @@ func newPortscanTestApp(t *testing.T, be backend.Backend, cfg *config.Config) *a
 		reg.Register(&backend.Tool{Name: name})
 	}
 	return &appctx.AppContext{
+		Log:    appctx.NopLogger(),
 		Tools:  backend.NewRunner(be, reg, nil),
 		Target: &appctx.Target{Domain: "example.com", WorkDir: t.TempDir()},
 		Cfg:    cfg,
@@ -283,7 +284,7 @@ func TestWebPortscanActiveNaabuNmap(t *testing.T) {
 		t.Errorf("naabu_open.txt missing open ports; got:\n%s", naabuOpen)
 	}
 
-	// naabu arg vector: -list <ips_nocdn> -silent -rate 1000 --top-ports 1000 -duc (T-13-03-02/03).
+	// naabu arg vector: -list <ips_nocdn> -silent -rate 1000 --top-ports 1000 -duc.
 	nArgs, ok := be.argsFor("naabu")
 	if !ok {
 		t.Fatal("naabu was not invoked")
@@ -295,7 +296,7 @@ func TestWebPortscanActiveNaabuNmap(t *testing.T) {
 	if !containsToken(nArgs, "-silent") || !hasSubsequence(nArgs, "-rate", "1000") {
 		t.Errorf("naabu args missing -silent / -rate 1000; got %v", nArgs)
 	}
-	// Ports MUST be split into separate argv tokens, never "--top-ports 1000" as one (T-13-03-02).
+	// Ports MUST be split into separate argv tokens, never "--top-ports 1000" as one.
 	if !hasSubsequence(nArgs, "--top-ports", "1000") {
 		t.Errorf("naabu ports not split into argv tokens; got %v", nArgs)
 	}
@@ -573,8 +574,8 @@ func TestPortscanServiceFingerprintSkips(t *testing.T) {
 	})
 }
 
-// ExecOpts satisfies the backend.Backend options seam added in 18-01. It
-// PRESERVES this fake's pre-18-01 dispatch exactly: Runner.Run used to call
+// ExecOpts satisfies the backend.Backend options seam. It
+// PRESERVES this fake's pre-seam dispatch exactly: Runner.Run used to call
 // Backend.Exec and Runner.RunEnv used to call Backend.ExecEnv, and both now
 // arrive here, so the env-set case forwards to ExecEnv and the zero case to Exec.
 //

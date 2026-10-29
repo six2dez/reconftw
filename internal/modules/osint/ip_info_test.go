@@ -1,5 +1,4 @@
-// ip_info_test.go — behavior tests for the IPInfoTask WHOISXML IP-target restore
-// (13-05 Task 3).
+// ip_info_test.go — behavior tests for the IPInfoTask WHOISXML IP-target restore.
 //
 // Proves the PAR-03 parity restore: for an IP-shaped target IPInfoTask makes the
 // three WHOISXML GETs (reverse-ip / whois / geolocation) against an httptest
@@ -10,8 +9,6 @@
 // path is unregressed.
 //
 // Internal (package osint) to reach unexported helpers.
-//
-// Source: .planning/phases/13-domain-parity/13-05-PLAN.md Task 3.
 package osint
 
 import (
@@ -301,8 +298,8 @@ func TestWhoisXMLFormatGeo(t *testing.T) {
 	}
 }
 
-// ExecOpts satisfies the backend.Backend options seam added in 18-01. It
-// PRESERVES this fake's pre-18-01 dispatch exactly: Runner.Run used to call
+// ExecOpts satisfies the backend.Backend options seam added with the Runner move. It
+// PRESERVES this fake's pre-Runner dispatch exactly: Runner.Run used to call
 // Backend.Exec and Runner.RunEnv used to call Backend.ExecEnv, and both now
 // arrive here, so the env-set case forwards to ExecEnv and the zero case to Exec.
 //

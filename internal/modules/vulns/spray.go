@@ -16,18 +16,18 @@
 //     default true) — brutus never sprays outside --deep.
 //
 // INPUT: hosts/portscan_active.gnmap + hosts/service_fingerprints.jsonl are
-// produced by the web portscan stage (13-03). SprayTask reads them directly
+// produced by the web portscan stage. SprayTask reads them directly
 // (DependsOn nil) because web runs before vulns in ModeAll/ModeDeep; the "vulns.spray"
-// prefix is wired into the vulns stage list by 13-08. vulns runs only in
+// prefix is wired into the vulns stage list. vulns runs only in
 // ModeAll/ModeDeep — never in recon.
 //
-// BRUTUS STDIN SEAM — 18-04: NO LONGER A BYPASS.
+// BRUTUS STDIN SEAM: NO LONGER A BYPASS.
 // brutus reads the service-fingerprint JSON on STDIN (bash: `brutus ... <input`).
 // The name-keyed Runner had no stdin channel when this landed, so brutus was
 // invoked through the brutusRunner package var with a direct exec.CommandContext.
-// 18-01 shipped ExecOptions.StdinPath — a PATH the backend opens, which is
+// The Runner move shipped ExecOptions.StdinPath — a PATH the backend opens, which is
 // exactly this call's shape (it already opened a file) and the only site in
-// phase 18 that uses it rather than a byte slice. The package var survives as a
+// the Runner move that uses it rather than a byte slice. The package var survives as a
 // TEST SEAM only; the dispatch inside it now goes through app.Tools.RunOpts.
 // brutespray takes a `-f <file>` argument and always routed through
 // app.Tools.Run.
@@ -37,25 +37,23 @@
 // timeout_seconds = 0, which means NO BOUND. Moving the dispatch onto the Runner
 // makes tools.lock the sole owner of the deadline, so leaving the manifest at 0
 // would have SILENTLY converted a bounded credential-spraying run into an
-// unbounded one against a third party (T-18-04-01). The manifest now carries
-// 1800 with its derivation, and TestBrutusDeadlineMatchesItsFormerBound pins the
-// two together so they cannot drift apart again.
+// unbounded one against a third party. The manifest now carries
+// 1800 with its derivation; the former pin test compared that TOML number with a
+// copy of itself and was deleted (internal/modules/DELETED_TESTS.md).
 //
 // DEFAULT ARGS: the brutus row carries default_args = [], so the argv is
 // byte-for-byte the pre-move `--json -o <path> [-u][-p][-k]`.
 //
-// XCUT-07 (T-13-07-03) — SPRAYED CREDENTIALS ARE NEVER PERSISTED:
+// XCUT-07 — SPRAYED CREDENTIALS ARE NEVER PERSISTED:
 // Discovered credentials MUST NOT be written to the JSONL findings. Only the
 // host / service / port that accepted a weak credential is recorded; the
 // user:password (or key) is redacted to "***" (PayloadRedacted/PoCRedacted).
 // brutus -u/-p carry live comma-separated values and are registered with the
 // recorder's redactor before dispatch; -k alone carries a file path.
 //
-// FAILURE POLICY (best_effort, D-V7): a missing brutespray/brutus or a tool
+// FAILURE POLICY (best_effort): a missing brutespray/brutus or a tool
 // error logs a warning and returns StatusSkipped/StatusDone — never
 // StatusErrored, so spraying never aborts the vulns pipeline.
-//
-// Source: .planning/phases/13-domain-parity/13-07-PLAN.md Task 1.
 package vulns
 
 import (
@@ -72,31 +70,26 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
 	"github.com/six2dez/reconftw/internal/core/backend"
 	"github.com/six2dez/reconftw/internal/core/config"
 	coreerrors "github.com/six2dez/reconftw/internal/core/errors"
 	"github.com/six2dez/reconftw/internal/core/log"
+	"github.com/six2dez/reconftw/internal/core/output"
 	"github.com/six2dez/reconftw/internal/core/task"
 )
 
 // brutusToolName is the tools.lock registry key.
 const brutusToolName = "brutus"
 
-// brutusFormerTimeout is the bound THIS FILE used to apply with its own
-// context.WithTimeout, kept as the written derivation for the tools.lock
-// timeout_seconds = 1800 that replaced it.
-//
-// It is not dead: TestBrutusDeadlineMatchesItsFormerBound (in
-// internal/core/backend) asserts the manifest value equals 30 minutes, so
-// silently setting the manifest back to 0 — which would make a credential
-// spraying run unbounded — is a failing diff rather than an invisible one.
-const brutusFormerTimeout = 30 * time.Minute //nolint:unused // retained derivation; see the comment above — the pin test duplicates the literal on purpose
+// The 30-minute bound this file used to apply with its own context.WithTimeout
+// is now the brutus row's timeout_seconds = 1800 in tools.lock, with its
+// derivation written there. The constant that mirrored it here was unused once
+// its pin test went and is gone with it.
 
 // errBrutusNotInstalled is the sentinel returned by brutusRunner when brutus
-// could not be dispatched at all (D-V7 graceful skip). It is now derived from
+// could not be dispatched at all (graceful skip). It is now derived from
 // the Runner's typed dispatch-failure label rather than from exec.LookPath, so
 // it additionally covers a tool that is registered but has no resolved path.
 var errBrutusNotInstalled = errors.New("brutus not installed")
@@ -168,27 +161,21 @@ func (t *SprayTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resul
 
 	// Step 1: IP-literal target → skip (bash vulns.sh:623 `! domain =~ ^IP$`).
 	if app.Target != nil && app.Target.IsIP {
-		if app.Log != nil {
-			app.Log.Info("vulns.spray: target is an IP literal — spraying skipped (bash parity)")
-		}
+		app.Log.Info("vulns.spray: target is an IP literal — spraying skipped (bash parity)")
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
 	// Step 2: active portscan gnmap must exist and be non-empty (bash vulns.sh:623).
 	gnmapPath := filepath.Join(app.Target.WorkDir, "hosts", "portscan_active.gnmap")
 	if !sprayFileNonEmpty(gnmapPath) {
-		if app.Log != nil {
-			app.Log.Info("vulns.spray: hosts/portscan_active.gnmap absent/empty — spraying skipped (run web portscan first)",
-				"gnmap", gnmapPath)
-		}
+		app.Log.Info("vulns.spray: hosts/portscan_active.gnmap absent/empty — spraying skipped (run web portscan first)",
+			"gnmap", gnmapPath)
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
 	// Step 3: deep-gate (cfg.Vulns.Spray.DeepOnly default true).
 	if cfg.Vulns.Spray.DeepOnly && !cfg.Advanced.Deep {
-		if app.Log != nil {
-			app.Log.Info("vulns.spray: DEEP-gated — spraying skipped (use --deep or set spray.deep_only=false)")
-		}
+		app.Log.Info("vulns.spray: DEEP-gated — spraying skipped (use --deep or set spray.deep_only=false)")
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
@@ -236,12 +223,12 @@ func (t *SprayTask) runBrutespray(
 
 	res, err := app.Tools.Run(ctx, toolName, args)
 	if err != nil {
-		// best_effort (D-V7): missing/failing brutespray never aborts vulns.
-		if app.Log != nil {
-			app.Log.Warn("vulns.spray: brutespray unavailable or failed — spraying skipped (best_effort)",
-				"error", err.Error())
-		}
-		return task.Result{Status: task.StatusSkipped}, nil
+		// best_effort: missing/failing brutespray never aborts vulns. The Reason
+		// says which of the two it was (task.ClassifyToolErr).
+		status, reason := task.ClassifyToolErr(err)
+		app.Log.Warn("vulns.spray: brutespray unavailable or failed — spraying skipped (best_effort)",
+			"reason", reason)
+		return task.Result{Status: status, Reason: reason}, nil
 	}
 
 	// Parse success lines from stdout (brutespray prints "[+] ... Login Successful ...").
@@ -251,7 +238,7 @@ func (t *SprayTask) runBrutespray(
 		stdout = res.Stdout
 	}
 
-	// WR-13-03: confine brutespray's raw output (native files under outDir + the
+	// Secret at rest: confine brutespray's raw output (native files under outDir + the
 	// user:pass on stdout success lines) to owner-only perms and register every
 	// discovered credential with the log Redactor (L2) BEFORE any log line. The
 	// findings stream still carries only "***" (parseBrutesprayHits redacts).
@@ -261,13 +248,11 @@ func (t *SprayTask) runBrutespray(
 	findings := sprayResolveScopeHosts(app, parseBrutesprayHits(stdout))
 
 	// brutespray RAN: an absent or failing binary returned StatusSkipped above,
-	// so reaching here means zero findings is a real observation (F3).
+	// so reaching here means zero findings is a real observation (run isolation).
 	sprayWriteFindings(app, true, findings)
 
-	if app.Log != nil {
-		// XCUT-07: log only the count, never the discovered credential.
-		app.Log.Info("vulns.spray: brutespray completed", "credential_findings", len(findings))
-	}
+	// XCUT-07: log only the count, never the discovered credential.
+	app.Log.Info("vulns.spray: brutespray completed", "credential_findings", len(findings))
 	return task.Result{
 		Status: task.StatusDone,
 		Stats:  map[string]int{"spray_findings": len(findings)},
@@ -284,27 +269,23 @@ func (t *SprayTask) runBrutus(
 ) (task.Result, error) {
 	// brutus deep-gate (bash SPRAY_BRUTUS_ONLY_DEEP default true).
 	if !app.Cfg.Advanced.Deep {
-		if app.Log != nil {
-			app.Log.Info("vulns.spray: brutus is DEEP-gated — spraying skipped (use --deep)")
-		}
+		app.Log.Info("vulns.spray: brutus is DEEP-gated — spraying skipped (use --deep)")
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
-	// Resolve the service-fingerprint input: prefer the 13-03 artefact; else
+	// Resolve the service-fingerprint input: prefer the portscan artefact; else
 	// generate it from naabu_open.txt via nerva if present (bash vulns.sh:641-647).
 	serviceFP := t.resolveServiceFingerprintInput(ctx, app)
 	if serviceFP == "" {
-		if app.Log != nil {
-			app.Log.Info("vulns.spray: no service-fingerprint input for brutus — spraying skipped " +
-				"(run web portscan with service_fingerprint=true)")
-		}
+		app.Log.Info("vulns.spray: no service-fingerprint input for brutus — spraying skipped " +
+			"(run web portscan with service_fingerprint=true)")
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
 	outPath := filepath.Join(vulnsDir, "brutus.jsonl")
 	args := []string{"--json", "-o", outPath}
 
-	// XCUT-07, CORRECTED IN 18-04. The comment that stood here claimed
+	// XCUT-07, CORRECTED WITH THE RUNNER MOVE. The comment that stood here claimed
 	// "credential wordlists cross as FILE PATHS only (never raw values)". That is
 	// TRUE of -k and FALSE of -u and -p: `brutus --help` on the installed build
 	// documents them as
@@ -315,9 +296,9 @@ func (t *SprayTask) runBrutus(
 	//
 	// so a configured advanced.tools.brutus.passwords is a LIST OF LIVE
 	// PASSWORDS placed on argv. That was survivable only while this file
-	// dispatched brutus itself: 18-04 routes it through backend.Runner, whose
+	// dispatched brutus itself: the Runner move routes it through backend.Runner, whose
 	// recorder writes argv into logs/tools.jsonl — a file operators paste into
-	// issue reports (T-18-04-03).
+	// issue reports.
 	//
 	// So register each configured value BEFORE the dispatch, through app.Secrets —
 	// the SecretRegistrar seam appctx.Boot points at the ToolRecorder's OWN
@@ -337,7 +318,7 @@ func (t *SprayTask) runBrutus(
 	if u := strings.TrimSpace(app.Cfg.Advanced.Tools.Brutus.Usernames); u != "" {
 		if sprayRegisterConfiguredCreds(app, u) {
 			args = append(args, "-u", u)
-		} else if app.Log != nil {
+		} else {
 			app.Log.Warn("vulns.spray: configured brutus usernames could NOT be registered " +
 				"with the run redactor — omitting -u rather than writing live credentials " +
 				"to logs/tools.jsonl (WR-09)")
@@ -346,7 +327,7 @@ func (t *SprayTask) runBrutus(
 	if p := strings.TrimSpace(app.Cfg.Advanced.Tools.Brutus.Passwords); p != "" {
 		if sprayRegisterConfiguredCreds(app, p) {
 			args = append(args, "-p", p)
-		} else if app.Log != nil {
+		} else {
 			app.Log.Warn("vulns.spray: configured brutus passwords could NOT be registered " +
 				"with the run redactor — omitting -p rather than writing live credentials " +
 				"to logs/tools.jsonl (WR-09)")
@@ -361,23 +342,21 @@ func (t *SprayTask) runBrutus(
 
 	err := brutusRunner(ctx, app, serviceFP, args)
 	// brutusRan is false only when the binary is absent: brutus never observed
-	// the service list, so it must not clear a previous run's staging (F3
+	// the service list, so it must not clear a previous run's staging (run isolation
 	// did-not-run — staging.go). Any OTHER error still means brutus ran and may
 	// have produced partial output, which is parsed below.
 	brutusRan := !errors.Is(err, errBrutusNotInstalled)
 	if err != nil {
-		// best_effort (D-V7): missing/failing brutus never aborts vulns.
+		// best_effort: missing/failing brutus never aborts vulns.
 		if errors.Is(err, errBrutusNotInstalled) {
-			if app.Log != nil {
-				app.Log.Warn("vulns.spray: brutus not found in PATH — spraying skipped (best_effort)")
-			}
-		} else if app.Log != nil {
+			app.Log.Warn("vulns.spray: brutus not found in PATH — spraying skipped (best_effort)")
+		} else {
 			app.Log.Warn("vulns.spray: brutus failed — continuing (best_effort)", "error", err.Error())
 		}
 		// A brutus error may still have produced partial output — try to parse it.
 	}
 
-	// WR-13-03: brutus wrote raw --json hits (live user:pass) to outPath at
+	// Secret at rest: brutus wrote raw --json hits (live user:pass) to outPath at
 	// tool-native perms (0644). Confine it to 0600 and register every discovered
 	// credential with the log Redactor (L2) BEFORE any log line — mirrors
 	// emails.go/github_repos.go. The findings stream still carries only "***".
@@ -388,10 +367,8 @@ func (t *SprayTask) runBrutus(
 	findings := sprayResolveScopeHosts(app, parseBrutusHits(outPath))
 	sprayWriteFindings(app, brutusRan, findings)
 
-	if app.Log != nil {
-		// XCUT-07: log only the count, never the discovered credential.
-		app.Log.Info("vulns.spray: brutus completed", "credential_findings", len(findings))
-	}
+	// XCUT-07: log only the count, never the discovered credential.
+	app.Log.Info("vulns.spray: brutus completed", "credential_findings", len(findings))
 	return task.Result{
 		Status: task.StatusDone,
 		Stats:  map[string]int{"spray_findings": len(findings)},
@@ -400,7 +377,7 @@ func (t *SprayTask) runBrutus(
 
 // resolveServiceFingerprintInput returns the path to a service-fingerprint JSONL
 // suitable for brutus stdin. Preference (bash vulns.sh:641-647):
-//  1. hosts/service_fingerprints.jsonl (from 13-03 nerva step) if non-empty.
+//  1. hosts/service_fingerprints.jsonl (from the portscan nerva step) if non-empty.
 //  2. Generate from hosts/naabu_open.txt via nerva (if naabu output + nerva present).
 //
 // Returns "" when no input can be resolved (caller → StatusSkipped).
@@ -423,10 +400,8 @@ func (t *SprayTask) resolveServiceFingerprintInput(ctx context.Context, app *app
 	genPath := filepath.Join(tmpDir, "service_fp_for_brutus.jsonl")
 	nervaArgs := []string{"--json", "-l", naabu, "-o", genPath}
 	if _, err := app.Tools.Run(ctx, "nerva", nervaArgs); err != nil {
-		if app.Log != nil {
-			app.Log.Debug("vulns.spray: nerva service-fingerprint generation failed (best_effort)",
-				"error", err.Error())
-		}
+		app.Log.Debug("vulns.spray: nerva service-fingerprint generation failed (best_effort)",
+			"error", err.Error())
 		return ""
 	}
 	if sprayFileNonEmpty(genPath) {
@@ -438,7 +413,7 @@ func (t *SprayTask) resolveServiceFingerprintInput(ctx context.Context, app *app
 // sprayWriteFindings writes redacted credential findings to the vulns staging
 // file inputs/findings.spray.jsonl (consumed by MergeAllVulnsArtefacts).
 //
-// F3 (phase 15): the write is UNCONDITIONAL. `ran` says whether the spray engine
+// Run isolation: the write is UNCONDITIONAL. `ran` says whether the spray engine
 // was actually dispatched; when it was and no credential was accepted, the
 // staging file is REMOVED, so a password that has since been rotated stops being
 // reported as still weak by every later run. XCUT-07 is unaffected: the records
@@ -448,9 +423,7 @@ func sprayWriteFindings(app *appctx.AppContext, ran bool, findings []VulnFinding
 	inputsDir := filepath.Join(app.Target.WorkDir, "inputs")
 	if len(findings) > 0 {
 		if err := os.MkdirAll(inputsDir, 0o755); err != nil {
-			if app.Log != nil {
-				app.Log.Debug("vulns.spray: mkdir inputs/ failed (best_effort)", "error", err.Error())
-			}
+			app.Log.Debug("vulns.spray: mkdir inputs/ failed (best_effort)", "error", err.Error())
 			return
 		}
 	}
@@ -459,7 +432,7 @@ func sprayWriteFindings(app *appctx.AppContext, ran bool, findings []VulnFinding
 }
 
 // sprayHardenFile restricts a spray tool's raw hit file (which can contain live
-// user:pass) to owner-only 0600 so it is not world-readable (WR-13-03).
+// user:pass) to owner-only 0600 so it is not world-readable (secret at rest).
 // Best-effort: a missing file or chmod failure is logged at Debug, never fatal.
 func sprayHardenFile(logger *slog.Logger, path string) {
 	if path == "" {
@@ -471,7 +444,7 @@ func sprayHardenFile(logger *slog.Logger, path string) {
 }
 
 // sprayHardenDir restricts every file under dir to 0600 and every directory to
-// 0700 (WR-13-03) — brutespray writes native output there that can carry live
+// 0700 (secret at rest) — brutespray writes native output there that can carry live
 // credentials. Best-effort; unreadable entries are skipped.
 func sprayHardenDir(logger *slog.Logger, dir string) {
 	if dir == "" {
@@ -494,8 +467,8 @@ func sprayHardenDir(logger *slog.Logger, dir string) {
 
 // sprayRegisterSecret registers one credential value with BOTH redaction sinks.
 //
-// WHY BOTH, and why app.Secrets is the load-bearing one (18-06 code review, CR-01
-// + phase verification Gap 1). 18-04 registered configured brutus credentials with
+// WHY BOTH, and why app.Secrets is the load-bearing one (code review
+// + phase verification). The Runner move registered configured brutus credentials with
 // log.RegisterHandlerSecret(app.Log, ...) alone, under a comment asserting "the
 // ToolRecorder holds the SAME redactor instance the logger does". appctx.Boot does
 // not wire them that way:
@@ -541,16 +514,14 @@ func sprayRegisterSecret(app *appctx.AppContext, value string) bool {
 		app.Secrets.Register(v)
 		registered = true
 	}
-	if app.Log != nil {
-		log.RegisterHandlerSecret(app.Log, v)
-	}
+	log.RegisterHandlerSecret(app.Log, v)
 	return registered
 }
 
 // sprayRegisterBrutusCreds reads brutus's raw --json hit file and registers every
 // discovered credential (username/password/key) with BOTH redaction sinks via
 // sprayRegisterSecret — the recorder's redactor AND the log one (CR-01) — so a
-// later log line or recorded argv echoing it is scrubbed (WR-13-03). Values are read transiently
+// later log line or recorded argv echoing it is scrubbed (secret at rest). Values are read transiently
 // and NEVER copied into a finding (XCUT-07 — findings carry "***").
 func sprayRegisterBrutusCreds(app *appctx.AppContext, outPath string) {
 	if app == nil {
@@ -617,7 +588,7 @@ func sprayRegisterConfiguredCreds(app *appctx.AppContext, list string) bool {
 // sprayRegisterBrutesprayCreds extracts the trailing user:pass from each
 // brutespray success line and registers it with BOTH redaction sinks via
 // sprayRegisterSecret (CR-01) so a later log line or recorded argv echoing it is
-// scrubbed (WR-13-03). The credential is NEVER copied into
+// scrubbed (secret at rest). The credential is NEVER copied into
 // a finding (XCUT-07 — parseBrutesprayHits redacts to "***").
 func sprayRegisterBrutesprayCreds(app *appctx.AppContext, stdout []byte) {
 	if app == nil || len(bytes.TrimSpace(stdout)) == 0 {
@@ -709,7 +680,7 @@ func parseBrutesprayHits(stdout []byte) []VulnFindingRecord {
 // actually supports: a weak credential was accepted at 10.0.0.5:22. It says
 // nothing about which of the names pointing at 10.0.0.5 owns that service.
 //
-// F20 (audit finding, bullet 3). This function used to overwrite Host with
+// Shared-IP attribution. This function used to overwrite Host with
 // whichever hostname happened to appear FIRST for that IP in hosts.jsonl,
 // justified in a comment as "keeping the result deterministic for shared IPs".
 // Determinism is not correctness. On shared hosting or a CDN edge, dozens of
@@ -773,16 +744,14 @@ func sprayResolveScopeHosts(app *appctx.AppContext, findings []VulnFindingRecord
 			// statement of fact rather than a guess.
 			findings[i].Host = hosts[0]
 		}
-		if app.Log != nil {
-			// XCUT-07: the IP and hostnames are non-secret locators; the
-			// credential never reaches this function. The previous message said
-			// the service IP had been mapped back to ITS in-scope host — the
-			// singular possessive was itself the unsupported claim. Log what is
-			// actually known: how many names share the address, and whether that
-			// makes the attribution ambiguous.
-			app.Log.Debug("vulns.spray: service IP associated with known hostnames",
-				"ip", ip, "hostnames", len(hosts), "ambiguous", len(hosts) > 1)
-		}
+		// XCUT-07: the IP and hostnames are non-secret locators; the
+		// credential never reaches this function. The previous message said
+		// the service IP had been mapped back to ITS in-scope host — the
+		// singular possessive was itself the unsupported claim. Log what is
+		// actually known: how many names share the address, and whether that
+		// makes the attribution ambiguous.
+		app.Log.Debug("vulns.spray: service IP associated with known hostnames",
+			"ip", ip, "hostnames", len(hosts), "ambiguous", len(hosts) > 1)
 	}
 	return findings
 }
@@ -793,43 +762,38 @@ func sprayResolveScopeHosts(app *appctx.AppContext, findings []VulnFindingRecord
 // Both writers of that artefact (web.httpx HostRecord and the subdomains geo
 // HostRecord) carry "host" and "ip", so one decode shape covers both.
 //
-// F20: this returned map[string]string with a first-wins guard. A shared IP
+// This used to return map[string]string with a first-wins guard. A shared IP
 // legitimately has MANY hostnames, and discarding all but one does not make the
 // answer right — it makes a wrong answer stable. Every name is kept so the
 // caller can tell "one name, therefore certain" from "many names, therefore
 // ambiguous"; that distinction is the whole fix.
 func sprayHostsByIP(app *appctx.AppContext) map[string][]string {
 	path := filepath.Join(app.Target.WorkDir, "artefacts", "hosts.jsonl")
-	f, err := os.Open(path) //nolint:gosec // path is workspace-internal
-	if err != nil {
-		return nil
-	}
-	defer f.Close() //nolint:errcheck
-
 	index := make(map[string][]string)
 	seen := make(map[string]map[string]struct{})
-	sc := bufio.NewScanner(f)
-	sc.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
-	for sc.Scan() {
+	// A read failure is best-effort here: the index only refines locators,
+	// and whatever was indexed before the bad line is still correct.
+	_ = output.ForEachJSONLLine(path, 0, func(line []byte) error {
 		var rec struct {
 			Host string `json:"host"`
 			IP   string `json:"ip"`
 		}
-		if err := json.Unmarshal(sc.Bytes(), &rec); err != nil {
-			continue
+		if err := json.Unmarshal(line, &rec); err != nil {
+			return nil
 		}
 		if rec.IP == "" || rec.Host == "" {
-			continue
+			return nil
 		}
 		if seen[rec.IP] == nil {
 			seen[rec.IP] = make(map[string]struct{})
 		}
 		if _, dup := seen[rec.IP][rec.Host]; dup {
-			continue
+			return nil
 		}
 		seen[rec.IP][rec.Host] = struct{}{}
 		index[rec.IP] = append(index[rec.IP], rec.Host)
-	}
+		return nil
+	})
 	return index
 }
 

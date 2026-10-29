@@ -438,7 +438,7 @@ func RunCompositeAsync(ctx context.Context, opts RunOptions, mode CompositeMode)
 	// CUT-08: end-of-scan finalization — materialize the v1 bash-shape
 	// Recon/<domain>/ (_compat/) tree from the now-final artefacts. Best-effort:
 	// compat writing must never fail the scan (WriteCompat returns nil by contract).
-	writeCompatTree(app, workdir)
+	writeCompatTree(app, workdir, cfg.Output.Compat.ReconSymlink)
 
 	persistScanToStore(ctx, boot, opts, compositeModeLabel(mode))
 	return nil

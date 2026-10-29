@@ -3,8 +3,6 @@
 // SINGLE-WRITER CONTRACT: SubBucketsTask is the ONLY writer for the "buckets"
 // artefact. Since no concurrent Task writes to "buckets", direct
 // app.Tree.Append is safe (no REPLACE-overwrite race).
-//
-// Source: .planning/phases/04-subdomains-e2e-axiom-integration/04-05-PLAN.md Task 1.
 package subdomains
 
 import (
@@ -60,10 +58,8 @@ func (SubBucketsTask) Run(ctx context.Context, app *appctx.AppContext) (task.Res
 
 	res, err := app.Tools.Run(ctx, toolName, args)
 	if err != nil {
-		if app.Log != nil {
-			app.Log.Debug("s3scanner run failed or tool not registered",
-				"tool", toolName, "err", err.Error())
-		}
+		app.Log.Debug("s3scanner run failed or tool not registered",
+			"tool", toolName, "err", err.Error())
 		// Non-fatal: emit empty result.
 		return task.Result{
 			Status: task.StatusDone,
@@ -134,10 +130,8 @@ func (SubBucketsTask) Run(ctx context.Context, app *appctx.AppContext) (task.Res
 
 	if len(records) > 0 {
 		if err := app.Tree.Append("buckets", records); err != nil {
-			if app.Log != nil {
-				app.Log.Debug("s3scanner: Tree.Append(buckets) failed",
-					"err", err.Error(), "records", len(records))
-			}
+			app.Log.Debug("s3scanner: Tree.Append(buckets) failed",
+				"err", err.Error(), "records", len(records))
 			return task.Result{Status: task.StatusErrored},
 				fmt.Errorf("s3scanner: Tree.Append(buckets): %w", err)
 		}

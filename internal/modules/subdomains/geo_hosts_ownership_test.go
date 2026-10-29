@@ -1,8 +1,8 @@
-// geo_hosts_ownership_test.go — the subdomains half of plan 15-13 Task 3's
-// "hosts" ownership decision.
+// geo_hosts_ownership_test.go — the subdomains half of the "hosts" ownership
+// decision.
 //
 // artefacts/hosts.jsonl has TWO direct writers: web/httpx.go and this package's
-// SubGeoTask. The F3 empty publish is assigned to httpx ALONE, on ordering
+// SubGeoTask. The empty publish is assigned to httpx ALONE, on ordering
 // evidence verified in internal/mcp/handlers/composite.go — subdomains.geo sits
 // in "subs-enrichment", the LAST subdomains stage group, and web.httpx sits in
 // "web-probe", the FIRST web group, with the web groups appended after the subs

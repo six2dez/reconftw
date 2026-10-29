@@ -1,11 +1,11 @@
-// grpc.go — GRPCTask: grpcurl reflection scanner (D-V3).
+// grpc.go — GRPCTask: grpcurl reflection scanner.
 //
-// GRPCTask is a D-V3 fold-in from web.sh grpc_reflection(), routed to the
-// vulns pipeline per plan 06-08 (VULN-14 parity completeness gate).
+// GRPCTask is a fold-in from web.sh grpc_reflection(), routed to the
+// vulns pipeline for parity completeness (VULN-14).
 //
-// INPUT: artefacts/urls.jsonl — URL corpus from Phase 5.
+// INPUT: artefacts/urls.jsonl — URL corpus from the web stage.
 //
-//	Empty → StatusSkipped (best_effort per D-V7).
+//	Empty → StatusSkipped (best_effort).
 //
 // ARG VECTOR (v1 web.sh grpc_reflection verbatim):
 //
@@ -17,8 +17,6 @@
 //
 // OUTPUT: artefacts/grpc.jsonl — single-writer; direct app.Tree.Append OK
 // (doc.go: single-writer artefacts do NOT go through the staging+merge pipeline).
-//
-// Source: .planning/phases/06-vulnerability-scanning-e2e/06-08-PLAN.md Task 1.
 package vulns
 
 import (
@@ -39,7 +37,7 @@ import (
 var grpcPorts = []string{"50051", "50052"}
 
 // GRPCTask runs grpcurl reflection probing against each host in the corpus
-// (D-V3, VULN-14 parity completeness).
+// (VULN-14 parity completeness).
 type GRPCTask struct{}
 
 // Name returns the globally unique dot-namespaced task identifier.
@@ -70,15 +68,13 @@ func (t *GRPCTask) DependsOn() []string { return []string{"vulns.gf"} }
 func (t *GRPCTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result, error) {
 	const toolName = "grpcurl"
 
-	// Step 1: Resolve URL corpus via D-V5 precedence (--urls ctx > artefacts/urls.jsonl).
+	// Step 1: Resolve URL corpus via precedence (--urls ctx > artefacts/urls.jsonl).
 	urls, err := readURLsWithCtx(ctx, app)
-	if err != nil && app.Log != nil {
+	if err != nil {
 		app.Log.Debug("vulns.grpc: read URL corpus error (best_effort)", "err", err)
 	}
 	if len(urls) == 0 {
-		if app.Log != nil {
-			app.Log.Info("vulns.grpc: no URLs in URL corpus — skipping")
-		}
+		app.Log.Info("vulns.grpc: no URLs in URL corpus — skipping")
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
@@ -105,10 +101,8 @@ func (t *GRPCTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 
 			res, runErr := app.Tools.Run(ctx, toolName, args)
 			if runErr != nil {
-				if app.Log != nil {
-					app.Log.Debug("vulns.grpc: grpcurl error (best_effort — continuing)",
-						"target", target, "err", runErr)
-				}
+				app.Log.Debug("vulns.grpc: grpcurl error (best_effort — continuing)",
+					"target", target, "err", runErr)
 				continue
 			}
 
@@ -145,16 +139,14 @@ func (t *GRPCTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 			lines = append(lines, b)
 		}
 		if len(lines) > 0 {
-			if wErr := app.Tree.Append("grpc", lines); wErr != nil && app.Log != nil {
+			if wErr := app.Tree.Append("grpc", lines); wErr != nil {
 				app.Log.Debug("vulns.grpc: Tree.Append failed",
 					"records", len(lines), "err", wErr)
 			}
 		}
 	}
 
-	if app.Log != nil {
-		app.Log.Info("vulns.grpc: completed", "grpc_hosts", found)
-	}
+	app.Log.Info("vulns.grpc: completed", "grpc_hosts", found)
 
 	return task.Result{
 		Status: task.StatusDone,

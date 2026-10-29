@@ -237,9 +237,12 @@ func runCompositeCmd(
 		ct = configTransform
 	}
 
+	scopeIncludeFile, scopeExcludeFile := scopeFileFlags(cmd)
 	if err := handlers.RunCompositeAsync(ctx, handlers.RunOptions{
 		Secrets:         runSecrets,
 		Target:          targetFlag,
+		IncludeFile:     scopeIncludeFile,
+		ExcludeFile:     scopeExcludeFile,
 		DryRun:          dryRun,
 		ConfigPath:      efs.configPath,
 		SecretsPath:     efs.secretsPath,
@@ -289,9 +292,12 @@ func runCompositeList(
 		afterBoot := func(boot handlers.AppBoot) {
 			commonAfterBoot(bctx, boot, sched, dryRun, subcommandName, &capture, runSecrets)
 		}
+		scopeIncludeFile, scopeExcludeFile := scopeFileFlags(cmd)
 		return handlers.RunCompositeAsync(bctx, handlers.RunOptions{
 			Secrets:         runSecrets,
 			Target:          target,
+			IncludeFile:     scopeIncludeFile,
+			ExcludeFile:     scopeExcludeFile,
 			DryRun:          dryRun,
 			ConfigPath:      efs.configPath,
 			SecretsPath:     efs.secretsPath,

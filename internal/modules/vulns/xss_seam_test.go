@@ -1,5 +1,5 @@
 // xss_seam_test.go — the proof that BOTH of vulns/xss.go's dispatch sites came
-// home to backend.Runner (18-04) with their command lines unchanged.
+// home to backend.Runner with their command lines unchanged.
 //
 // THE CONTROLS ARE THE PRE-MOVE ARG VECTORS, captured from xss.go as it stood at
 // f436d2e BEFORE the edit.
@@ -11,6 +11,11 @@
 //	                 "--only-poc", "r", "--ignore-return", "302,404,403",
 //	                 "--skip-bav", "-w", <threads>, "-d", <depth>}
 //	cmd.Stdin = bytes.NewReader([]byte(strings.Join(reflectedLines, "\n") + "\n"))
+//
+// 21-07a narrowed site A to the flags dalfox v2 AND v3 both accept (xss.go
+// header): --no-spinner / --skip-bav / -w are v2-only and -d was the POST body
+// in both. xssWantDalfoxArgv below is the NEW vector; the control is no longer
+// "unchanged across the move" but "exactly the common subset".
 //
 // site B — the Gxss reflection pre-pass (was gxssCmd.Output(), a shape the
 // FOUND-10 walker does not even count):
@@ -37,13 +42,12 @@ import (
 	"github.com/six2dez/reconftw/internal/core/task"
 )
 
-// xssWantDalfoxArgv is the PRE-MOVE dalfox arg vector for the default config
-// (no XSS_SERVER, threads 5, depth 2). Deliberately a literal, not a call into
+// xssWantDalfoxArgv is the dalfox arg vector for the default config (no
+// XSS_SERVER): the v2/v3 common subset. Deliberately a literal, not a call into
 // the code under test.
 var xssWantDalfoxArgv = []string{
-	"pipe", "--silence", "--no-color", "--no-spinner",
-	"--only-poc", "r", "--ignore-return", "302,404,403", "--skip-bav",
-	"-w", "5", "-d", "2",
+	"pipe", "--silence", "--no-color",
+	"--only-poc", "r", "--ignore-return", "302,404,403",
 }
 
 // xssWantGxssArgv is the PRE-MOVE reflection pre-pass arg vector.
@@ -131,6 +135,7 @@ func newXSSSeamApp(t *testing.T, workDir, gxssPath, dalfoxPath string) *appctx.A
 		t.Fatalf("output.NewTree: %v", err)
 	}
 	return &appctx.AppContext{
+		Log:    appctx.NopLogger(),
 		Tools:  backend.NewRunner(&backend.LocalBackend{}, reg, nil),
 		Cfg:    cfg,
 		Tree:   tree,
@@ -208,7 +213,7 @@ func TestDalfoxArgvUnchangedAcrossTheMove(t *testing.T) {
 }
 
 // TestXssUnavailableToolStatusUnchanged pins the FAILURE POLICY for both sites
-// across the move (T-18-04-04).
+// across the move.
 //
 //   - dalfox absent  → StatusSkipped, exactly what its exec.LookPath gate gave.
 //   - Gxss absent    → the reflection filter falls back to the FUZZ-replaced
@@ -229,9 +234,12 @@ func TestXssUnavailableToolStatusUnchanged(t *testing.T) {
 			t.Fatalf("status on an unavailable dalfox = %v, want %v — a best-effort task that "+
 				"starts returning an errored status aborts the vulns pipeline", res.Status, task.StatusSkipped)
 		}
+		if res.Reason != task.ReasonToolAbsent {
+			t.Fatalf("Reason on an unavailable dalfox = %q, want %q (absent-vs-failed policy)", res.Reason, task.ReasonToolAbsent)
+		}
 		if _, statErr := os.Stat(filepath.Join(workDir, "inputs", "findings.xss.jsonl")); statErr == nil {
 			t.Error("a run in which dalfox never started wrote the findings staging file — " +
-				"F3 did-not-run must preserve the previous run's findings")
+				"the did-not-run rule must preserve the previous run's findings")
 		}
 	})
 
@@ -262,7 +270,7 @@ func TestXssUnavailableToolStatusUnchanged(t *testing.T) {
 // TestGxssTimeoutFallsBackToUnfilteredCorpus pins the WR-05 fix.
 //
 // This site used gxssCmd.Output(), which returns captured stdout even on a
-// non-zero exit or a cancelled context. RunOpts discards it, so after 18-04 a Gxss
+// non-zero exit or a cancelled context. RunOpts discards it, so after the Runner move a Gxss
 // deadline produced zero reflected lines, the caller saw an empty candidate list
 // and returned StatusSkipped — the WHOLE XSS scan went silent behind an Info line
 // indistinguishable from a genuine zero-reflection result. The 120s bound the file
@@ -284,6 +292,7 @@ func TestGxssTimeoutFallsBackToUnfilteredCorpus(t *testing.T) {
 		Timeout: 300 * time.Millisecond,
 	})
 	app := &appctx.AppContext{
+		Log:    appctx.NopLogger(),
 		Tools:  backend.NewRunner(&backend.LocalBackend{}, reg, nil),
 		Cfg:    config.Defaults(),
 		Target: &appctx.Target{Domain: "example.com", WorkDir: dir},

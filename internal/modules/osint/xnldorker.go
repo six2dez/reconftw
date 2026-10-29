@@ -4,27 +4,25 @@
 // google_dorks at osint.sh:17 used dorks_hunter — xnldorker is the named OSINT-15
 // engine per the phase plan) seeded by the company name to surface indexed,
 // publicly-dorkable assets (exposed files, login panels, config leaks) across
-// search engines. Each dork hit becomes an informational OSINTFindingRecord (D-O4).
+// search engines. Each dork hit becomes an informational OSINTFindingRecord.
 //
-// KEY GATE (D-O8, logged-never-silent): Google dorking through search-engine APIs
+// KEY GATE (logged-never-silent): Google dorking through search-engine APIs
 // requires a credential. The only dork-related credential configured in v2 is the
 // GitHub-tokens file (the same credential the GitHub-dork engines use); xnldorker
 // gates on it as the dork-credential proxy. Absent → log.Info naming the var +
 // StatusSkipped (NEVER a silent skip — web/nuclei.go:108-128). The run COMPLETES.
 //
-// CONSERVATIVE RATE LIMITS (D-O8): Google dorking is a noisy/abuse-prone source.
+// CONSERVATIVE RATE LIMITS: Google dorking is a noisy/abuse-prone source.
 // It ships with a conservative per-engine cap and the company seed only — no
 // aggressive multi-engine fan-out.
 //
-// SEEDING (D-O1): company-seeded, no DependsOn edges.
-// FAILURE POLICY (D-O8, ARCH-09): best_effort.
+// SEEDING: company-seeded, no DependsOn edges.
+// FAILURE POLICY (ARCH-09): best_effort.
 //
-// THREAT MODEL (T-07-05-04): the dork credential stays log.Secret-typed; xnldorker
+// THREAT MODEL: the dork credential stays log.Secret-typed; xnldorker
 // reads it only as a gate signal here (never passes the raw token to argv — the
 // credential is consumed by the GitHub-dork engines). The company string crosses
 // into xnldorker argv via Backend.Run's []string arg-vector (never a shell string).
-//
-// Source: .planning/phases/07-osint-e2e/07-05-PLAN.md Task 2.
 package osint
 
 import (
@@ -57,14 +55,14 @@ func (t *XnldorkerTask) Enabled(cfg *config.Config) bool {
 	return cfg.OSINT.GoogleDorks.Enabled && cfg.OSINT.GoogleDorks.XnldorkerEnabled
 }
 
-// DependsOn returns nil — OSINT is root-domain/company-seeded (D-O1), no DAG edges.
+// DependsOn returns nil — OSINT is root-domain/company-seeded, no DAG edges.
 func (t *XnldorkerTask) DependsOn() []string { return nil }
 
-// Run executes xnldorker seeded by the company name (key-gated D-O8).
+// Run executes xnldorker seeded by the company name (key-gated).
 //
 // Steps:
-//  1. Derive + validate the root domain → company name (T-07-05-04).
-//  2. Key gate (D-O8): require a configured dork credential (GitHub tokens file).
+//  1. Derive + validate the root domain → company name.
+//  2. Key gate: require a configured dork credential (GitHub tokens file).
 //     Absent → log Info naming the var + StatusSkipped (logged-never-silent).
 //  3. Run xnldorker seeded by company (conservative caps).
 //  4. Parse dork hits into informational records.
@@ -72,19 +70,15 @@ func (t *XnldorkerTask) DependsOn() []string { return nil }
 func (t *XnldorkerTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result, error) {
 	root := rootDomain(app)
 	if root == "" {
-		if app.Log != nil {
-			app.Log.Info("osint.xnldorker: no valid root domain — skipping")
-		}
+		app.Log.Info("osint.xnldorker: no valid root domain — skipping")
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 	company := companyName(root)
 
-	// Step 2: key gate (D-O8, logged-never-silent). The GitHub-tokens file is the
+	// Step 2: key gate (logged-never-silent). The GitHub-tokens file is the
 	// configured dork credential proxy; absent → logged skip naming the var.
 	if gitHubTokenFile(app) == "" {
-		if app.Log != nil {
-			app.Log.Info("osint.xnldorker: no dork credential (cfg.paths.github_tokens) — skipping (D-O8)")
-		}
+		app.Log.Info("osint.xnldorker: no dork credential (cfg.paths.github_tokens) — skipping")
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
@@ -97,14 +91,15 @@ func (t *XnldorkerTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 	_ = os.MkdirAll(osintDir, 0o755) //nolint:errcheck // best_effort
 
 	// Step 3: xnldorker seeded by the company name, writing to osint/xnldorker.txt.
-	// Conservative single-seed invocation (D-O8) — no aggressive engine fan-out.
+	// Conservative single-seed invocation — no aggressive engine fan-out.
 	dorkOut := filepath.Join(osintDir, "xnldorker.txt")
 	res, err := app.Tools.Run(ctx, "xnldorker", []string{"-q", company, "-o", dorkOut})
 	if err != nil {
-		if app.Log != nil {
-			app.Log.Debug("osint.xnldorker: xnldorker run failed (best_effort)", "err", err)
-		}
-		return task.Result{Status: task.StatusDone, Stats: map[string]int{"findings": 0}}, nil
+		// Absent-vs-failed (task.ClassifyToolErr): a tool that did not run is a
+		// Skipped result with a Reason, never a silent findings:0 success.
+		status, reason := task.ClassifyToolErr(err)
+		app.Log.Info("osint.xnldorker: xnldorker not run — skipping", "reason", reason)
+		return task.Result{Status: status, Reason: reason}, nil
 	}
 
 	// Step 4: parse dork hits. xnldorker writes osint/xnldorker.txt; also parse
@@ -118,9 +113,7 @@ func (t *XnldorkerTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 	// Step 5: write staging JSONL (multi-writer contract).
 	writeOSINTStaging(app, inputsDir, "findings.xnldorker.jsonl", records)
 
-	if app.Log != nil {
-		app.Log.Info("osint.xnldorker: completed", "findings", len(records))
-	}
+	app.Log.Info("osint.xnldorker: completed", "findings", len(records))
 	return task.Result{
 		Status: task.StatusDone,
 		Stats:  map[string]int{"findings": len(records)},

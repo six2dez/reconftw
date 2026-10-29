@@ -1,15 +1,15 @@
 // github_repos_test.go — behavior tests for the GithubReposTask company-repo
-// secret scan (13-06 Task 1, PAR-03).
+// secret scan (secret-scan parity).
 //
 // Proves the highest-complexity OSINT parity restore: after enumerepo,
 // GithubReposTask clones every company repo (sha256-named dirs, no token on
 // argv), runs titus (bash's default engine) + trufflehog, merges the per-repo
 // scan output into osint/github_company_secrets.json (bash-parity human
 // artefact), and emits REDACTED OSINTFindingRecords to
-// inputs/findings.github_secrets.jsonl (XCUT-07 / T-13-06-02 — the raw secret is
+// inputs/findings.github_secrets.jsonl (XCUT-07 — the raw secret is
 // registered with the Redactor and NEVER reaches the JSONL stream or a log line).
 //
-// noseyparker is DEFERRED to Phase 14: SecretsEngine=="noseyparker" logs a
+// noseyparker is DEFERRED: SecretsEngine=="noseyparker" logs a
 // "deferred — using titus" note and runs titus (no noseyparker invocation).
 //
 // Internal (package osint) to reach the unexported git-clone seam
@@ -17,8 +17,6 @@
 // (emails_test.go / github_actions_test.go). Synthetic FAKE_ markers mirror the
 // vulns dalfox FAKE_XSS_MARKER convention so redaction is asserted without
 // committing a real credential.
-//
-// Source: .planning/phases/13-domain-parity/13-06-PLAN.md Task 1.
 package osint
 
 import (
@@ -231,7 +229,7 @@ func TestGithubReposTask_TitusScanProducesRedactedFindings(t *testing.T) {
 		t.Fatalf("XCUT-07 L2 VIOLATION: raw secret leaked into log output:\n%s", buf.String())
 	}
 
-	// 4. XCUT-07 T-13-06-01: the token NEVER appears on any tool argv, and
+	// 4. XCUT-07: the token NEVER appears on any tool argv, and
 	//    enumerepo received -token-file pointing at a temp file (removed after run).
 	var tokenFilePath string
 	for _, args := range fx.be.seenArgs {
@@ -283,7 +281,7 @@ func TestGithubReposTask_NoseyparkerDefersToTitus(t *testing.T) {
 	}
 }
 
-// TestGithubReposTask_NoTokenSkips proves the D-O8 key gate: no GitHub token →
+// TestGithubReposTask_NoTokenSkips proves the key gate: no GitHub token →
 // StatusSkipped, no clone, no secrets file.
 func TestGithubReposTask_NoTokenSkips(t *testing.T) {
 	fx := githubReposFixture{
@@ -302,7 +300,7 @@ func TestGithubReposTask_NoTokenSkips(t *testing.T) {
 	}
 }
 
-// TestGithubReposTask_TitusAbsentDegrades proves best-effort (D-O8): titus not
+// TestGithubReposTask_TitusAbsentDegrades proves best-effort: titus not
 // registered → StatusDone + warning, no crash, no github_company_secrets.json
 // (trufflehog yields nothing here). enumerepo-only behavior is preserved.
 func TestGithubReposTask_TitusAbsentDegrades(t *testing.T) {
@@ -369,12 +367,12 @@ func TestGithubReposTask_TrufflehogFindingsRedacted(t *testing.T) {
 	}
 }
 
-// TestGithubReposGitCloneRejectsNonURL proves the WR-13-04 hardening: the git
+// TestGithubReposGitCloneRejectsNonURL proves the clone-target hardening: the git
 // clone seam refuses any target that is not an http(s)/git URL BEFORE invoking
 // git, so an option-injection value (leading "-", ext:: transport, file://) can
 // never reach git's argv.
 //
-// 18-05: the check now runs before app.Tools.RunOpts rather than before
+// The check now runs before app.Tools.RunOpts rather than before
 // exec.LookPath, and it is passed a NIL AppContext ON PURPOSE. If the validation
 // were ever moved below the dispatch, this test would panic on the nil rather
 // than quietly passing — a stronger guarantee than the old "deterministic
@@ -398,7 +396,7 @@ func TestGithubReposGitCloneRejectsNonURL(t *testing.T) {
 	}
 }
 
-// TestParseEnumerepoOutputFallbackOnlyOnParseFailure proves the WR-13-05 gate:
+// TestParseEnumerepoOutputFallbackOnlyOnParseFailure proves the parse-failure gate:
 // the plain-text fallback runs ONLY when the payload is not valid JSON. Valid
 // JSON whose repo keys are unrecognized (schema drift) must yield an empty list —
 // NOT the pretty-printed JSON shredded into per-line "{"/"}" garbage.
@@ -438,8 +436,8 @@ func TestParseEnumerepoOutputFallbackOnlyOnParseFailure(t *testing.T) {
 	})
 }
 
-// ExecOpts satisfies the backend.Backend options seam added in 18-01. It
-// PRESERVES this fake's pre-18-01 dispatch exactly: Runner.Run used to call
+// ExecOpts satisfies the backend.Backend options seam added with the Runner move. It
+// PRESERVES this fake's pre-Runner dispatch exactly: Runner.Run used to call
 // Backend.Exec and Runner.RunEnv used to call Backend.ExecEnv, and both now
 // arrive here, so the env-set case forwards to ExecEnv and the zero case to Exec.
 //

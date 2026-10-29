@@ -28,7 +28,8 @@ import (
 // the test's temp dir so nothing escapes it.
 //
 // Pass the extra entries the caller would otherwise have appended to os.Environ()
-// (e.g. a minimal PATH); they are applied last and win.
+// (e.g. a stub PATH); they are applied last and win. PATH is already reduced to
+// hermeticMinimalPATH — a caller must never re-append os.Getenv("PATH").
 func hermeticResolverEnv(t *testing.T, extra ...string) []string {
 	t.Helper()
 
@@ -54,9 +55,22 @@ func hermeticResolverEnv(t *testing.T, extra ...string) []string {
 		"XDG_CONFIG_HOME="+filepath.Join(home, ".config"),
 		"RECONFTW_PATHS_RESOLVERS="+resolvers,
 		"RECONFTW_PATHS_RESOLVERS_TRUSTED="+trusted,
+		// PATH defaults to the minimal system set, NOT the developer's. os.Environ()
+		// above carries the real PATH, and on a provisioned box that is the whole
+		// toolchain — a subprocess run meant to be hermetic then dispatches real
+		// tools against the real network (21-04: TestE2EToolRecorderCapturesRealArgv
+		// took 115 s doing exactly that). A caller that needs stubs passes its own
+		// PATH= in extra, which is applied last and wins (os/exec keeps the last
+		// value of a duplicated key).
+		"PATH="+hermeticMinimalPATH,
 	)
 	return append(env, extra...)
 }
+
+// hermeticMinimalPATH is the only PATH a hermetic subprocess run gets unless
+// the caller overrides it: enough for /bin/sh stubs and git, nothing that could
+// be a recon tool.
+const hermeticMinimalPATH = "/usr/bin:/bin"
 
 // TestHermeticResolverEnvIsUsable is a guard on the helper itself: if the env-var
 // spelling drifts from the koanf path (RECONFTW_<SECTION>_<FIELD> → section.field),

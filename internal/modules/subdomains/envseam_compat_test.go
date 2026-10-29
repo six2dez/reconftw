@@ -1,5 +1,5 @@
 // envseam_compat_test.go — env-seam compile guards for the package's mock
-// Backends (Phase 07-09 GAP-02). The Backend interface gained additive
+// Backends. The Backend interface gained additive
 // ExecEnv/StreamEnv methods; these subdomains tests never exercise child-env
 // injection, so each mock delegates the env-capable variant to its existing
 // nil-env Exec/Stream. Keeping these in one file avoids scattering identical
@@ -68,8 +68,8 @@ func (t *toolCallTracker) StreamEnv(ctx context.Context, tool *backend.Tool, arg
 	return t.Stream(ctx, tool, args)
 }
 
-// ExecOpts satisfies the backend.Backend options seam added in 18-01. It
-// PRESERVES this fake's pre-18-01 dispatch exactly: Runner.Run used to call
+// ExecOpts satisfies the backend.Backend options seam. It PRESERVES this
+// fake's original dispatch exactly: Runner.Run used to call
 // Backend.Exec and Runner.RunEnv used to call Backend.ExecEnv, and both now
 // arrive here, so the env-set case forwards to ExecEnv and the zero case to Exec.
 //
@@ -92,8 +92,8 @@ func (m *permutStreamBackend) StreamOpts(ctx context.Context, t *backend.Tool, a
 	return m.Stream(ctx, t, args)
 }
 
-// ExecOpts satisfies the backend.Backend options seam added in 18-01. It
-// PRESERVES this fake's pre-18-01 dispatch exactly: Runner.Run used to call
+// ExecOpts satisfies the backend.Backend options seam. It PRESERVES this
+// fake's original dispatch exactly: Runner.Run used to call
 // Backend.Exec and Runner.RunEnv used to call Backend.ExecEnv, and both now
 // arrive here, so the env-set case forwards to ExecEnv and the zero case to Exec.
 //
@@ -116,8 +116,8 @@ func (t *trackingBackend) StreamOpts(ctx context.Context, tool *backend.Tool, ar
 	return t.Stream(ctx, tool, args)
 }
 
-// ExecOpts satisfies the backend.Backend options seam added in 18-01. It
-// PRESERVES this fake's pre-18-01 dispatch exactly: Runner.Run used to call
+// ExecOpts satisfies the backend.Backend options seam. It PRESERVES this
+// fake's original dispatch exactly: Runner.Run used to call
 // Backend.Exec and Runner.RunEnv used to call Backend.ExecEnv, and both now
 // arrive here, so the env-set case forwards to ExecEnv and the zero case to Exec.
 //
@@ -140,8 +140,8 @@ func (m *mockStreamBackend) StreamOpts(ctx context.Context, t *backend.Tool, arg
 	return m.Stream(ctx, t, args)
 }
 
-// ExecOpts satisfies the backend.Backend options seam added in 18-01. It
-// PRESERVES this fake's pre-18-01 dispatch exactly: Runner.Run used to call
+// ExecOpts satisfies the backend.Backend options seam. It PRESERVES this
+// fake's original dispatch exactly: Runner.Run used to call
 // Backend.Exec and Runner.RunEnv used to call Backend.ExecEnv, and both now
 // arrive here, so the env-set case forwards to ExecEnv and the zero case to Exec.
 //
@@ -164,8 +164,8 @@ func (m *streamTrackingBackend) StreamOpts(ctx context.Context, t *backend.Tool,
 	return m.Stream(ctx, t, args)
 }
 
-// ExecOpts satisfies the backend.Backend options seam added in 18-01. It
-// PRESERVES this fake's pre-18-01 dispatch exactly: Runner.Run used to call
+// ExecOpts satisfies the backend.Backend options seam. It PRESERVES this
+// fake's original dispatch exactly: Runner.Run used to call
 // Backend.Exec and Runner.RunEnv used to call Backend.ExecEnv, and both now
 // arrive here, so the env-set case forwards to ExecEnv and the zero case to Exec.
 //
@@ -188,8 +188,8 @@ func (m *mockBackend) StreamOpts(ctx context.Context, t *backend.Tool, args []st
 	return m.Stream(ctx, t, args)
 }
 
-// ExecOpts satisfies the backend.Backend options seam added in 18-01. It
-// PRESERVES this fake's pre-18-01 dispatch exactly: Runner.Run used to call
+// ExecOpts satisfies the backend.Backend options seam. It PRESERVES this
+// fake's original dispatch exactly: Runner.Run used to call
 // Backend.Exec and Runner.RunEnv used to call Backend.ExecEnv, and both now
 // arrive here, so the env-set case forwards to ExecEnv and the zero case to Exec.
 //
@@ -212,8 +212,8 @@ func (m *mockMultiToolBackend) StreamOpts(ctx context.Context, t *backend.Tool, 
 	return m.Stream(ctx, t, args)
 }
 
-// ExecOpts satisfies the backend.Backend options seam added in 18-01. It
-// PRESERVES this fake's pre-18-01 dispatch exactly: Runner.Run used to call
+// ExecOpts satisfies the backend.Backend options seam. It PRESERVES this
+// fake's original dispatch exactly: Runner.Run used to call
 // Backend.Exec and Runner.RunEnv used to call Backend.ExecEnv, and both now
 // arrive here, so the env-set case forwards to ExecEnv and the zero case to Exec.
 //

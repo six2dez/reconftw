@@ -1,6 +1,4 @@
 // recursive_test.go — TDD RED tests for SubRecursivePassiveTask and SubRecursiveBruteTask.
-//
-// Source: .planning/phases/04-subdomains-e2e-axiom-integration/04-04-PLAN.md Task 2.
 package subdomains_test
 
 import (
@@ -183,6 +181,7 @@ func buildRecursiveApp(workDir string, runner *backend.Runner) *appctx.AppContex
 	cfg.Advanced.Tools.Subfinder.TimeoutMinutes = 3
 
 	return &appctx.AppContext{
+		Log:    appctx.NopLogger(),
 		Tools:  runner,
 		Tree:   &mockTree{},
 		Target: &appctx.Target{Domain: "example.com", WorkDir: workDir},
@@ -221,7 +220,7 @@ func (t *trackingBackend) HealthCheck(_ context.Context) error { return nil }
 func (t *trackingBackend) Capacity() int { return 1 }
 
 // -------------------------------------------------------------------------
-// Task 2 (13-02): dsieve top-N recursion seed selection
+// dsieve top-N recursion seed selection
 // -------------------------------------------------------------------------
 
 // TestRecursivePassiveUsesDsieveSeeds verifies SubRecursivePassiveTask selects
@@ -434,8 +433,8 @@ func argValue(args []string, flag string) string {
 	return ""
 }
 
-// ExecOpts satisfies the backend.Backend options seam added in 18-01. It
-// PRESERVES this fake's pre-18-01 dispatch exactly: Runner.Run used to call
+// ExecOpts satisfies the backend.Backend options seam. It PRESERVES this
+// fake's original dispatch exactly: Runner.Run used to call
 // Backend.Exec and Runner.RunEnv used to call Backend.ExecEnv, and both now
 // arrive here, so the env-set case forwards to ExecEnv and the zero case to Exec.
 //

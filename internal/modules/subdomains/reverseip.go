@@ -1,13 +1,13 @@
 // reverseip.go — hakip2host reverse-IP → host discovery for the resolve stage.
 //
-// PAR-01 (Phase 13-01): folds bash sub_dns's hakip2host reverse-IP step
+// PAR-01: folds bash sub_dns's hakip2host reverse-IP step
 // (modules/subdomains.sh:931-935) into SubDNSTask. hakip2host is a hakluke
 // stdin-only tool — it reads newline-delimited IPs on stdin and emits
 // "[TAG] <ip> <hostname>" lines.
 //
-// 18-01: THIS FILE NO LONGER BYPASSES THE SEAM. It used to reach for a direct
+// THIS FILE NO LONGER BYPASSES THE SEAM. It used to reach for a direct
 // exec.CommandContext with cmd.Stdin, because the name-keyed Backend/Runner had
-// no way to inject standard input — the justification recorded on its FOUND-10
+// no way to inject standard input — the justification recorded on its
 // allowlist entry. backend.Runner.RunOpts now carries stdin, so the reason is
 // gone and the entry has been REMOVED from the allowlist. hakip2host was
 // invisible to logs/tools.jsonl, to the arg-vector census and to the tools.lock
@@ -22,9 +22,9 @@
 // returned whatever partial stdout it had captured, and LocalBackend does not —
 // it returns a *ToolError with no Result. Partial output from a failing
 // hakip2host is therefore no longer parsed. This is the same buffered-path
-// decision every other tool on the seam already lives with (see the CR-07 note
-// at local.go's deadline arm); the alternative is keeping this tool outside
-// every guard phases 16-17 built, which is what this phase exists to end.
+// decision every other tool on the seam already lives with (see the note at
+// local.go's deadline arm); the alternative is keeping this tool outside
+// every guard built since, which is what the seam exists to end.
 //
 // The dispatch stays behind the hakip2hostRunner package var so hermetic tests
 // (reverseip_internal_test.go) can inject canned output without a real binary.
@@ -41,7 +41,7 @@ import (
 
 // hakip2hostRunner runs hakip2host with the given newline-delimited IP list on
 // stdin and returns raw stdout. Overridable in tests. Returns ("", nil) when the
-// binary is not on PATH (D-O2 graceful skip) so a missing optional tool never
+// binary is not on PATH (graceful skip) so a missing optional tool never
 // fails the resolve stage.
 var hakip2hostRunner = func(ctx context.Context, app *appctx.AppContext, ips []string) (string, error) {
 	if app == nil || app.Tools == nil {
@@ -53,7 +53,7 @@ var hakip2hostRunner = func(ctx context.Context, app *appctx.AppContext, ips []s
 	if err != nil {
 		// A tool that is not registered, or registered but absent from PATH
 		// (Discover leaves Path empty, so cmd.Start fails and LocalBackend
-		// reports NeverStarted), is a GRACEFUL SKIP per D-O2 — a missing
+		// reports NeverStarted), is a GRACEFUL SKIP — a missing
 		// optional tool must never fail the resolve stage. Note the gain over
 		// the old exec.LookPath skip: this path is now RECORDED as
 		// dispatch_failed in logs/tools.jsonl instead of vanishing silently.
@@ -74,7 +74,7 @@ func reverseIPHosts(ctx context.Context, app *appctx.AppContext, ips []string) [
 		return nil
 	}
 	out, err := hakip2hostRunner(ctx, app, ips)
-	if err != nil && app.Log != nil {
+	if err != nil {
 		app.Log.Warn("resolve: hakip2host reverse-IP failed (non-fatal)", "error", err.Error())
 	}
 	return parseHakip2hostHosts(out, app)
@@ -83,7 +83,7 @@ func reverseIPHosts(ctx context.Context, app *appctx.AppContext, ips []string) [
 // parseHakip2hostHosts parses hakip2host stdout ("[TAG] <ip> <hostname>", third
 // whitespace field is the hostname — bash awk '{print $3}') and returns
 // distinct, in-scope, syntactically-valid hostnames. In-scope filtering
-// (inScope → app.Tree.InScope) is the T-13-01-01 mitigation: reverse-IP output
+// (inScope → app.Tree.InScope) is required because reverse-IP output
 // can include off-scope hosts, so it is anchored-filtered before staging.
 func parseHakip2hostHosts(out string, app *appctx.AppContext) []string {
 	if out == "" {

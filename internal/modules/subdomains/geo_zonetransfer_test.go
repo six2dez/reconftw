@@ -1,8 +1,5 @@
 // geo_zonetransfer_test.go — TDD RED tests for SubGeoTask and ZoneTransferTask.
 //
-// Source: .planning/phases/04-subdomains-e2e-axiom-integration/04-05-PLAN.md
-// Task 2 behavior tests.
-//
 // Test infrastructure reuses mockBackend, mockTree from scope_crosscheck_test.go.
 package subdomains_test
 
@@ -60,6 +57,7 @@ func buildGeoApp(t *testing.T, ipinfoBaseURL string) (*appctx.AppContext, string
 	cfg.APIKeys.PDCP = "test-pdcp-key-value"
 
 	app := &appctx.AppContext{
+		Log:    appctx.NopLogger(),
 		Tools:  runner,
 		Tree:   &mockTree{},
 		Target: &appctx.Target{Domain: "example.com", WorkDir: workDir},
@@ -204,6 +202,7 @@ func TestSubGeoTaskDeduplicatesIPLookups(t *testing.T) {
 	cfg.Subdomains.Enabled = true
 
 	app := &appctx.AppContext{
+		Log:    appctx.NopLogger(),
 		Tools:  runner,
 		Tree:   &mockTree{},
 		Target: &appctx.Target{Domain: "example.com", WorkDir: workDir},
@@ -260,6 +259,7 @@ func TestZoneTransferRunReturnsSkippedWhenDisabled(t *testing.T) {
 	cfg.Subdomains.ZoneTransfer.Enabled = false // disabled
 
 	app := &appctx.AppContext{
+		Log:    appctx.NopLogger(),
 		Tools:  runner,
 		Tree:   &mockTree{},
 		Target: &appctx.Target{Domain: "example.com", WorkDir: workDir},
@@ -276,7 +276,7 @@ func TestZoneTransferRunReturnsSkippedWhenDisabled(t *testing.T) {
 		t.Fatalf("ZoneTransferTask.Run: unexpected error: %v", err)
 	}
 	// Run() must return StatusSkipped even when ZoneTransfer.Enabled == false.
-	// This is the REVIEWS finding #4 fix: Enabled() is NOT called by Scheduler.
+	// Enabled() is NOT called by Scheduler, so Run() must gate on its own.
 	if res.Status != task.StatusSkipped {
 		t.Errorf("ZoneTransferTask.Run(ZoneTransfer.Enabled=false) = %q, want skipped (in-Run gate required)", res.Status)
 	}

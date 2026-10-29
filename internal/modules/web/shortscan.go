@@ -7,12 +7,12 @@
 //
 // DEPENDENCY: DependsOn ["web.nuclei"] — reads inputs/findings.nuclei.jsonl (staging).
 //
-// INPUT FILTER (RESEARCH §shortscan, web.sh:1609):
+// INPUT FILTER (web.sh:1609):
 // v1 extracts IIS targets from nuclei info.txt: `awk '/iis-version/ {print $4}'`
 // v2 reads inputs/findings.nuclei.jsonl (nuclei staging), filtering records where
 // TemplateID == "iis-version". No fallback to artefacts/ (WARNING-3 fix).
 //
-// ARG VECTOR (RESEARCH §shortscan, web.sh:1609-1612 via interlace):
+// ARG VECTOR (web.sh:1609-1612 via interlace):
 //
 //	shortscan <url> -F -s -p 1
 //
@@ -20,13 +20,13 @@
 // OUTPUT FILTER: v1 deletes output files not containing "Vulnerable: Yes".
 // Only findings with "Vulnerable: Yes" in stdout are written as records.
 //
-// 18-04: THIS FILE NEVER HAD A REASON TO BYPASS THE SEAM, and it is now home.
+// THIS FILE NEVER HAD A REASON TO BYPASS THE SEAM, and it is now home.
 //
 // It was carried for a long time under a blanket allowlist comment asserting
 // that the registry "does not support cmd.Dir or stdin injection" — a claim
-// about two capabilities THIS FILE DEMANDS NEITHER OF. 18-03 replaced that prose
+// about two capabilities THIS FILE DEMANDS NEITHER OF. The typed manifest replaced that prose
 // with a typed manifest and could find no corroborated reason for it at all, so
-// it was declared `pending_removal` with HomeBy 18-04. The four facts, RE-DERIVED
+// it was declared `pending_removal`. The four facts, RE-DERIVED
 // FROM THIS FILE on 2026-08-26 rather than quoted from a plan:
 //
 //	0 assignments to a cmd.Stdin field
@@ -48,15 +48,13 @@
 // the one file in this cohort where it does not. runShortscan already returned
 // `nil, err` on a non-zero exit and discarded the buffer, so the Runner's
 // no-Result-on-error contract reproduces the old behaviour exactly.
-//
-// Source: .planning/phases/05-web-pipeline-e2e/05-05-PLAN.md Task 1.
 package web
 
 import (
 	"bufio"
-	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -97,13 +95,11 @@ func (t *ShortscanTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 	// where TemplateID == "iis-version". DependsOn ["web.nuclei"] ensures
 	// nuclei's staging file exists before shortscan runs.
 	iisTargets, readErr := readIISTargetsFromNucleiStaging(app)
-	if readErr != nil && app.Log != nil {
+	if readErr != nil {
 		app.Log.Debug("web.shortscan: read nuclei staging error", "err", readErr)
 	}
 	if len(iisTargets) == 0 {
-		if app.Log != nil {
-			app.Log.Info("web.shortscan: no IIS targets found in nuclei staging — skipping")
-		}
+		app.Log.Info("web.shortscan: no IIS targets found in nuclei staging — skipping")
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
@@ -115,11 +111,11 @@ func (t *ShortscanTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 		if runErr != nil {
 			// The tool never started: the same graceful skip the exec.LookPath
 			// gate gave, including NO staging write, so a run in which shortscan
-			// never ran cannot clear a previous run's findings (F3 did-not-run).
-			// WR-06: LATCH, do not return from inside the loop.
+			// never ran cannot clear a previous run's findings (did-not-run).
+			// LATCH, do not return from inside the loop.
 			//
 			// Returning here threw away every result the earlier iterations had already
-			// collected. With CR-04 fixed, a rate-limiter or context error mid-loop IS a
+			// collected. A rate-limiter or context error mid-loop IS a
 			// dispatch failure, so a Ctrl-C or a task deadline part-way through now
 			// reaches this arm and silently discarded a partial but perfectly valid set.
 			// The decision belongs after the loop, where "the tool never ran" and "the
@@ -129,29 +125,25 @@ func (t *ShortscanTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 				unresolvable = true
 				break
 			}
-			if app.Log != nil {
-				app.Log.Debug("web.shortscan: scan error",
-					"url", targetURL, "err", runErr)
-			}
+			app.Log.Debug("web.shortscan: scan error",
+				"url", targetURL, "err", runErr)
 		}
 		allFindings = append(allFindings, findings...)
 	}
 
-	// WR-06: only a run that collected NOTHING is a skip — see the loop above.
+	// Only a run that collected NOTHING is a skip — see the loop above.
 	if unresolvable && len(allFindings) == 0 {
-		if app.Log != nil {
-			app.Log.Info("web.shortscan: shortscan unavailable — skipping")
-		}
+		app.Log.Info("web.shortscan: shortscan unavailable — skipping")
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
-	if unresolvable && app.Log != nil {
+	if unresolvable {
 		app.Log.Warn("web.shortscan: dispatch stopped part-way — staging the findings "+
 			"collected before it (WR-06)", "findings", len(allFindings))
 	}
 
 	// Stage findings into inputs/findings.shortscan.jsonl (staging contract).
 	//
-	// F3 (phase 15): staged UNCONDITIONALLY — StageJSONL removes the staging
+	// Staged UNCONDITIONALLY — StageJSONL removes the staging
 	// file when this run found no IIS short names, so a previous run's findings
 	// cannot be republished.
 	var lines [][]byte
@@ -163,16 +155,14 @@ func (t *ShortscanTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 		lines = append(lines, b)
 	}
 	stagingPath := filepath.Join(app.Target.WorkDir, "inputs", "findings.shortscan.jsonl")
-	if wErr := output.StageJSONL(stagingPath, lines); wErr != nil && app.Log != nil {
+	if wErr := output.StageJSONL(stagingPath, lines); wErr != nil {
 		app.Log.Debug("web.shortscan: staging write failed",
 			"path", stagingPath, "err", wErr)
 	}
 
-	if app.Log != nil {
-		app.Log.Debug("web.shortscan: completed",
-			"iis_targets", len(iisTargets),
-			"findings", len(allFindings))
-	}
+	app.Log.Debug("web.shortscan: completed",
+		"iis_targets", len(iisTargets),
+		"findings", len(allFindings))
 
 	return task.Result{
 		Status:     task.StatusDone,
@@ -185,9 +175,9 @@ func (t *ShortscanTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 const shortscanToolName = "shortscan"
 
 // shortscanArgs returns the arg vector for one target, VERBATIM as it stood
-// before 18-04 moved this dispatch onto the Runner:
+// before this dispatch moved onto the Runner:
 //
-//	shortscan <url> -F -s -p 1   (RESEARCH §shortscan, v1 web.sh:1610)
+//	shortscan <url> -F -s -p 1   (v1 web.sh:1610)
 //
 // The target URL is POSITIONAL and comes FIRST; that ordering is part of the
 // vector, and TestShortscanArgvUnchangedAcrossTheMove asserts it in order.
@@ -253,36 +243,22 @@ func runShortscan(ctx context.Context, app *appctx.AppContext, targetURL string)
 //
 // DependsOn ["web.nuclei"] ensures nuclei has written its staging file before
 // shortscan runs.
+
 func readIISTargetsFromNucleiStaging(app *appctx.AppContext) ([]string, error) {
 	stagingPath := filepath.Join(app.Target.WorkDir, "inputs", "findings.nuclei.jsonl")
-	data, err := os.ReadFile(stagingPath) //nolint:gosec // path within WorkDir
-	if err != nil {
-		if os.IsNotExist(err) {
-			if app.Log != nil {
-				app.Log.Info("web.shortscan: inputs/findings.nuclei.jsonl absent — IIS target detection skipped")
-			}
-			return nil, nil
-		}
-		return nil, fmt.Errorf("read inputs/findings.nuclei.jsonl: %w", err)
-	}
-	if len(data) == 0 {
+	if _, statErr := os.Stat(stagingPath); errors.Is(statErr, os.ErrNotExist) {
+		app.Log.Info("web.shortscan: inputs/findings.nuclei.jsonl absent — IIS target detection skipped")
 		return nil, nil
 	}
 	var targets []string
-	scanner := bufio.NewScanner(bytes.NewReader(data))
-	scanner.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
-	for scanner.Scan() {
-		line := bytes.TrimSpace(scanner.Bytes())
-		if len(line) == 0 {
-			continue
-		}
+	err := output.ForEachJSONLLine(stagingPath, 0, func(line []byte) error {
 		var rec struct {
 			TemplateID string `json:"template_id"`
 			MatchedAt  string `json:"matched_at"`
 			Host       string `json:"host"`
 		}
 		if err := json.Unmarshal(line, &rec); err != nil {
-			continue
+			return nil // malformed record: skipped, as before
 		}
 		if rec.TemplateID == "iis-version" {
 			target := rec.MatchedAt
@@ -293,6 +269,10 @@ func readIISTargetsFromNucleiStaging(app *appctx.AppContext) ([]string, error) {
 				targets = append(targets, target)
 			}
 		}
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("read inputs/findings.nuclei.jsonl: %w", err)
 	}
 	return targets, nil
 }

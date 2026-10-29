@@ -2,7 +2,7 @@
 // the tool is dispatched.
 //
 // Both tasks read a token FILE and put its CONTENT on argv (`-t <token>`). The
-// comment at passive.go had promised since phase 4 that the token was "registered
+// comment at passive.go had long promised that the token was "registered
 // as a secret before any logging"; nothing registered it — the code logged the
 // token's LENGTH and moved on. That was survivable while argv stayed in memory.
 // It stopped being survivable when logs/tools.jsonl began writing argv to disk.
@@ -128,8 +128,8 @@ func TestGithubGitlabTokensAreRegisteredBeforeDispatch(t *testing.T) {
 	}
 }
 
-// ExecOpts satisfies the backend.Backend options seam added in 18-01. It
-// PRESERVES this fake's pre-18-01 dispatch exactly: Runner.Run used to call
+// ExecOpts satisfies the backend.Backend options seam. It PRESERVES this
+// fake's original dispatch exactly: Runner.Run used to call
 // Backend.Exec and Runner.RunEnv used to call Backend.ExecEnv, and both now
 // arrive here, so the env-set case forwards to ExecEnv and the zero case to Exec.
 //

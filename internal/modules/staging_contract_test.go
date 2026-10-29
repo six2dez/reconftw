@@ -172,9 +172,9 @@ var stagingContractAllowlist = map[string][]string{
 }
 
 // stagingContractAllowlistSize is the FLATTENED entry count of
-// stagingContractAllowlist. Asserted by TestStagingContractAllowlistShrinks so
-// lowering one without the other fails, and pinned at exactly 0 by
-// TestStagingContractRatchetIsClosed so neither can be raised.
+// stagingContractAllowlist. Pinned at exactly 0 by
+// TestStagingContractRatchetIsClosed, which also asserts the map is empty, so
+// neither can be raised.
 //
 // 15-03 seed: 38 (web 16, vulns 15, subdomains 6, osint 1).
 // 15-13 lowered it to 16 by removing all 22 web + subdomains entries (web 16,
@@ -960,18 +960,6 @@ func TestStagingContract(t *testing.T) {
 	}
 }
 
-func TestStagingContractAllowlistShrinks(t *testing.T) {
-	n := 0
-	for _, fns := range stagingContractAllowlist {
-		n += len(fns)
-	}
-	if n != stagingContractAllowlistSize {
-		t.Fatalf("flattened stagingContractAllowlist has %d entries but "+
-			"stagingContractAllowlistSize is %d — lower BOTH together (the ratchet must "+
-			"reach 0 before cutover)", n, stagingContractAllowlistSize)
-	}
-}
-
 func TestDerivedOutputExemptionsPinned(t *testing.T) {
 	n := 0
 	for _, fns := range derivedOutputExemptions {
@@ -1010,8 +998,7 @@ func TestDerivedOutputExemptionsPinned(t *testing.T) {
 // TestStagingContractRatchetIsClosed is phase 15 plan 17's permanent closure of
 // the F3 migration ratchet.
 //
-// TestStagingContractAllowlistShrinks only pins the map AGAINST the constant, so
-// raising BOTH together would satisfy it. This test pins the CONSTANT, so the
+// A map-against-constant pin alone would be satisfied by raising BOTH together. This test pins the CONSTANT, so the
 // only way to re-open the ratchet is to edit an assertion whose failure message
 // says that editing it is the regression.
 //
@@ -1020,6 +1007,19 @@ func TestDerivedOutputExemptionsPinned(t *testing.T) {
 // the substantive claim: "the allowlist is empty" is worthless if the detector
 // would report violations were it consulted.
 func TestStagingContractRatchetIsClosed(t *testing.T) {
+	// The MAP, not only the constant. TestStagingContractAllowlistShrinks used
+	// to compare the two; with both at 0 that was 0==0 and it was deleted in
+	// 21-04 (internal/modules/DELETED_TESTS.md). What it still guarded — an
+	// entry quietly added to the map — is asserted here.
+	if n := 0; true {
+		for _, fns := range stagingContractAllowlist {
+			n += len(fns)
+		}
+		if n != 0 {
+			t.Errorf("stagingContractAllowlist holds %d entries: %v — the ratchet is CLOSED and no "+
+				"entry may ever be added back; migrate the write instead", n, stagingContractAllowlist)
+		}
+	}
 	if stagingContractAllowlistSize != 0 {
 		t.Errorf("stagingContractAllowlistSize is %d, want 0.\n"+
 			"  The F3 staging-contract ratchet was CLOSED by phase 15 plan 17. Every "+

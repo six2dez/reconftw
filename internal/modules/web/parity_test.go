@@ -1,4 +1,4 @@
-// parity_test.go — Frozen-replay parity harness for the web pipeline (D-W7, WEB-16).
+// parity_test.go — Frozen-replay parity harness for the web pipeline.
 //
 // Purpose: detect porting bugs by replaying v1-captured (or synthetic) tool
 // output through v2 web pipeline logic and asserting per-category behaviour
@@ -7,11 +7,11 @@
 //
 // FIXTURE NOTES:
 //   - Stub fixtures (httpx, nuclei, katana): header starts "# TODO: capture from: ..."
-//     → test t.Skip()s cleanly. Populate via Plan 05-07 instructions.
+//     → test t.Skip()s cleanly. Populate from a captured run.
 //   - Synthetic fixtures (jsluice_secrets.jsonl, wafw00f_example.txt): committed
 //     right now. Tests backed by these MUST PASS (no t.Skip).
 //   - jsluice_secrets.jsonl uses clearly-fake token "FAKE_AWS_AAAA0000BBBBCCCC"
-//     to verify ExtractSecrets redaction without committing real credentials (T-05-20).
+//     to verify ExtractSecrets redaction without committing real credentials.
 //
 // FIXTURE CAPTURE INSTRUCTIONS (for stub fixtures):
 //
@@ -20,7 +20,6 @@
 //	Then replace the stub header line with:
 //	  # captured-from: httpx -follow-host-redirects ... -json -l hosts_seed.txt | date: YYYY-MM-DD
 //
-// Source: .planning/phases/05-web-pipeline-e2e/05-06-PLAN.md Task 1.
 // PACKAGE web, NOT web_test. These tests must call parseHTTPXOutput and
 // parseNucleiOutput, which are unexported — and calling the production parser is
 // the entire point of this file after the 2026-08-21 dead-web-layer bug. The
@@ -57,7 +56,7 @@ func webParitySkip(t *testing.T, fixtureBytes []byte, fixturePath string) {
 			continue
 		}
 		if strings.HasPrefix(line, "# TODO:") {
-			t.Skipf("fixture not captured yet (stub header): %s — populate via Plan 05-07", fixturePath)
+			webParityStub(t, fixturePath, line)
 		}
 		return
 	}
@@ -67,6 +66,33 @@ func webParitySkip(t *testing.T, fixtureBytes []byte, fixturePath string) {
 // fixturesBase returns the path to the testdata/fixtures directory
 // relative to this test file's package directory.
 func fixturesBase() string { return filepath.Join("testdata", "fixtures") }
+
+// webParityStub is the one place a "# TODO: capture from: <cmd>" stub decides
+// between skip and failure .
+//
+// These stubs have made the parity subtests skip since the fixtures were stubbed, and a skip is
+// not a pass. By default the subtest still skips — but the skip message now
+// names the exact capture command from the stub header, so the remedy is in the
+// test output rather than in a plan file. With PARITY_FIXTURES_REQUIRED=1 (the
+// provisioned-box / sign-off setting) the same stub is a FAILURE: a sign-off run
+// must not be able to report green over fixtures nobody captured.
+func webParityStub(t *testing.T, fixturePath, headerLine string) {
+	t.Helper()
+	cmd := strings.TrimSpace(strings.TrimPrefix(headerLine, "# TODO:"))
+	cmd = strings.TrimSpace(strings.TrimPrefix(cmd, "capture from:"))
+	if cmd == "" {
+		cmd = "(the stub header names no capture command — write one)"
+	}
+	if os.Getenv("PARITY_FIXTURES_REQUIRED") == "1" {
+		t.Fatalf("fixture NOT captured: %s\n"+
+			"  PARITY_FIXTURES_REQUIRED=1 forbids skipping over a stub. Capture it with:\n"+
+			"    %s\n"+
+			"  then replace the stub header with `# captured-from: <argv> | date: <YYYY-MM-DD> | version: <v>`.",
+			fixturePath, cmd)
+	}
+	t.Skipf("fixture not captured yet (stub header): %s — NOT a pass; capture with: %s "+
+		"(set PARITY_FIXTURES_REQUIRED=1 to make this a failure)", fixturePath, cmd)
+}
 
 // -------------------------------------------------------------------------
 // TestWebParityHTTPX / TestWebParityNuclei
@@ -377,7 +403,7 @@ func TestWebParityWAF(t *testing.T) {
 //   - All 3 records are returned (one per fixture line).
 //   - Every record has Redacted == "***".
 //   - No record field contains the fake raw token "FAKE_AWS_AAAA0000BBBBCCCC"
-//     (XCUT-07: raw secret values must never propagate).
+//     (raw secret values must never propagate).
 //
 // This test MUST PASS (not skip) — it uses a committed synthetic fixture.
 func TestWebParityJSSecrets(t *testing.T) {
@@ -405,7 +431,7 @@ func TestWebParityJSSecrets(t *testing.T) {
 	const forbiddenRaw = "FAKE_AWS_AAAA0000BBBBCCCC"
 
 	for i, rec := range records {
-		// Assert Redacted is always "***" (XCUT-07 guarantee).
+		// Assert Redacted is always "***" (redaction guarantee).
 		if rec.Redacted != "***" {
 			t.Errorf("TestWebParityJSSecrets: record[%d].Redacted = %q; want \"***\"", i, rec.Redacted)
 		}
@@ -440,7 +466,7 @@ func TestWebParityJSSecrets(t *testing.T) {
 }
 
 // -------------------------------------------------------------------------
-// TestWebParityURLDedup — stub-backed: skips until Plan 05-07 populates fixture.
+// TestWebParityURLDedup — stub-backed: skips until the fixture is populated.
 // -------------------------------------------------------------------------
 
 // TestWebParityURLDedup verifies URL list fixture can be parsed and counted.

@@ -3,7 +3,6 @@
 // EVERY network-touching test here binds LOOPBACK (httptest.NewServer) and
 // scans nothing but itself. There is no third-party host anywhere in this file,
 // by construction: the target URLs come from httptest's own listener address.
-// T-17-05-04.
 //
 // The end-to-end test drives the REAL nuclei binary through the REAL
 // backend.Runner and the production runNucleiGroup, against real template files
@@ -124,12 +123,13 @@ func nucleiApp(t *testing.T) (*appctx.AppContext, string) {
 		Name: "nuclei",
 		Path: binPath,
 		// -duc: the ProjectDiscovery update check reaches the network at startup.
-		// A test must not, and 16-03 already established the flag as the way to
+		// A test must not, and the fixture harness already established the flag as the way to
 		// stop it.
 		DefaultArgs: []string{"-duc"},
 		Timeout:     4 * time.Minute,
 	})
 	app := &appctx.AppContext{
+		Log:    appctx.NopLogger(),
 		Tree:   tree,
 		Tools:  backend.NewRunner(backend.NewLocalBackend(0), reg, nil),
 		Target: &appctx.Target{Domain: "fixture.local", WorkDir: workdir},
@@ -396,6 +396,7 @@ func TestNucleiCoverageWrittenOnTerminatedGroup(t *testing.T) {
 	reg := backend.NewToolRegistry()
 	reg.Register(&backend.Tool{Name: "nuclei", Path: stub})
 	app := &appctx.AppContext{
+		Log:    appctx.NopLogger(),
 		Tools:  backend.NewRunner(backend.NewLocalBackend(0), reg, nil),
 		Target: &appctx.Target{Domain: "fixture.local", WorkDir: workdir},
 	}
@@ -481,7 +482,7 @@ func TestNucleiCoverageProxyDeclarationEnforced(t *testing.T) {
 	}
 }
 
-// TestNucleiCoverageUnknownIsNotZero pins T-17-05-01: a count nuclei did not
+// TestNucleiCoverageUnknownIsNotZero pins that a count nuclei did not
 // report must serialise as null, never 0.
 func TestNucleiCoverageUnknownIsNotZero(t *testing.T) {
 	// Built with `-silent` in the argv: under -silent nuclei suppresses the
@@ -645,7 +646,7 @@ func TestNucleiCoverageParsesRealTemplateList(t *testing.T) {
 	}
 }
 
-// TestNucleiCoverageRecordStaysSmall pins T-17-05-06: the accounting interval
+// TestNucleiCoverageRecordStaysSmall pins that the accounting interval
 // must not flood the workspace. One record per group per run, and the record is
 // a single bounded JSON line whatever the stats volume.
 func TestNucleiCoverageRecordStaysSmall(t *testing.T) {

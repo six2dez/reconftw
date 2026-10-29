@@ -1,7 +1,7 @@
 // Package sysinfo provides OS-level memory availability metrics for the
 // reconFTW v2 subdomain permutation back-pressure gate (SUBD-03).
 //
-// REVIEWS FINDING — Memory back-pressure source:
+// WRONG SOURCE, for the record — memory back-pressure:
 // runtime.ReadMemStats().Sys - runtime.ReadMemStats().Alloc = Go heap
 // reservation delta. This is NOT OS free RAM. It reflects the Go runtime's
 // own heap allocation pattern, not whether the host has free physical RAM.
@@ -17,8 +17,6 @@
 //   - Production code calls MemAvailable() which uses OSMemProvider.
 //   - OSMemProvider.Available() returns 0 on gopsutil error (conservative —
 //     back-pressure gate engages on error, preventing OOM from proceeding).
-//
-// Source: .planning/phases/04-subdomains-e2e-axiom-integration/04-04-PLAN.md Task 1.
 package sysinfo
 
 import (
@@ -53,7 +51,7 @@ type OSMemProvider struct{}
 // Do NOT use runtime.ReadMemStats here:
 //
 //	runtime.MemStats.Sys - runtime.MemStats.Alloc = Go heap reservation delta
-//	That is NOT OS free memory. gopsutil is correct (REVIEWS finding fix).
+//	That is NOT OS free memory. gopsutil is correct.
 func (OSMemProvider) Available() uint64 {
 	vmStat, err := mem.VirtualMemory()
 	if err != nil {

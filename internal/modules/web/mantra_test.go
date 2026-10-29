@@ -1,5 +1,5 @@
 // mantra_test.go — the proof that web.mantra came home to backend.Runner
-// (18-04) without changing the command line mantra receives, and that an
+// without changing the command line mantra receives, and that an
 // unavailable mantra still produces the SAME task status it always did.
 //
 // THE CONTROL IS THE PRE-MOVE ARG VECTOR, captured from mantra.go as it stood at
@@ -55,6 +55,7 @@ func newMantraTestApp(t *testing.T, workDir, toolPath string) *appctx.AppContext
 		t.Fatalf("output.NewTree: %v", err)
 	}
 	return &appctx.AppContext{
+		Log:    appctx.NopLogger(),
 		Tools:  backend.NewRunner(&backend.LocalBackend{}, reg, nil),
 		Cfg:    cfg,
 		Tree:   tree,
@@ -99,9 +100,9 @@ func TestMantraArgvUnchangedAcrossTheMove(t *testing.T) {
 }
 
 // TestMantraUnavailableToolStatusUnchanged pins the FAILURE POLICY across the
-// move. Before 18-04 an absent mantra hit an exec.LookPath gate and returned
+// move. Before the move an absent mantra hit an exec.LookPath gate and returned
 // StatusSkipped; a best-effort task that starts returning StatusErrored aborts
-// the web pipeline (T-18-04-04). The registry entry has an empty Path, which is
+// the web pipeline. The registry entry has an empty Path, which is
 // exactly the shape Discover leaves for a registered-but-uninstalled tool.
 func TestMantraUnavailableToolStatusUnchanged(t *testing.T) {
 	workDir := seedMantraWorkspace(t)
@@ -146,6 +147,7 @@ func TestHakoriginfinderArgvUnchangedAcrossTheMove(t *testing.T) {
 		t.Fatalf("output.NewTree: %v", err)
 	}
 	app := &appctx.AppContext{
+		Log:    appctx.NopLogger(),
 		Tools:  backend.NewRunner(&backend.LocalBackend{}, reg, nil),
 		Cfg:    cfg,
 		Tree:   tree,
@@ -190,8 +192,8 @@ func TestHakoriginfinderArgvUnchangedAcrossTheMove(t *testing.T) {
 // TestHakoriginfinderUnavailableToolStatusUnchanged pins the failure policy: an
 // unresolvable hakoriginfinder returned StatusSkipped before the move (the
 // exec.LookPath gate) and must still, or a best-effort task becomes a pipeline
-// abort (T-18-04-04). It must ALSO not publish an empty origins artefact — the
-// tool did not run, so the previous run's origins are preserved (F3).
+// abort. It must ALSO not publish an empty origins artefact — the
+// tool did not run, so the previous run's origins are preserved.
 func TestHakoriginfinderUnavailableToolStatusUnchanged(t *testing.T) {
 	workDir := t.TempDir()
 	for _, d := range []string{"artefacts", "inputs", "logs"} {
@@ -219,6 +221,7 @@ func TestHakoriginfinderUnavailableToolStatusUnchanged(t *testing.T) {
 		t.Fatalf("output.NewTree: %v", err)
 	}
 	app := &appctx.AppContext{
+		Log:    appctx.NopLogger(),
 		Tools:  backend.NewRunner(&backend.LocalBackend{}, reg, nil),
 		Cfg:    cfg,
 		Tree:   tree,

@@ -1,38 +1,61 @@
 //go:build realtools
 
-// Package backend_test — Phase 6 vulns DoD-1 real-tool ARG-VECTOR smoke test.
+// Package backend_test — Phase 6 vulns and Phase 7 OSINT real-tool ARG-VECTOR
+// probes (Gate 13).
 //
-// TestRealtoolsVulnsPhase6 extends the Phase 4/5 DoD-1 pattern (smoke_test.go)
-// to cover all 18 Phase 6 vulnerability scanning tools. Mirrors the DoD-1
-// requirement from .planning/phases/06-vulnerability-scanning-e2e/06-CONTEXT.md:
+// # WHAT 21-04 CHANGED, AND WHY
 //
-// - argv golden ALWAYS (a wrong flag is caught even when the binary is absent)
-// - real invocation when the binary is present (checks flag acceptance)
-// - logged SKIP when absent — NEVER a silent skip
+// Until 21-04 both probes below LOGGED a goldenArgs vector and EXECUTED a
+// separate safeArgs one — and 31 of the 44 safeArgs were `--help`, seven more
+// `-version`. A help probe exits before flag parsing, so the only thing those
+// runs proved was that the binary starts. smoke_test.go's header says exactly
+// why that is not enough ("help short-circuits before flag parsing of the real
+// args"), and the Phase-4 live run is the evidence: crt's table output,
+// analyticsrelationships' missing -u, favirecon's nonexistent -d all sat behind
+// green --help probes. The census line then counted every one of those tools as
+// "present", which Gate 13 read as verified.
 //
-// WHY: mock-only CI hides wrong arg vectors. The live Phase-4 run exposed this
-// class of bug (crt table output, analyticsrelationships missing -u, etc.). Vuln
-// tools are MORE prone to silent arg-vector breakage (dalfox `pipe` flags,
-// sqlmap batch flags, interactsh session args).
+// Now each probe executes the GOLDEN vector — the shape the Task dispatches —
+// with SAFE inputs:
 //
-// CLASSIFICATION: non-zero exit alone is NOT a failure (many tools exit non-zero
-// on no-input / no-findings / network errors). The test fails ONLY when
-// stderr/stdout contains a flag-parse/usage sentinel. Tools not on PATH are
-// logged-SKIP (not failed) so the suite stays usable without the full toolchain.
+//   - targets are the loopback closed port 127.0.0.1:9 (asserted closed at the
+//     start of each test), as a URL where the Task passes a URL;
+//   - input files are throwaway files under t.TempDir() holding loopback lines;
+//   - output goes under t.TempDir(); the working directory is t.TempDir() for
+//     PATH tools (WCVS and friends write reports to cwd) and the clone's own
+//     directory for clone tools, exactly as the Runner does;
+//   - every run gets HTTP_PROXY/HTTPS_PROXY/ALL_PROXY pointed at the same closed
+//     port and the GitHub / PDCP credentials scrubbed from its environment;
+//   - a short per-probe timeout.
 //
-// SAFETY: all binary invocations use --help/-version or the simplest safe arg
-// set that does not trigger actual scanning (T-06-09-02 / T-06-09-03: 5-second
-// context timeout per tool; no target URLs in vuln-tool invocations).
+// Where the golden alone would still reach the network, a HERMETICITY PIN is
+// added (a resolver, proxy or disable flag the tool documents, or a global proxy
+// the tool was OBSERVED to honour) and, where the pin is not itself the barrier,
+// an `expect` marker must appear in the output to prove the run died at the
+// barrier rather than somewhere past it. Where no such pin exists the probe is
+// `presence-only`: it runs --help or nothing, is recorded separately, and the
+// census line reports `argvector_verified=N presence_only=M` so a reader cannot
+// mistake a help probe for a verified vector.
+//
+// # WHAT COUNTS AS REJECTION
+//
+// ANY exit status is accepted EXCEPT a usage error. Tools exit non-zero on
+// refused connections, missing credentials and empty results, and all of those
+// are fine. A usage error is detected per the tool's flag-parsing FAMILY (Go
+// flag/goflags, pflag/cobra, argparse, optparse, clap, shell, perl, BSD whois):
+// its stderr signature, and for families that use one, exit code 2 (or 64 for
+// whois) together with a usage dump. The shared usageSentinels from
+// smoke_test.go apply to every family.
 //
 // BUILD TAG: //go:build realtools keeps plain `go test ./...` hermetic. Run with:
 //
-//	go test -tags realtools ./internal/core/backend/... -run TestRealtoolsVulnsPhase6 -v
-//
-// Source: .planning/phases/06-vulnerability-scanning-e2e/06-09-PLAN.md Task 2.
+//	go test -tags realtools ./internal/core/backend/... -run 'TestRealtoolsVulnsPhase6|TestRealtoolsOSINTPhase7' -v
 package backend_test
 
 import (
 	"context"
+	"errors"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -41,414 +64,595 @@ import (
 	"time"
 )
 
-// vulnsToolProbe pairs a Phase 6 vuln tool name with its representative argv
-// golden (the exact arg slice the corresponding Task passes). The argv golden is
-// always asserted regardless of binary presence — a wrong flag is caught even on
-// a toolchain-free CI runner.
-//
-// The `safeArgs` field holds the arg vector used for the LIVE invocation when the
-// binary is present. These must be safe-to-run (--help / -version / echo-pipe
-// only — T-06-09-02 / T-06-09-03 mitigations). They may differ from the
-// goldenArgs when the golden requires target/file arguments.
-type vulnsToolProbe struct {
-	name       string   // binary name for exec.LookPath
-	goldenArgs []string // argv golden (the real Task arg vector — always asserted)
-	safeArgs   []string // safe invocation args for live binary test (help/version)
-	stdin      bool     // true when tool reads from stdin (empty string fed)
+// loopbackClosed is the target every golden vector is pointed at. TCP port 9
+// (discard) is not bound on any default install; mustBeClosed asserts it.
+const (
+	loopbackClosed = "127.0.0.1:9"
+	loopbackURL    = "http://" + loopbackClosed
+	loopbackProxy  = loopbackURL
+)
+
+// probeKind partitions what a probe PROVES.
+type probeKind string
+
+const (
+	// probeArgVector executes the golden arg vector (safe inputs, pins) and
+	// fails on a usage error. This is verification.
+	probeArgVector probeKind = "argvector"
+	// probePresenceOnly resolves the tool and at most runs its help/version.
+	// This is NOT verification and is counted separately in the census.
+	probePresenceOnly probeKind = "presence-only"
+)
+
+// usageFamily names how a tool parses its command line, which decides what a
+// rejection looks like.
+type usageFamily string
+
+const (
+	familyGoFlag   usageFamily = "goflag"   // stdlib flag + projectdiscovery goflags
+	familyPflag    usageFamily = "pflag"    // cobra / spf13-pflag
+	familyArgparse usageFamily = "argparse" // python argparse
+	familyOptparse usageFamily = "optparse" // sqlmap / commix (optparse-derived)
+	familyClap     usageFamily = "clap"     // rust clap
+	familyShell    usageFamily = "shell"    // testssl.sh
+	familyPerl     usageFamily = "perl"     // exiftool
+	familyWhois    usageFamily = "whois"    // BSD / GNU whois
+	familyGeneric  usageFamily = "generic"  // unknown parser: sentinels only
+)
+
+// usageSignature is one family's rejection shape.
+type usageSignature struct {
+	// patterns are exit-code-independent rejection substrings (lower-case).
+	patterns []string
+	// usageExit is the exit code at which a bare usage dump ("usage") counts as
+	// a rejection. 0 disables that leg (cobra prints usage on EVERY error and
+	// exits 1, so for pflag only the patterns are trusted).
+	usageExit int
 }
 
-// TestRealtoolsVulnsPhase6 is the DoD-1 argv-golden smoke test for all 18
-// Phase 6 vulnerability scanning tools. Per DoD-1:
-//   - argv golden is asserted unconditionally (regardless of binary presence)
-//   - present binary → invoked with safeArgs; sentinel-checked for flag errors
-//   - absent binary → t.Logf("SKIP: ...") + t.Skip() (never silent, never fatal)
+// usageErrorSignatures is the per-family table. Add a family rather than
+// loosening an existing one.
+var usageErrorSignatures = map[usageFamily]usageSignature{
+	familyGoFlag: {
+		patterns:  []string{"flag provided but not defined", "flag needs an argument", "invalid value \"", "unknown flag"},
+		usageExit: 2,
+	},
+	familyPflag: {
+		patterns: []string{"unknown flag", "unknown shorthand flag", "unknown command", "invalid argument \"", "requires at least", "accepts "},
+	},
+	familyArgparse: {
+		patterns:  []string{"unrecognized arguments", "the following arguments are required", "error: argument", "invalid choice", "expected one argument", "expected at least one argument"},
+		usageExit: 2,
+	},
+	familyOptparse: {
+		patterns:  []string{"no such option", "error: option", "ambiguous option"},
+		usageExit: 2,
+	},
+	familyClap: {
+		patterns:  []string{"error: unexpected argument", "error: unexpected value", "error: invalid value", "unrecognized subcommand", "the following required arguments were not provided"},
+		usageExit: 2,
+	},
+	familyShell: {
+		patterns: []string{"unrecognized option", "unknown option", "invalid option"},
+	},
+	familyPerl: {
+		patterns: []string{"unknown option"},
+	},
+	familyWhois: {
+		patterns:  []string{"illegal option", "invalid option"},
+		usageExit: 64, // EX_USAGE
+	},
+	familyGeneric: {
+		patterns:  []string{"unknown long flag", "unknown short flag", "unrecognized option", "unknown option", "no such option", "unrecognized arguments"},
+		usageExit: 2,
+	},
+}
+
+// goldenProbe is one tool's probe: the Task's arg vector with safe inputs, plus
+// whatever makes running it hermetic.
+type goldenProbe struct {
+	name    string // logical name (census key); also the registry/exec name unless cmdName is set
+	cmdName string
+	kind    probeKind
+	family  usageFamily
+	// golden is the Task's vector with safe inputs substituted. For a
+	// presence-only probe it is the help/version vector, or nil to resolve the
+	// tool WITHOUT executing anything (SwaggerSpy searches SwaggerHub for the
+	// literal string "--help").
+	golden []string
+	// prePins / pins are hermeticity pins placed before / after the golden.
+	// Documented on each probe. They never replace a golden token.
+	prePins []string
+	pins    []string
+	// stdin, when non-nil, is fed to the process (empty string = EOF at once).
+	stdin *string
+	// unsetEnv names variables scrubbed from the process environment in
+	// addition to the credentials every probe loses.
+	unsetEnv []string
+	// expect, when set, lists output markers of which at least one MUST appear:
+	// proof the run reached the hermetic barrier (a refused proxy connect, a
+	// missing-credential abort) rather than going somewhere else.
+	expect []string
+	// why explains a presence-only probe, in the words a census reader needs.
+	why     string
+	timeout time.Duration
+	// knownBad records a PRODUCTION arg-vector defect this probe surfaced and
+	// that is deliberately not fixed here (the module is a non-test file and the
+	// fix is its own change with its own verification — the 16-04 Task 1 rule).
+	// The probe then EXPECTS the rejection: it passes while the defect stands,
+	// logs REALTOOLS_KNOWN_BAD so the census names it, and fails STALE the moment
+	// the tool accepts the vector, so the entry cannot outlive the fix.
+	knownBad string
+	// wrongBinary maps an output marker to an explanation: the name on PATH
+	// resolved to a DIFFERENT program than the one the Task was written for.
+	// That is a box/installer defect, reported as a failure in its own words
+	// rather than as "the vector was rejected".
+	wrongBinary map[string]string
+}
+
+func str(s string) *string { return &s }
+
+// mustBeClosed fails the test if the loopback target accepts connections — a
+// listener there would turn every "refused" barrier into a live service.
+func mustBeClosed(t *testing.T) {
+	t.Helper()
+	c, err := net.DialTimeout("tcp", loopbackClosed, 500*time.Millisecond)
+	if err == nil {
+		_ = c.Close()
+		t.Fatalf("%s accepts connections on this box; the probes assume it is CLOSED and every "+
+			"hermeticity barrier below depends on that", loopbackClosed)
+	}
+}
+
+// probeEnv is the process environment every probe runs with: the caller's,
+// minus credentials, plus the loopback proxy and NO_COLOR.
+func probeEnv(extraUnset []string) []string {
+	drop := map[string]bool{
+		"GH_TOKEN": true, "GITHUB_TOKEN": true, "PDCP_API_KEY": true,
+		"HTTP_PROXY": true, "HTTPS_PROXY": true, "ALL_PROXY": true, "NO_PROXY": true,
+		"http_proxy": true, "https_proxy": true, "all_proxy": true, "no_proxy": true,
+		"NO_COLOR": true,
+	}
+	for _, k := range extraUnset {
+		drop[k] = true
+	}
+	var env []string
+	for _, kv := range os.Environ() {
+		k, _, _ := strings.Cut(kv, "=")
+		if !drop[k] {
+			env = append(env, kv)
+		}
+	}
+	return append(env,
+		"HTTP_PROXY="+loopbackProxy, "HTTPS_PROXY="+loopbackProxy, "ALL_PROXY="+loopbackProxy,
+		"http_proxy="+loopbackProxy, "https_proxy="+loopbackProxy, "all_proxy="+loopbackProxy,
+		"NO_PROXY=", "no_proxy=", "NO_COLOR=1",
+	)
+}
+
+// runGoldenProbe is the single executor for both tables.
+func runGoldenProbe(t *testing.T, census *probeCensus, p goldenProbe) {
+	t.Helper()
+	cmdName := p.cmdName
+	if cmdName == "" {
+		cmdName = p.name
+	}
+	r := realtoolsResolve(t, cmdName)
+	if r.Availability != toolResolved {
+		census.recordUnavailable(p.name, r)
+		t.Logf("SKIP: %s (%s) %s — arg vector NOT verified (counted in REALTOOLS_CENSUS)",
+			p.name, cmdName, r.describe())
+		t.Skip()
+		return
+	}
+	census.recordPresent(p.name)
+	logResolution(t, r)
+
+	timeout := p.timeout
+	if timeout == 0 {
+		timeout = 20 * time.Second
+	}
+
+	switch p.kind {
+	case probePresenceOnly:
+		census.recordPresenceOnly(p.name)
+		t.Logf("REALTOOLS_PRESENCE_ONLY tool=%s why=%s — the golden vector was NOT executed; this is not verification",
+			p.name, p.why)
+		if p.golden == nil {
+			t.Logf("%s: resolved only; no invocation is safe for this tool", p.name)
+			return
+		}
+		res := execProbe(t, r, p, p.golden, timeout)
+		rejected, sig := usageRejected(p.family, res)
+		if rejected {
+			t.Errorf("%s rejected even its help/version vector (%s):\n  args: %v\n  output:\n%s",
+				p.name, sig, res.argv, res.output)
+		}
+		return
+
+	case probeArgVector:
+		full := make([]string, 0, len(p.prePins)+len(p.golden)+len(p.pins))
+		full = append(full, p.prePins...)
+		full = append(full, p.golden...)
+		full = append(full, p.pins...)
+		if len(p.prePins)+len(p.pins) > 0 {
+			t.Logf("REALTOOLS_PINS tool=%s pre=%v post=%v", p.name, p.prePins, p.pins)
+		}
+		res := execProbe(t, r, p, full, timeout)
+		if res.timedOut {
+			t.Logf("WARN: %s did not finish within %s and was killed. Accepted (not a usage error), but a "+
+				"hang against a closed loopback port usually means the tool is waiting on something else.",
+				p.name, timeout)
+		}
+		rejected, sig := usageRejected(p.family, res)
+		if rejected {
+			census.recordRejected(p.name)
+			lower := strings.ToLower(res.output)
+			for marker, explanation := range p.wrongBinary {
+				if strings.Contains(lower, strings.ToLower(marker)) {
+					t.Errorf("%s: WRONG BINARY on this box — %s\n  (the usage text contains %q)\n  argv: %v\n  output:\n%s",
+						p.name, explanation, marker, res.argv, res.output)
+					return
+				}
+			}
+			if p.knownBad != "" {
+				t.Logf("REALTOOLS_KNOWN_BAD tool=%s sig=%q why=%s\n  argv: %v\n  output:\n%s",
+					p.name, sig, p.knownBad, res.argv, strings.TrimSpace(res.output))
+				return
+			}
+			t.Errorf("%s REJECTED its golden arg vector (%s).\n  argv: %v\n  exit: %d\n  output:\n%s",
+				p.name, sig, res.argv, res.exit, res.output)
+			return
+		}
+		if p.knownBad != "" {
+			census.recordRejected(p.name)
+			t.Errorf("%s: STALE knownBad entry — the tool ACCEPTED the vector this entry says it rejects.\n"+
+				"  Either the module was fixed (delete the entry in the same change) or this box carries a\n"+
+				"  tool version that still takes the old flag (say which, and pin the version).\n"+
+				"  entry: %s\n  argv: %v\n  output:\n%s", p.name, p.knownBad, res.argv, res.output)
+			return
+		}
+		if len(p.expect) > 0 {
+			lower := strings.ToLower(res.output)
+			hit := false
+			for _, m := range p.expect {
+				if strings.Contains(lower, strings.ToLower(m)) {
+					hit = true
+					break
+				}
+			}
+			if !hit {
+				census.recordRejected(p.name)
+				t.Errorf("%s: hermeticity UNPROVEN — none of %q appears in the output, so the run cannot be "+
+					"shown to have stopped at its loopback barrier.\n  argv: %v\n  exit: %d\n  output:\n%s",
+					p.name, p.expect, res.argv, res.exit, res.output)
+				return
+			}
+		}
+		census.recordVerified(p.name)
+		t.Logf("REALTOOLS_ARGVECTOR_OK tool=%s exit=%d argv=%v", p.name, res.exit, res.argv)
+	default:
+		t.Fatalf("probe %s has no kind", p.name)
+	}
+}
+
+type probeResult struct {
+	argv     []string
+	output   string
+	exit     int
+	timedOut bool
+}
+
+// execProbe runs the resolved tool the way the Runner would (interpreter
+// prefix, clone workdir) inside a temp cwd for PATH tools.
+func execProbe(t *testing.T, r resolvedTool, p goldenProbe, args []string, timeout time.Duration) probeResult {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	full := r.argv(args)
+	cmd := exec.CommandContext(ctx, r.Path, full...) //nolint:gosec // path from the tool registry; args are controlled
+	cmd.Dir = r.WorkDir
+	if cmd.Dir == "" {
+		cmd.Dir = t.TempDir() // never the package directory: some tools write reports to cwd
+	}
+	cmd.Env = probeEnv(p.unsetEnv)
+	if p.stdin != nil {
+		cmd.Stdin = strings.NewReader(*p.stdin)
+	} else {
+		cmd.Stdin = strings.NewReader("") // EOF, never the test's own stdin (gato prompts)
+	}
+	var out strings.Builder
+	cmd.Stdout = &out
+	cmd.Stderr = &out
+	err := cmd.Run()
+	res := probeResult{argv: full, output: out.String(), exit: -1}
+	var ee *exec.ExitError
+	switch {
+	case err == nil:
+		res.exit = 0
+	case errors.As(err, &ee):
+		res.exit = ee.ExitCode()
+	}
+	if ctx.Err() != nil {
+		res.timedOut = true
+	}
+	return res
+}
+
+// usageRejected classifies a run as a usage error per family. Returns the
+// signature that matched.
+func usageRejected(fam usageFamily, res probeResult) (bool, string) {
+	lower := strings.ToLower(res.output)
+	for _, s := range usageSentinels {
+		if strings.Contains(lower, s) {
+			return true, "shared sentinel " + s
+		}
+	}
+	sig, ok := usageErrorSignatures[fam]
+	if !ok {
+		sig = usageErrorSignatures[familyGeneric]
+	}
+	for _, pat := range sig.patterns {
+		if strings.Contains(lower, pat) {
+			return true, string(fam) + " pattern " + pat
+		}
+	}
+	if sig.usageExit != 0 && res.exit == sig.usageExit && strings.Contains(lower, "usage") {
+		return true, string(fam) + " usage dump at exit " + itoa(res.exit)
+	}
+	return false, ""
+}
+
+func itoa(n int) string {
+	if n == 0 {
+		return "0"
+	}
+	neg := n < 0
+	if neg {
+		n = -n
+	}
+	var b []byte
+	for n > 0 {
+		b = append([]byte{byte('0' + n%10)}, b...)
+		n /= 10
+	}
+	if neg {
+		b = append([]byte{'-'}, b...)
+	}
+	return string(b)
+}
+
+// ---------------------------------------------------------------------------
+// Phase 6 — vulnerability scanning tools
+// ---------------------------------------------------------------------------
+
+// TestRealtoolsVulnsPhase6 executes every Phase 6 vuln tool's golden arg vector
+// against loopback. Per DoD-1 an absent tool is a logged SKIP counted in the
+// census, never a silent one.
 func TestRealtoolsVulnsPhase6(t *testing.T) {
-	// Skip accounting: see realtools_census_test.go. This probe had NEVER run
-	// before phase 16 plan 04, so its known-absent list was derived by running it.
 	census := newProbeCensus()
 	defer reportRealtoolsCensus(t, "TestRealtoolsVulnsPhase6", census, vulnsKnownAbsent)
+	mustBeClosed(t)
 
-	// Throwaway temp paths substituted in goldenArgs where real files are needed.
 	dir := t.TempDir()
 	hostsFile := filepath.Join(dir, "hosts.txt")
+	tlsHostsFile := filepath.Join(dir, "tls_hosts.txt")
 	urlsFile := filepath.Join(dir, "urls.txt")
 	outFile := filepath.Join(dir, "out.txt")
 	sqliFile := filepath.Join(dir, "sqli.txt")
 	rceFile := filepath.Join(dir, "rce.txt")
-	mustWrite(t, hostsFile, "https://example.com\nhttps://test.example.com\n")
-	mustWrite(t, urlsFile, "https://example.com/?q=test\nhttps://example.com/?id=1\n")
-	mustWrite(t, sqliFile, "https://example.com/?id=FUZZ\n")
-	mustWrite(t, rceFile, "https://example.com/?cmd=FUZZ\n")
+	sstiFile := filepath.Join(dir, "ssti.txt")
+	templatesDir := filepath.Join(dir, "dast-templates")
+	mustWrite(t, hostsFile, loopbackURL+"\n")
+	mustWrite(t, tlsHostsFile, loopbackClosed+"\n")
+	mustWrite(t, urlsFile, loopbackURL+"/?q=test\n"+loopbackURL+"/?id=1\n")
+	mustWrite(t, sqliFile, loopbackURL+"/?id=FUZZ\n")
+	mustWrite(t, rceFile, loopbackURL+"/?cmd=FUZZ\n")
+	mustWrite(t, sstiFile, loopbackURL+"/?tpl=FUZZ\n")
+	if err := os.MkdirAll(templatesDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
 
 	// Defaults matching config.Defaults() D-V6 WAF-friendly caps (06-09 plan golden):
 	const (
-		defaultXSSThreads     = "5"  // cfg.Vulns.XSS.Threads == 5 (D-V6)
-		defaultFrayMaxPay     = "20" // cfg.Vulns.Fray.MaxPayloads == 20 (D-V6)
-		defaultToxiThreads    = "70" // cfg.Advanced.Tools.Toxicache.Threads default
-		defaultFrayTimeout    = "10" // cfg.Vulns.Fray.Timeout default
-		defaultFrayDelay      = "0.5"
-		defaultFrayCategories = "ai_prompt_injection,prototype_pollution,api_security,modern_bypasses"
-		defaultXSSDepth       = "2"  // depth when !cfg.Advanced.Deep
-		defaultSecondDepth    = "1"  // cfg.Advanced.Tools.SecondOrder.Depth default
-		defaultSecondThreads  = "10" // cfg.Advanced.Tools.SecondOrder.Threads default
-		defaultTInjATimeout   = "15" // cfg.Advanced.Tools.TInjA.Timeout default
-		nucleiDefaultRL       = "150"
+		defaultXSSThreads    = "5"  // cfg.Vulns.XSS.Threads == 5 (D-V6)
+		defaultFrayMaxPay    = "20" // cfg.Vulns.Fray.MaxPayloads == 20 (D-V6)
+		defaultToxiThreads   = "70" // cfg.Advanced.Tools.Toxicache.Threads default
+		defaultFrayTimeout   = "10" // cfg.Vulns.Fray.Timeout default
+		defaultFrayDelay     = "0.5"
+		defaultXSSDepth      = "2"  // depth when !cfg.Advanced.Deep
+		defaultSecondDepth   = "1"  // cfg.Advanced.Tools.SecondOrder.Depth default
+		defaultSecondThreads = "10" // cfg.Advanced.Tools.SecondOrder.Threads default
+		defaultTInjATimeout  = "15" // cfg.Advanced.Tools.TInjA.Timeout default
+		nucleiDefaultRL      = "150"
+		defaultSSTImapLevel  = "1" // cfg.Advanced.Tools.SSTImap.Level default
+		defaultInteractshWhy = "the Task dispatches it with NO arguments (ssrf.go: StreamOpts(ctx, \"interactsh-client\", nil, …)); a bare run opens a live OOB session against the public oast servers and there is no golden token to verify"
+		stdinLoopURL         = loopbackURL + "/?q=1\n"
 	)
 
-	probes := []vulnsToolProbe{
-		// gf: URL gf-pattern classification (GFTask — gf.go).
-		// goldenArgs: gf <class> <inputFile> (positional args only, one class at a time)
-		{
-			name:       "gf",
-			goldenArgs: []string{"xss", urlsFile},
-			safeArgs:   []string{"--help"},
-		},
+	probes := []goldenProbe{
+		// gf: URL gf-pattern classification (GFTask — gf.go): gf <class> <inputFile>.
+		{name: "gf", kind: probeArgVector, family: familyGeneric, golden: []string{"xss", urlsFile}},
 
-		// qsreplace: querystring replacement pipeline step (XSSTask — xss.go).
-		// goldenArgs: qsreplace FUZZ (reads stdin, replaces param values with FUZZ)
-		{
-			name:       "qsreplace",
-			goldenArgs: []string{"FUZZ"},
-			safeArgs:   []string{"FUZZ"},
-			stdin:      true,
-		},
+		// qsreplace: querystring replacement (XSSTask — xss.go), reads stdin.
+		{name: "qsreplace", kind: probeArgVector, family: familyGoFlag, golden: []string{"FUZZ"}, stdin: str(stdinLoopURL)},
 
-		// Gxss: XSS reflection finder (XSSTask — xss.go: Gxss -c 100 -p Xss).
-		{
-			name:       "Gxss",
-			goldenArgs: []string{"-c", "100", "-p", "Xss"},
-			safeArgs:   []string{"-c", "100", "-p", "Xss"},
-			stdin:      true,
-		},
+		// Gxss: reflection finder (XSSTask — xss.go: Gxss -c 100 -p Xss), reads stdin.
+		{name: "Gxss", kind: probeArgVector, family: familyGoFlag, golden: []string{"-c", "100", "-p", "Xss"}, stdin: str(stdinLoopURL)},
 
-		// dalfox: XSS scanner pipe mode (XSSTask — xss.go).
-		// D-V6: -w 5 from cfg.Vulns.XSS.Threads==5; -d 2 when !Advanced.Deep.
-		// goldenArgs exclude -b <blindServer> (D-V6: gate when XSS_SERVER empty — which is the default).
+		// dalfox pipe (XSSTask — xss.go): no -b because XSS_SERVER is empty by
+		// default. 21-07a narrowed the vector to the flags dalfox v2.9 (Go) and
+		// v3.2 (Rust/clap) BOTH accept: --no-spinner, --skip-bav and -w were
+		// v2-only, and -d was never a depth flag (it is --data in both majors).
 		{
-			name: "dalfox",
-			goldenArgs: []string{
-				"pipe",
-				"--silence",
-				"--no-color",
-				"--no-spinner",
-				"--only-poc", "r",
-				"--ignore-return", "302,404,403",
-				"--skip-bav",
-				"-w", defaultXSSThreads,
-				"-d", defaultXSSDepth,
+			name: "dalfox", kind: probeArgVector, family: familyClap,
+			golden: []string{
+				"pipe", "--silence", "--no-color",
+				"--only-poc", "r", "--ignore-return", "302,404,403",
 			},
-			safeArgs: []string{"--help"},
-			stdin:    true,
+			stdin: str(stdinLoopURL),
 		},
 
-		// sqlmap: SQL injection scanner (SQLiTask — sqli.go).
-		// v1 arg vector (vulns.sh:533-534) verbatim.
+		// sqlmap (SQLiTask — sqli.go): v1 vulns.sh:533-534 verbatim. Resolves
+		// through the clone row (.venv/bin/python3 sqlmap.py), as production does.
 		{
-			name: "sqlmap",
-			goldenArgs: []string{
-				"-m", sqliFile,
-				"-b",
-				"-o",
-				"--smart",
-				"--batch",
-				"--disable-coloring",
-				"--random-agent",
-				"--output-dir", dir,
+			name: "sqlmap", kind: probeArgVector, family: familyOptparse,
+			golden: []string{
+				"-m", sqliFile, "-b", "-o", "--smart", "--batch",
+				"--disable-coloring", "--random-agent", "--output-dir", dir,
 			},
-			safeArgs: []string{"--help"},
+			timeout: 45 * time.Second,
 		},
 
-		// ghauri: SQLi alternative engine (SQLiTask — sqli.go, D-V6 opt-in default off).
-		// goldenArgs: per-URL invocation (ghauri -u <url> --batch --force-ssl).
+		// ghauri (SQLiTask — sqli.go, D-V6 opt-in): per-URL invocation.
 		{
-			name: "ghauri",
-			goldenArgs: []string{
-				"-u", "https://example.com/?id=FUZZ",
-				"--batch",
-				"--force-ssl",
+			name: "ghauri", kind: probeArgVector, family: familyArgparse,
+			golden:  []string{"-u", loopbackURL + "/?id=FUZZ", "--batch", "--force-ssl"},
+			timeout: 30 * time.Second,
+		},
+
+		// interactsh-client (SSRFTask — ssrf.go): PRESENCE ONLY, see why.
+		{name: "interactsh-client", kind: probePresenceOnly, family: familyGoFlag, golden: []string{"-version"}, why: defaultInteractshWhy},
+
+		// crlfuzz (CRLFTask — crlf.go): v1 vulns.sh:223.
+		{name: "crlfuzz", kind: probeArgVector, family: familyPflag, golden: []string{"-l", hostsFile, "-o", outFile}},
+
+		// TInjA (SSTITask — ssti.go:229): url subcommand, then --url per target.
+		{
+			name: "TInjA", kind: probeArgVector, family: familyPflag,
+			golden: []string{
+				"url", "--reportpath", dir + "/", "--timeout", defaultTInjATimeout, "--verbosity", "0",
+				"--url", loopbackURL + "/?q=1",
 			},
-			safeArgs: []string{"--help"},
 		},
 
-		// interactsh-client: OOB callback server (SSRFTask — ssrf.go, VULN-03).
-		// goldenArgs: bare invocation (starts the OOB session; session URL from stdout).
+		// SSTImap (SSTITask — ssti.go runSSTImap): the clone row supplies
+		// `venv/bin/python3 sstimap.py`; the Task appends --level, --no-color and
+		// --load-urls. Until 21-04 this probe ran `python3 --version` under the
+		// name "python3" and verified nothing about SSTImap.
 		{
-			name:       "interactsh-client",
-			goldenArgs: []string{},
-			safeArgs:   []string{"-version"},
+			name: "SSTImap", kind: probeArgVector, family: familyArgparse,
+			golden:  []string{"--level", defaultSSTImapLevel, "--no-color", "--load-urls", sstiFile},
+			timeout: 30 * time.Second,
 		},
 
-		// crlfuzz: CRLF injection scanner (CRLFTask — crlf.go).
-		// v1 arg vector (vulns.sh:223): crlfuzz -l <file> -o <stagingTxt>.
+		// commix (CMDITask — cmdi.go): v1 vulns.sh:731.
 		{
-			name:       "crlfuzz",
-			goldenArgs: []string{"-l", hostsFile, "-o", outFile},
-			safeArgs:   []string{"--help"},
+			name: "commix", kind: probeArgVector, family: familyOptparse,
+			golden:  []string{"--batch", "-m", rceFile, "--output-dir", dir},
+			timeout: 45 * time.Second,
 		},
 
-		// TInjA: SSTI scanner primary engine (SSTITask — ssti.go, VULN-05).
-		// v1 arg vector (ssti.sh): TInjA url --reportpath <dir>/ --timeout 15 --verbosity 0.
-		{
-			name: "TInjA",
-			goldenArgs: []string{
-				"url",
-				"--reportpath", dir + "/",
-				"--timeout", defaultTInjATimeout,
-				"--verbosity", "0",
-			},
-			safeArgs: []string{"--help"},
-		},
+		// smugglex (SmugglingTask — smuggling.go): v1 vulns.sh:817, hosts on stdin.
+		{name: "smugglex", kind: probeArgVector, family: familyClap, golden: []string{"-f", "plain"}, stdin: str(loopbackURL + "\n")},
 
-		// SSTImap: SSTI scanner alternative engine (SSTITask — ssti.go, D-V6 opt-in).
-		// SSTImap is a repo-clone Python tool; checked via os.Stat (not exec.LookPath).
-		// goldenArgs: python3 SSTImap/sstimap.py -u <url> [--level <n>] [--delay <n>].
-		// NOTE: this entry is for the SSTImap binary when installed in PATH;
-		// the actual Task uses a repo-clone path. Here we test the arg shape.
-		{
-			name: "python3",
-			goldenArgs: []string{
-				"sstimap.py",
-				"-u", "https://example.com/?tpl=FUZZ",
-				"--level", "1",
-				"--delay", "0",
-			},
-			safeArgs: []string{"--version"},
-		},
+		// Web-Cache-Vulnerability-Scanner (WebCacheTask — webcache.go): v1 vulns.sh:879.
+		// Writes its report files to cwd, which execProbe makes a temp dir.
+		{name: "Web-Cache-Vulnerability-Scanner", kind: probeArgVector, family: familyGoFlag, golden: []string{"-u", "file:" + hostsFile, "-v", "0"}},
 
-		// commix: command injection scanner (CMDITask — cmdi.go, VULN-08).
-		// v1 arg vector (vulns.sh:731): commix --batch -m <rceFile> --output-dir <dir>.
+		// toxicache (WebCacheTask — webcache.go): v1 vulns.sh:894.
 		{
-			name: "commix",
-			goldenArgs: []string{
-				"--batch",
-				"-m", rceFile,
-				"--output-dir", dir,
-			},
-			safeArgs: []string{"--help"},
-		},
-
-		// smugglex: HTTP request smuggling detector (SmugglingTask — smuggling.go, VULN-07).
-		// v1 arg vector (vulns.sh:817): smugglex -f plain (reads hosts from stdin).
-		{
-			name:       "smugglex",
-			goldenArgs: []string{"-f", "plain"},
-			safeArgs:   []string{"--help"},
-			stdin:      true,
-		},
-
-		// Web-Cache-Vulnerability-Scanner: WCVS (WebCacheTask — webcache.go, VULN-09).
-		// v1 arg vector (vulns.sh:879): Web-Cache-Vulnerability-Scanner -u "file:<hostsFile>" -v 0.
-		{
-			name: "Web-Cache-Vulnerability-Scanner",
-			goldenArgs: []string{
-				"-u", "file:" + hostsFile,
-				"-v", "0",
-			},
-			safeArgs: []string{"--help"},
-		},
-
-		// toxicache: web cache poisoning scanner (WebCacheTask — webcache.go, VULN-09).
-		// v1 arg vector (vulns.sh:894): toxicache -i <file> -o <outFile> -t 70 -ua <ua>.
-		{
-			name: "toxicache",
-			goldenArgs: []string{
-				"-i", hostsFile,
-				"-o", outFile,
-				"-t", defaultToxiThreads,
+			name: "toxicache", kind: probeArgVector, family: familyGoFlag,
+			golden: []string{
+				"-i", hostsFile, "-o", outFile, "-t", defaultToxiThreads,
 				"-ua", "Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0",
 			},
-			safeArgs: []string{"--help"},
 		},
 
-		// second-order: second-order injection + broken-link checker (SecondOrderTask, VULN-12).
-		// v1 arg vector (second_order.go): second-order -target <url> -depth 1 -threads 10 -output <dir>.
+		// second-order (SecondOrderTask — second_order.go).
 		{
-			name: "second-order",
-			goldenArgs: []string{
-				"-target", "https://example.com",
-				"-depth", defaultSecondDepth,
-				"-threads", defaultSecondThreads,
-				"-output", dir,
-			},
-			safeArgs: []string{"--help"},
+			name: "second-order", kind: probeArgVector, family: familyGoFlag,
+			golden: []string{"-target", loopbackURL, "-depth", defaultSecondDepth, "-threads", defaultSecondThreads, "-output", dir},
 		},
 
-		// nuclei (DAST mode): NucleiDASTTask — nuclei_dast.go (VULN-11).
-		// -duc: mandatory (disables update check — dev Mac DNS block / XCUT memory).
-		// Rate limit from cfg.Web.Nuclei.RateLimit default 150.
+		// nuclei DAST (NucleiDASTTask — nuclei_dast.go). -duc is mandatory (PD
+		// update check hangs on the dev-Mac DNS block). The template path is an
+		// empty temp dir: "no templates" is not a usage error.
 		{
-			name: "nuclei",
-			goldenArgs: []string{
-				"-l", hostsFile,
-				"-dast",
-				"-nh",
-				"-rl", nucleiDefaultRL,
-				"-silent",
-				"-retries", "2",
-				"-duc",
-				"-t", "/path/to/dast/templates",
-				"-j",
-				"-o", outFile,
+			name: "nuclei", kind: probeArgVector, family: familyGoFlag,
+			golden: []string{
+				"-l", hostsFile, "-dast", "-nh", "-rl", nucleiDefaultRL, "-silent", "-retries", "2", "-duc",
+				"-t", templatesDir, "-j", "-o", outFile,
 			},
-			safeArgs: []string{"-version"},
+			timeout: 30 * time.Second,
 		},
 
-		// fray: WAF-aware modern-payload scanner (FrayTask — fray.go, D-V3 fold-in).
-		// D-V6: --max 20 (cfg.Vulns.Fray.MaxPayloads==20), -t 10, -d 0.5.
-		// Per-category invocation; golden shows one category from frayDefaultCategories.
+		// fray (FrayTask — fray.go): D-V6 --max 20, -t 10, -d 0.5; one category.
+		// Targets on STDIN (21-07a): `fray test` takes one positional target and
+		// has no list flag, so the v1 `cat targets | fray test ...` shape is the
+		// only multi-target form; fray.go hands the file over as StdinPath.
 		{
-			name: "fray",
-			goldenArgs: []string{
-				"test",
-				"-c", "ai_prompt_injection",
-				"-l", hostsFile,
-				"--max", defaultFrayMaxPay,
-				"-t", defaultFrayTimeout,
-				"-d", defaultFrayDelay,
-				"--json",
+			name: "fray", kind: probeArgVector, family: familyArgparse,
+			golden: []string{
+				"test", "-c", "ai_prompt_injection",
+				"--max", defaultFrayMaxPay, "-t", defaultFrayTimeout, "-d", defaultFrayDelay, "--json",
 			},
-			safeArgs: []string{"--help"},
+			stdin:   str(stdinLoopURL),
+			timeout: 30 * time.Second,
 		},
 
-		// testssl.sh: TLS/SSL misconfiguration testing (TestSSLTask — testssl.go, D-V3).
-		// v1 arg vector: testssl.sh --quiet --color 0 -U -iL <targetsFile>.
+		// testssl.sh (TestSSLTask — testssl.go): host:port lines, not URLs.
 		{
-			name: "testssl.sh",
-			goldenArgs: []string{
-				"--quiet",
-				"--color", "0",
-				"-U",
-				"-iL", hostsFile,
-			},
-			safeArgs: []string{"--help"},
+			name: "testssl.sh", kind: probeArgVector, family: familyShell,
+			golden:  []string{"--quiet", "--color", "0", "-U", "-iL", tlsHostsFile},
+			timeout: 45 * time.Second,
 		},
 
-		// gqlspection: GraphQL introspection scanner (GraphQLTask — graphql.go, D-V3).
-		// v1 arg vector: gqlspection -t <url> -o <tmpFile>.
-		{
-			name: "gqlspection",
-			goldenArgs: []string{
-				"-t", "https://example.com/graphql",
-				"-o", outFile,
-			},
-			safeArgs: []string{"--help"},
-		},
+		// gqlspection (GraphQLTask — graphql.go).
+		{name: "gqlspection", kind: probeArgVector, family: familyArgparse, golden: []string{"-t", loopbackURL + "/graphql", "-o", outFile}},
 	}
 
 	for _, p := range probes {
 		p := p
-		maxLabel := 3
-		if len(p.goldenArgs) < maxLabel {
-			maxLabel = len(p.goldenArgs)
-		}
-		label := p.name + " " + strings.Join(p.goldenArgs[:maxLabel], " ")
-		t.Run(label, func(t *testing.T) {
-			// Phase 1 (ALWAYS): assert argv golden shape is non-empty / correct.
-			// For tools with empty goldenArgs (interactsh-client bare invocation),
-			// the golden is valid — the tool starts without args to open a session.
-			t.Logf("DoD-1 golden args for %s: %v", p.name, p.goldenArgs)
-
-			// Phase 2: attempt live binary invocation (skip when absent).
-			// Special-case python3: present on every system; use safeArgs only.
-			if p.name == "python3" {
-				// python3 is a generic interpreter; skip the golden assertion
-				// for the SSTImap use-case (the arg vector depends on the script path).
-				// The live invocation just verifies python3 --version works.
-				// 18-06: resolution goes through the registry, not PATH. python3
-				// is not a tools.lock row, so realtoolsResolve falls back to PATH
-				// for it — the same answer, reached through the one seam.
-				r := realtoolsResolve(t, "python3")
-				if r.Availability != toolResolved {
-					census.recordUnavailable("python3", r)
-					t.Logf("SKIP: python3 %s — NOT a pass (counted in REALTOOLS_CENSUS)", r.describe())
-					t.Skip()
-					return
-				}
-				census.recordPresent("python3")
-				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-				defer cancel()
-				_ = execSafely(t, ctx, r, p.safeArgs, p.stdin)
-				return
-			}
-
-			r := realtoolsResolve(t, p.name)
-			if r.Availability != toolResolved {
-				// DoD-1: logged SKIP (never silent, never fatal on an unavailable tool).
-				census.recordUnavailable(p.name, r)
-				t.Logf("SKIP: %s %s — argv golden asserted, live invocation NOT verified "+
-					"(counted in REALTOOLS_CENSUS)", p.name, r.describe())
-				t.Skip()
-				return
-			}
-			census.recordPresent(p.name)
-			logResolution(t, r)
-
-			// T-06-09-03: 5-second per-invocation timeout.
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			defer cancel()
-			_ = execSafely(t, ctx, r, p.safeArgs, p.stdin)
+		t.Run(p.name, func(t *testing.T) {
+			t.Logf("DoD-1 golden args for %s (%s): %v", p.name, p.kind, p.golden)
+			runGoldenProbe(t, census, p)
 		})
 	}
 }
 
-// osintToolProbe pairs a Phase 7 OSINT tool name with its representative argv
-// golden (the EXACT arg slice the corresponding osint Task passes). Same shape
-// as vulnsToolProbe — the argv golden is always asserted regardless of binary
-// presence so a wrong flag is caught even on a toolchain-free CI runner
-// (T-07-06-02 DoD-1). cmdName overrides the exec.LookPath binary name when the
-// Task tool name differs from the executable on PATH (e.g. exiftool vs the
-// "metafinder/exiftool" DoD-1 entry, or python-backed tools).
-type osintToolProbe struct {
-	name       string   // logical tool name (from the DoD-1 list)
-	cmdName    string   // exec.LookPath binary name (defaults to name when empty)
-	goldenArgs []string // argv golden (the real Task arg vector — always asserted)
-	safeArgs   []string // safe invocation args for live binary test (help/version)
-	stdin      bool     // true when tool reads from stdin (empty string fed)
-}
+// ---------------------------------------------------------------------------
+// Phase 7 — OSINT tools
+// ---------------------------------------------------------------------------
 
-// TestRealtoolsOSINTPhase7 is the DoD-1 argv-golden smoke test for every Phase 7
-// OSINT tool. Mirrors TestRealtoolsVulnsPhase6. Per DoD-1:
-//   - argv golden asserted unconditionally (regardless of binary presence)
-//   - present binary → invoked with safeArgs; sentinel-checked for flag errors
-//   - absent binary → t.Logf("SKIP: ...") + t.Skip() (never silent, never fatal)
-//
-// The goldenArgs come verbatim from the osint Task sources (internal/modules/
-// osint/*.go). A wrong flag in a Task arg vector fails HERE even when the binary
-// is absent — exactly the Phase-4 failure mode mock-only CI cannot catch.
-//
-// PD tools (dnsx, mapcidr, asnmap) carry "-duc" (D-O7: disable update-check to
-// avoid the dev-Mac DNS-block hang). The golden block below MUST keep them.
-//
-//	go test -tags realtools ./internal/core/backend/... -run TestRealtoolsOSINTPhase7 -v
+// TestRealtoolsOSINTPhase7 executes every Phase 7 OSINT tool's golden arg
+// vector. The goldens come from internal/modules/osint/*.go; an OSINT tool is
+// by nature a network tool, so this table carries most of the pins and all of
+// the presence-only entries. Each presence-only `why` is specific: the reader
+// must be able to tell "nobody tried" from "there is no safe way".
 func TestRealtoolsOSINTPhase7(t *testing.T) {
-	// Skip accounting: see realtools_census_test.go.
 	census := newProbeCensus()
 	defer reportRealtoolsCensus(t, "TestRealtoolsOSINTPhase7", census, osintKnownAbsent)
+	mustBeClosed(t)
 
 	dir := t.TempDir()
 	tokenFile := filepath.Join(dir, "github_tokens.txt")
 	usernamesFile := filepath.Join(dir, "usernames.txt")
 	orgsFile := filepath.Join(dir, "orgs.txt")
+	oneDomainFile := filepath.Join(dir, "one.txt")
 	enumOut := filepath.Join(dir, "enum.json")
-	dorksOut := filepath.Join(dir, "dorks.txt")
 	ghReport := filepath.Join(dir, "github_leaks.json")
 	favOut := filepath.Join(dir, "favicon.json")
 	gatoJSON := filepath.Join(dir, "gato.json")
 	postleaksOut := filepath.Join(dir, "postleaks")
-	dorkOut := filepath.Join(dir, "xnldork.txt")
 	gqlOut := filepath.Join(dir, "gql.json")
 	hostsFile := filepath.Join(dir, "hosts.txt")
 	doc := filepath.Join(dir, "report.pdf")
-	mustWrite(t, tokenFile, "ghp_FAKETOKEN0000000000000000000000000000\n")
+	// No trailing newline: enumerepo puts the file's bytes straight into an
+	// Authorization header and net/http refuses a header value with a newline
+	// BEFORE dialing, which would make this probe "hermetic" by accident.
+	mustWrite(t, tokenFile, "ghp_FAKETOKEN0000000000000000000000000000")
 	mustWrite(t, usernamesFile, "example\n")
 	mustWrite(t, orgsFile, "example\n")
-	mustWrite(t, hostsFile, "https://example.com\n")
+	mustWrite(t, oneDomainFile, "example.com\n")
+	mustWrite(t, hostsFile, loopbackURL+"\n")
 	mustWrite(t, doc, "%PDF-1.4 fake\n")
+	dorksFile := filepath.Join(dir, "dorks.txt")
+	mustWrite(t, dorksFile, "filename:.env\n")
 
 	const (
 		domain  = "example.com"
 		company = "example"
-		ip      = "93.184.216.34"
 		// D-O8 conservative caps (config.Defaults() OSINT block).
 		cloudThreads   = "20" // cloudEnumDefaultThreads
 		postmanThreads = "10" // cfg.OSINT.Postman.Threads default
@@ -458,267 +662,249 @@ func TestRealtoolsOSINTPhase7(t *testing.T) {
 		cewlerDepth    = "1"  // cewlerDepth
 		cewlerMinLen   = "5"  // cewlerMinLength
 	)
+	proxyRefused := []string{"proxyconnect", "127.0.0.1:9", "proxy"}
 
-	probes := []osintToolProbe{
-		// whois: domain registration lookup (DomainInfoTask — domain_info.go:104).
+	probes := []goldenProbe{
+		// whois (DomainInfoTask — domain_info.go:104): `whois <domain>`. BSD getopt
+		// stops at the first operand, so the server pin must come FIRST:
+		// -h 127.0.0.1 -p 9 sends the query to the closed loopback port.
 		{
-			name:       "whois",
-			goldenArgs: []string{domain},
-			safeArgs:   []string{"--version"},
+			name: "whois", kind: probeArgVector, family: familyWhois,
+			prePins: []string{"-h", "127.0.0.1", "-p", "9"},
+			golden:  []string{domain},
+			expect:  []string{"connect"},
 		},
-		// dnsx: DNS records (IPInfoTask — ip_info.go:208; DomainInfoTask records).
-		// -duc mandatory (PD tool, D-O7).
+
+		// dnsx (IPInfoTask — ip_info.go:272; DomainInfoTask — domain_info.go:158):
+		// the LIST form, which 17-04 fixed. Pin: -r 127.0.0.1:9 so the lookup is
+		// answered by a closed loopback port, never a real resolver.
 		{
-			name:       "dnsx",
-			goldenArgs: []string{"-duc", "-silent", "-a", "-resp-only", "-d", domain},
-			safeArgs:   []string{"-version", "-duc"},
+			name: "dnsx", kind: probeArgVector, family: familyGoFlag,
+			golden: []string{"-duc", "-silent", "-a", "-resp-only", "-l", oneDomainFile},
+			pins:   []string{"-r", loopbackClosed},
 		},
-		// mapcidr: CIDR aggregation (IPInfoTask — ip_info.go:119). PD tool (-duc safe).
+
+		// mapcidr (IPInfoTask — ip_info.go:119): pure CIDR arithmetic. Pin: -duc,
+		// which the Task does NOT pass and which is the only way to keep a PD
+		// tool from phoning home on start.
 		{
-			name:       "mapcidr",
-			goldenArgs: []string{"-silent", "-aggregate", "-cidr", ip + "/24"},
-			safeArgs:   []string{"-version", "-duc"},
+			name: "mapcidr", kind: probeArgVector, family: familyGoFlag,
+			golden: []string{"-silent", "-aggregate", "-cidr", "127.0.0.0/24"},
+			pins:   []string{"-duc"},
 		},
-		// asnmap: ASN→CIDR (IPInfoTask — ip_info.go:145). -duc mandatory (PD tool).
+
+		// asnmap (IPInfoTask — ip_info.go:180). It IGNORES the proxy environment
+		// (observed answering with real CIDRs under HTTPS_PROXY), so the pin is
+		// its own -proxy flag, which it validates by connecting BEFORE any API
+		// call and aborts on: "could not set proxy" is the barrier and must appear.
 		{
-			name:       "asnmap",
-			goldenArgs: []string{"-duc", "-silent", "-i", ip},
-			safeArgs:   []string{"-version", "-duc"},
+			name: "asnmap", kind: probeArgVector, family: familyGoFlag,
+			golden: []string{"-duc", "-silent", "-i", "127.0.0.1"},
+			pins:   []string{"-proxy", loopbackProxy},
+			expect: []string{"could not set proxy"},
 		},
-		// EmailHarvester: email harvesting (EmailsTask — emails.go:82).
+
+		// EmailHarvester (EmailsTask — emails.go:82). Pin: its own -x proxy flag.
 		{
-			name:       "EmailHarvester",
-			goldenArgs: []string{"-d", domain, "-e", "all", "-l", "20"},
-			safeArgs:   []string{"--help"},
+			name: "EmailHarvester", kind: probeArgVector, family: familyArgparse,
+			golden: []string{"-d", domain, "-e", "all", "-l", "20"},
+			pins:   []string{"-x", loopbackProxy},
+			expect: []string{"proxy"},
 		},
-		// dorks_hunter: GitHub/Google dork automation (GitHubDorksTask — github_dorks.go:96).
+
+		// dorks_hunter (GitHubDorksTask — github_dorks.go:96, golden `-d <domain>
+		// -o <file>`): PRESENCE ONLY. It shells out to xnldorker per dork
+		// (Google/Bing/DDG) and neither tool offers a proxy or offline option.
 		{
-			name:       "dorks_hunter",
-			goldenArgs: []string{"-d", domain, "-o", dorksOut},
-			safeArgs:   []string{"--help"},
+			name: "dorks_hunter", kind: probePresenceOnly, family: familyArgparse, golden: []string{"--help"},
+			why: "shells out to xnldorker (Google/Bing/DuckDuckGo) per dork; neither tool has a proxy or offline flag",
 		},
-		// gitdorks_go: GitHub dork search (GitDorksTask — gitdorks.go:98).
+
+		// gitdorks_go (GitDorksTask — gitdorks.go). The Task's vector, with a
+		// one-dork file standing in for <tools>/gitdorks_go/Dorks/smalldorks.txt.
+		// 21-07a added `-gd` (the v1 flag the port dropped); until then the tool
+		// answered "require keyword or dorkfile" and searched nothing. With a
+		// dorks file it reaches the GitHub API through the Go default transport,
+		// which honours HTTPS_PROXY — the loopback refusal is the barrier.
 		{
-			name:       "gitdorks_go",
-			goldenArgs: []string{"-nws", gitDorksNWS, "-target", domain, "-tf", tokenFile, "-ew", "3"},
-			safeArgs:   []string{"-h"},
+			name: "gitdorks_go", kind: probeArgVector, family: familyGoFlag,
+			golden: []string{"-gd", dorksFile, "-nws", gitDorksNWS, "-target", domain, "-tf", tokenFile, "-ew", "3"},
+			expect: proxyRefused,
+			pins:   []string{"-nw=false"},
 		},
-		// enumerepo: GitHub org repo enumeration (GitHubReposTask — github_repos.go:114).
-		// Feeds the trufflehog per-repo scan (the github_leaks DAG edge).
+
+		// enumerepo (GitHubReposTask — github_repos.go:114). Go default transport:
+		// honours HTTPS_PROXY, observed as "proxyconnect tcp: dial tcp 127.0.0.1:9".
 		{
-			name:       "enumerepo",
-			goldenArgs: []string{"-token-file", tokenFile, "-usernames", usernamesFile, "-o", enumOut},
-			safeArgs:   []string{"-h"},
+			name: "enumerepo", kind: probeArgVector, family: familyGoFlag,
+			golden: []string{"-token-file", tokenFile, "-usernames", usernamesFile, "-o", enumOut},
+			expect: proxyRefused,
 		},
-		// ghleaks: GitHub-wide secret search (GitHubLeaksTask — github_leaks.go:112).
+
+		// ghleaks (GitHubLeaksTask — github_leaks.go:112). Same transport, same proof.
 		{
-			name:       "ghleaks",
-			goldenArgs: []string{"-q", domain, "--token", "REDACTED_TOKEN", "--report", ghReport, "--no-banner"},
-			safeArgs:   []string{"--help"},
+			name: "ghleaks", kind: probeArgVector, family: familyPflag,
+			golden: []string{"-q", domain, "--token", "REDACTED_TOKEN", "--report", ghReport, "--no-banner"},
+			expect: proxyRefused,
 		},
-		// trufflehog: per-repo git secret scan (GitHubLeaksTask — github_leaks.go:136).
+
+		// trufflehog (GitHubLeaksTask — github_leaks.go:136): `git <url> -j`. The
+		// URL is a file:// repository built below, so the clone is local. Pin:
+		// --no-update (trufflehog checks for updates on start otherwise).
 		{
-			name:       "trufflehog",
-			goldenArgs: []string{"git", "https://github.com/example/repo", "-j"},
-			safeArgs:   []string{"--version"},
+			name: "trufflehog", kind: probeArgVector, family: familyGeneric,
+			golden:  []string{"git", "file://" + buildLocalGitRepo(t, dir), "-j"},
+			pins:    []string{"--no-update"},
+			timeout: 30 * time.Second,
+			// The name `trufflehog` is ALSO the abandoned Python v2 package on PyPI
+			// (`trufflehog [--json] git_url`), which `uv tool install trufflehog`
+			// happily puts on PATH. Its usage names the positional `git_url`; the
+			// Go v3 the Task targets has subcommands. Observed on the box this was
+			// written on (2026-10-07): ~/.local/bin/trufflehog is the Python one.
+			wrongBinary: map[string]string{
+				"git_url": "PATH resolves `trufflehog` to the Python trufflehog v2 (PyPI), not trufflesecurity/trufflehog v3 that github_leaks.go:150 was written for (`git <url> -j`); install v3 via go install and remove the uv one",
+			},
 		},
-		// gato: GitHub Actions audit (GitHubActionsTask — github_actions.go:109).
+
+		// gato (GitHubActionsTask — github_actions.go:109). With GH_TOKEN unset it
+		// prompts on stdin, reads EOF and aborts before any request; that prompt
+		// is the barrier and must appear.
 		{
-			name: "gato",
-			goldenArgs: []string{
+			name: "gato", kind: probeArgVector, family: familyArgparse,
+			golden: []string{
 				"e", "--enum_wf_artifacts", "--skip_sh_runner_enum",
 				"-O", orgsFile, "-oJ", gatoJSON, "--include_all_artifact_secrets",
 			},
-			safeArgs: []string{"--help"},
+			expect: []string{"GH_TOKEN"},
 		},
-		// cloud_enum: S3/GCP/Azure bucket enum (CloudEnumTask — cloud_enum.go:106).
+
+		// cloud_enum (CloudEnumTask — cloud_enum.go:106). Pins: the three
+		// --disable-* flags, so no provider is enumerated.
 		{
-			name: "cloud_enum",
-			goldenArgs: []string{
-				"-k", company, "-k", domain, "-k", company,
-				"-t", cloudThreads, "-qs",
-			},
-			safeArgs: []string{"--help"},
+			name: "cloud_enum", kind: probeArgVector, family: familyArgparse,
+			golden: []string{"-k", company, "-k", domain, "-k", company, "-t", cloudThreads, "-qs"},
+			pins:   []string{"--disable-aws", "--disable-azure", "--disable-gcp"},
 		},
-		// porch-pirate: Postman public-library dump (PostmanTask — postman.go:117).
+
+		// porch-pirate (PostmanTask — postman.go:117). Pin: its own --proxy.
 		{
-			name:       "porch-pirate",
-			goldenArgs: []string{"-s", domain, "-l", "25", "--dump"},
-			safeArgs:   []string{"--help"},
+			name: "porch-pirate", kind: probeArgVector, family: familyArgparse,
+			golden: []string{"-s", domain, "-l", "25", "--dump"},
+			pins:   []string{"--proxy", loopbackProxy},
 		},
-		// postleaksNg: Postman URL/secret search (PostmanTask — postman.go:131).
+
+		// postleaksNg (PostmanTask — postman.go:131). requests honours HTTPS_PROXY
+		// (observed: urllib3 _prepare_proxy → ConnectionRefusedError).
 		{
-			name:       "postleaksNg",
-			goldenArgs: []string{"-k", domain, "--output", postleaksOut, "-t", postmanThreads},
-			safeArgs:   []string{"--help"},
+			name: "postleaksNg", kind: probeArgVector, family: familyArgparse,
+			golden: []string{"-k", domain, "--output", postleaksOut, "-t", postmanThreads},
+			expect: proxyRefused,
 		},
-		// sj: Swagger/OpenAPI endpoint auto-analysis (SwaggerTask — swagger.go:135).
+
+		// sj (SwaggerTask — swagger.go:135): loopback URL.
+		{name: "sj", kind: probeArgVector, family: familyPflag, golden: []string{"automate", "-u", loopbackURL + "/swagger.json"}},
+
+		// SwaggerSpy (SwaggerTask — swagger.go:111): a single positional. requests
+		// honours HTTPS_PROXY (observed). NOTE: `swaggerspy.py --help` is NOT safe —
+		// it searches SwaggerHub for the string "--help".
 		{
-			name:       "sj",
-			goldenArgs: []string{"automate", "-u", "https://example.com"},
-			safeArgs:   []string{"--help"},
+			name: "SwaggerSpy", kind: probeArgVector, family: familyGeneric,
+			golden: []string{domain},
+			expect: proxyRefused,
 		},
-		// SwaggerSpy: public Swagger leak search (SwaggerTask — swagger.go:111).
+
+		// Spoofy (SpoofyTask — spoofy.go:91): PRESENCE ONLY. SPF/DMARC lookups go
+		// through dns.resolver and the system resolvers; no resolver flag, no
+		// proxy, and it hung for the full timeout when tried.
 		{
-			name:       "SwaggerSpy",
-			goldenArgs: []string{domain},
-			safeArgs:   []string{"--help"},
+			name: "Spoofy", kind: probePresenceOnly, family: familyArgparse, golden: []string{"--help"},
+			why: "DNS lookups via the system resolver; no resolver/proxy flag (observed hanging 15 s under a loopback proxy)",
 		},
-		// Spoofy: SPF/DMARC/DKIM spoofing posture (SpoofyTask — spoofy.go:91).
+
+		// msftrecon (MSFTReconTask — msftrecon.go:99): PRESENCE ONLY. urllib
+		// without a ProxyHandler: observed connecting directly under HTTPS_PROXY.
 		{
-			name:       "Spoofy",
-			goldenArgs: []string{"-d", domain},
-			safeArgs:   []string{"--help"},
+			name: "msftrecon", kind: probePresenceOnly, family: familyArgparse, golden: []string{"--help"},
+			why: "urllib opener without ProxyHandler — ignores HTTPS_PROXY (observed); no proxy flag; targets login.microsoftonline.com",
 		},
-		// msftrecon: Microsoft tenant recon (MSFTReconTask — msftrecon.go:99).
+
+		// cmseek (CMSeeKTask — cmseek.go:102): loopback URL.
+		{name: "cmseek", kind: probeArgVector, family: familyArgparse, golden: []string{"-u", loopbackURL, "--batch", "-r"}, timeout: 30 * time.Second},
+
+		// favirecon (FaviReconTask — favirecon.go:112): loopback hosts file.
 		{
-			name:       "msftrecon",
-			goldenArgs: []string{"-d", domain},
-			safeArgs:   []string{"--help"},
+			name: "favirecon", kind: probeArgVector, family: familyGoFlag,
+			golden: []string{"-l", hostsFile, "-c", faviConcurr, "-t", faviTimeout, "-s", "-j", "-o", favOut},
 		},
-		// cmseek: CMS fingerprint (CMSeeKTask — cmseek.go:102). Binary name "cmseek".
+
+		// gqlspection (GQLSpectionTask — gqlspection.go:101): loopback URL.
+		{name: "gqlspection", kind: probeArgVector, family: familyArgparse, golden: []string{"-t", loopbackURL + "/graphql", "-o", gqlOut}},
+
+		// cewler (CewlerTask — cewler.go:110): loopback URL.
 		{
-			name:       "cmseek",
-			goldenArgs: []string{"-u", "https://example.com", "--batch", "-r"},
-			safeArgs:   []string{"--help"},
+			name: "cewler", kind: probeArgVector, family: familyArgparse,
+			golden: []string{"-d", cewlerDepth, "-m", cewlerMinLen, "-l", "-o", filepath.Join(dir, "cewl.part"), loopbackURL},
 		},
-		// favirecon: favicon-based tech recon (FaviReconTask — favirecon.go:112).
+
+		// xnldorker (XnldorkerTask — xnldorker.go:102, golden `-q <company> -o <file>`): PRESENCE ONLY.
 		{
-			name: "favirecon",
-			goldenArgs: []string{
-				"-l", hostsFile, "-c", faviConcurr, "-t", faviTimeout, "-s", "-j", "-o", favOut,
-			},
-			safeArgs: []string{"--help"},
+			name: "xnldorker", kind: probePresenceOnly, family: familyArgparse, golden: []string{"--help"},
+			why: "queries Google/Bing/DuckDuckGo; no proxy or offline flag",
 		},
-		// gqlspection: GraphQL introspection (GQLSpectionTask — gqlspection.go:101).
+
+		// misconfig-mapper (MisconfigTask — misconfig.go:85). Its first act is to
+		// pull services.json from GitHub through the Go default transport, which
+		// honours HTTPS_PROXY (observed "proxyconnect tcp: dial tcp 127.0.0.1:9").
 		{
-			name:       "gqlspection",
-			goldenArgs: []string{"-t", "https://example.com/graphql", "-o", gqlOut},
-			safeArgs:   []string{"--help"},
-		},
-		// cewler: web wordlist generation (CewlerTask — cewler.go:110).
-		{
-			name: "cewler",
-			goldenArgs: []string{
-				"-d", cewlerDepth, "-m", cewlerMinLen, "-l", "-o", filepath.Join(dir, "cewl.part"), "https://example.com",
-			},
-			safeArgs: []string{"--help"},
-		},
-		// xnldorker: Google dorking (XnldorkerTask — xnldorker.go:102).
-		{
-			name:       "xnldorker",
-			goldenArgs: []string{"-q", company, "-o", dorkOut},
-			safeArgs:   []string{"--help"},
-		},
-		// misconfig-mapper: third-party misconfiguration (MisconfigTask — misconfig.go:85).
-		{
-			name: "misconfig-mapper",
-			goldenArgs: []string{
+			name: "misconfig-mapper", kind: probeArgVector, family: familyGoFlag,
+			golden: []string{
 				"-target", domain, "-as-domain", "true", "-permutations", "false",
 				"-skip-ssl", "-service", "*", "-verbose", "0",
 			},
-			safeArgs: []string{"--help"},
+			expect: proxyRefused,
 		},
-		// metafinder/exiftool: doc-metadata extraction (MetadataTask — metadata.go:117).
-		// DoD-1 lists "metafinder/exiftool"; the Task invokes exiftool directly.
+
+		// metafinder/exiftool (MetadataTask — metadata.go:117): local file.
 		{
-			name:    "metafinder/exiftool",
-			cmdName: "exiftool",
-			goldenArgs: []string{
-				"-S", "-Author", "-Creator", "-Producer", "-Software", "-Company", doc,
-			},
-			safeArgs: []string{"-ver"},
+			name: "metafinder/exiftool", cmdName: "exiftool", kind: probeArgVector, family: familyPerl,
+			golden: []string{"-S", "-Author", "-Creator", "-Producer", "-Software", "-Company", doc},
 		},
 	}
 
 	for _, p := range probes {
 		p := p
 		t.Run(p.name, func(t *testing.T) {
-			// Phase 1 (ALWAYS): assert the argv golden shape — logged and present
-			// even when the binary is absent (T-07-06-02 DoD-1).
-			if len(p.goldenArgs) == 0 {
+			if p.kind == probeArgVector && len(p.golden) == 0 {
 				t.Fatalf("DoD-1: %s has an empty argv golden — a Task with no arg vector is a porting bug", p.name)
 			}
-			t.Logf("DoD-1 golden args for %s: %v", p.name, p.goldenArgs)
-
-			// Phase 2: attempt live binary invocation (logged SKIP when absent).
-			cmd := p.cmdName
-			if cmd == "" {
-				cmd = p.name
-			}
-			// 18-06: the registry, not PATH. Six of this probe's seven
-			// "observed absent" entries were repo clones sitting on disk that
-			// exec.LookPath could not see; they resolve here and their arg
-			// vectors reach the real tool for the first time.
-			r := realtoolsResolve(t, cmd)
-			if r.Availability != toolResolved {
-				// DoD-1: logged SKIP (never silent, never fatal on an unavailable tool).
-				census.recordUnavailable(p.name, r)
-				t.Logf("SKIP: %s (%s) %s — argv golden asserted, live invocation NOT verified "+
-					"(counted in REALTOOLS_CENSUS)", p.name, cmd, r.describe())
-				t.Skip()
-				return
-			}
-			census.recordPresent(p.name)
-			logResolution(t, r)
-
-			// T-07-06-03: 5-second per-invocation timeout; safeArgs only (no real scan).
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			defer cancel()
-			_ = execSafely(t, ctx, r, p.safeArgs, p.stdin)
+			t.Logf("DoD-1 golden args for %s (%s): %v", p.name, p.kind, p.golden)
+			runGoldenProbe(t, census, p)
 		})
 	}
 }
 
-// execSafely runs a binary with the given args inside a context timeout.
-// Fails the test if stderr/stdout contains a flag-parse usage sentinel.
-// Non-zero exit code is NOT a failure (mirrors smoke_test.go classification).
-// Returns the combined output for diagnostics.
-func execSafely(t *testing.T, ctx context.Context, r resolvedTool, args []string, readStdin bool) string {
+// buildLocalGitRepo creates a one-commit repository under dir for the
+// trufflehog probe and returns its absolute path. Fatal when git is missing:
+// the probe is then not runnable and must not pass by accident.
+func buildLocalGitRepo(t *testing.T, dir string) string {
 	t.Helper()
-	// 18-06: the argv is the RESOLVED one — a clone's interpreter prefix in
-	// front, and the clone's own directory as cwd when it declared
-	// clone_workdir. Running a clone tool with a bare argv and an arbitrary cwd
-	// is how regulator crashed on FileNotFoundError in 18-02; the probe must
-	// invoke it the way the Runner does or it verifies a shape production never
-	// sends.
-	full := r.argv(args)
-	cmd := exec.CommandContext(ctx, r.Path, full...) //nolint:gosec // path from the tool registry; args are controlled
-	cmd.Dir = r.WorkDir
-	if readStdin {
-		cmd.Stdin = strings.NewReader("")
+	repo := filepath.Join(dir, "repo")
+	if err := os.MkdirAll(repo, 0o755); err != nil {
+		t.Fatal(err)
 	}
-	var out strings.Builder
-	cmd.Stdout = &out
-	cmd.Stderr = &out
-	_ = cmd.Run() // exit code is NOT the failure condition — sentinels are.
-
-	combined := strings.ToLower(out.String())
-	for _, sentinel := range usageSentinels {
-		if strings.Contains(combined, sentinel) {
-			t.Errorf("%s rejected its safe arg vector (sentinel %q):\n  args: %v\n  output:\n%s",
-				r.Path, sentinel, full, out.String())
-			break
+	mustWrite(t, filepath.Join(repo, "README.md"), "nothing secret here\n")
+	for _, argv := range [][]string{
+		{"init", "-q"},
+		{"-c", "user.email=probe@example.invalid", "-c", "user.name=probe", "add", "README.md"},
+		{"-c", "user.email=probe@example.invalid", "-c", "user.name=probe", "commit", "-q", "-m", "probe"},
+	} {
+		cmd := exec.Command("git", argv...)
+		cmd.Dir = repo
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", argv, err, out)
 		}
 	}
-	return out.String()
-}
-
-// logResolution prints how a tool was resolved, so a REFERENCE run's log shows
-// whether a probe reached a PATH binary or a declared clone — and with which
-// interpreter and working directory.
-//
-// Without this the census could report a tool "present" and nobody could tell
-// which of the two routes answered, which is the ambiguity 18-02's three-state
-// partition exists to remove.
-func logResolution(t *testing.T, r resolvedTool) {
-	t.Helper()
-	if r.ViaPath {
-		t.Logf("REALTOOLS_RESOLVED tool=%s via=PATH path=%s", r.Name, r.Path)
-		return
-	}
-	t.Logf("REALTOOLS_RESOLVED tool=%s via=CLONE path=%s argv_prefix=%v workdir=%s",
-		r.Name, r.Path, r.ArgvPrefix, r.WorkDir)
+	return repo
 }
 
 // ---------------------------------------------------------------------------
@@ -828,6 +1014,7 @@ func TestRealtoolsFixedArgVectors(t *testing.T) {
 				t.Skipf("%s unavailable", p.tool)
 			}
 			census.recordPresent(p.tool)
+			census.recordVerified(p.tool)
 			logResolution(t, r)
 
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -857,6 +1044,23 @@ func TestRealtoolsFixedArgVectors(t *testing.T) {
 			}
 		})
 	}
+}
+
+// logResolution prints how a tool was resolved, so a REFERENCE run's log shows
+// whether a probe reached a PATH binary or a declared clone — and with which
+// interpreter and working directory.
+//
+// Without this the census could report a tool "present" and nobody could tell
+// which of the two routes answered, which is the ambiguity 18-02's three-state
+// partition exists to remove.
+func logResolution(t *testing.T, r resolvedTool) {
+	t.Helper()
+	if r.ViaPath {
+		t.Logf("REALTOOLS_RESOLVED tool=%s via=PATH path=%s", r.Name, r.Path)
+		return
+	}
+	t.Logf("REALTOOLS_RESOLVED tool=%s via=CLONE path=%s argv_prefix=%v workdir=%s",
+		r.Name, r.Path, r.ArgvPrefix, r.WorkDir)
 }
 
 // fixedVectorKnownAbsent moved to realtools_census_test.go in 18-06, alongside

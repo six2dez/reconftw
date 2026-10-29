@@ -25,6 +25,7 @@ import (
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
 	"github.com/six2dez/reconftw/internal/core/config"
+	coreerrors "github.com/six2dez/reconftw/internal/core/errors"
 )
 
 // Task is the smallest schedulable unit of recon work. Implementors live
@@ -159,17 +160,6 @@ const (
 	StatusSkipped   Status = "skipped"
 )
 
-// LifecycleAware is an optional lifecycle extension Tasks may implement.
-// The Scheduler checks for this interface via type assertion before each
-// Run. OnStart is called immediately before Run; OnEnd is called after Run
-// completes (including on error or cancellation).
-//
-// Source: ADR §5.1 lines 1606-1613.
-type LifecycleAware interface {
-	OnStart(ctx context.Context, app *appctx.AppContext) error
-	OnEnd(ctx context.Context, app *appctx.AppContext, r Result) error
-}
-
 // ErrIncompleteRun marks a run whose tool did not finish, for the CHECKPOINT
 // RECORD only (V-04).
 //
@@ -179,3 +169,49 @@ type LifecycleAware interface {
 // Done() reports false — which is what makes the next run retry instead of
 // skipping a deadline-killed task forever.
 var ErrIncompleteRun = stderrors.New("task did not complete (tool deadline, crash, or cancellation)")
+
+// ReasonToolAbsent is the Reason ClassifyToolErr gives a tool that never
+// started. One string, so a grep across a run's results finds every task the
+// installer left without its binary.
+const ReasonToolAbsent = "tool absent"
+
+// ClassifyToolErr is the absent-vs-failed policy for a best-effort task.
+//
+// The two facts were conflated at every dispatch site: a tool that was never
+// installed and a tool that ran and exited non-zero both reached the same
+// "run failed (best_effort)" Debug line. They need different operators:
+// one installs a binary, the other reads stderr. The backend already carries
+// the distinction as data (ToolError.NeverStarted → coreerrors.ErrDispatch);
+// this maps it onto a task Status + Reason:
+//
+//	nil                      → StatusDone,      ""
+//	never started            → StatusSkipped,   ReasonToolAbsent
+//	context cancelled        → StatusCancelled, the error text
+//	exit≠0 / timeout / other → StatusSkipped,   "<tool>: <error>" (ToolDegraded)
+//
+// The non-Done arms all share ToolDegraded's StatusSkipped rather than
+// StatusErrored because a best-effort tool's failure must not fail the scan
+// (bash CONTINUE_ON_TOOL_ERROR parity); the Reason is what distinguishes them.
+// The tool name is read off the *ToolError when there is one, so a wrapped
+// error still names the binary.
+func ClassifyToolErr(err error) (Status, string) {
+	if err == nil {
+		return StatusDone, ""
+	}
+	if coreerrors.IsDispatchFailure(err) {
+		return StatusSkipped, ReasonToolAbsent
+	}
+	if stderrors.Is(err, context.Canceled) {
+		return StatusCancelled, err.Error()
+	}
+	tool := "tool"
+	var te *coreerrors.ToolError
+	if stderrors.As(err, &te) && te.Tool != "" {
+		tool = te.Tool
+	}
+	var tt *coreerrors.ToolTimeout
+	if stderrors.As(err, &tt) && tt.Tool != "" {
+		tool = tt.Tool
+	}
+	return StatusSkipped, ToolDegraded(tool, err).Reason
+}

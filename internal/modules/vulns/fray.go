@@ -16,8 +16,13 @@
 //
 //	cat <targets> | fray test -c <category> --max <maxPayloads> -t <timeout> -d <delay> --json
 //
-// Per-category invocation. fray reads targets from stdin.
-// fray is a Python PyPI tool that reads stdin and outputs JSONL.
+// Per-category invocation. fray reads targets from stdin, and that is how
+// they are delivered: ExecOptions.StdinPath hands it the targets file (18-01).
+// `fray test` takes ONE positional target and has no list flag — the `-l
+// <file>` this file sent until 21-07a was answered with "unrecognized
+// arguments: -l" (exit 2) on every category, so the task never tested
+// anything (verified against `fray test --help`, 2026-10-07). On stdin fray
+// emits one JSON object per target, which is what parseFrayOutput reads.
 //
 // DEEP_LIMIT GATE (mirrors v1 fray_checks() lines 1133-1141):
 // If URL count > cfg.Advanced.DeepLimit and !cfg.Advanced.Deep → truncate to DeepLimit.
@@ -49,7 +54,9 @@ import (
 	"strings"
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
+	"github.com/six2dez/reconftw/internal/core/backend"
 	"github.com/six2dez/reconftw/internal/core/config"
+	coreerrors "github.com/six2dez/reconftw/internal/core/errors"
 	"github.com/six2dez/reconftw/internal/core/task"
 )
 
@@ -85,7 +92,7 @@ func (t *FrayTask) DependsOn() []string { return []string{"vulns.gf"} }
 //  3. Write target list to inputs/fray_targets.txt.
 //  4. For each category:
 //     a. Run fray test -c <category> --max <maxPayloads> -t <timeout> -d <delay> --json
-//     with targets on stdin (via temp file redirect via -l flag for registry compat).
+//     with the targets file on stdin (ExecOptions.StdinPath).
 //     b. Parse JSONL output — filter bypassed > 0.
 //     c. Build VulnFindingRecord (XCUT-07: PayloadRedacted="***" always).
 //  5. Write inputs/findings.fray.jsonl via output.WriteJSONL (multi-writer staging).
@@ -96,14 +103,12 @@ func (t *FrayTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 
 	// Step 1: Resolve URL corpus via D-V5 precedence (--urls ctx > artefacts/urls.jsonl).
 	urls, err := readURLsWithCtx(ctx, app)
-	if err != nil && app.Log != nil {
+	if err != nil {
 		app.Log.Debug("vulns.fray: read URL corpus error (best_effort)", "err", err)
 	}
 	if len(urls) == 0 {
-		if app.Log != nil {
-			app.Log.Info("vulns.fray: no URLs in URL corpus — skipping")
-		}
-		return task.Result{Status: task.StatusSkipped}, nil
+		app.Log.Info("vulns.fray: no URLs in URL corpus — skipping")
+		return task.NothingProduced("no URLs in URL corpus"), nil
 	}
 
 	inputsDir := filepath.Join(workDir, "inputs")
@@ -118,19 +123,14 @@ func (t *FrayTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 		deepLimit = 100 // v1 DEEP_LIMIT default
 	}
 	if !cfg.Advanced.Deep && len(urls) > deepLimit {
-		if app.Log != nil {
-			app.Log.Info("vulns.fray: limiting targets (DeepMode disabled)",
-				"original", len(urls), "limit", deepLimit)
-		}
+		app.Log.Info("vulns.fray: limiting targets (DeepMode disabled)",
+			"original", len(urls), "limit", deepLimit)
 		urls = urls[:deepLimit]
 	}
 
-	// Step 3: Write target list to inputs/fray_targets.txt.
-	// fray reads targets from stdin; we pass via -l <file> (or use a temp file).
-	// The Backend registry does not support stdin injection, so we use a targets
-	// file and pass it via fray's -l flag (if supported) or redirect approach.
-	// v1 uses: cat $targets | fray test -c $cat ... --json
-	// v2 uses: fray test -c $cat -l $targetsFile ... --json (stdin equiv via file)
+	// Step 3: Write the target list to inputs/fray_targets.txt. It reaches fray
+	// on STANDARD INPUT (ExecOptions.StdinPath) — the v1 `cat $targets | fray
+	// test ...` shape — because `fray test` has no list flag (file header).
 	targetsFile := filepath.Join(inputsDir, "fray_targets.txt")
 	if wErr := os.WriteFile(targetsFile,
 		[]byte(strings.Join(urls, "\n")+"\n"), 0o644); wErr != nil { //nolint:gosec
@@ -164,8 +164,10 @@ func (t *FrayTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 	// frayRan records whether AT LEAST ONE category invocation was dispatched.
 	// If fray is not installed every category fails, the task observed nothing,
 	// and it must not clear a previous run's staging (F3 did-not-run —
-	// staging.go).
+	// staging.go). firstErr keeps the first failure so a run in which NO
+	// category ran can say why (task.ClassifyToolErr: absent vs failed).
 	frayRan := false
+	var firstErr error
 
 	// Step 4: Per-category fray invocation.
 	for _, cat := range catList {
@@ -182,27 +184,28 @@ func (t *FrayTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 		default:
 		}
 
-		// Build fray arg vector.
+		// Build fray arg vector — v1 verbatim; the targets travel on stdin.
 		// v1: cat $targets | fray test -c $cat --max $max -t $timeout -d $delay --json
-		// v2 equivalent using -l <file> flag (avoids stdin injection via Backend):
 		args := []string{
 			"test",
 			"-c", cat,
-			"-l", targetsFile,
 			"--max", strconv.Itoa(maxPayloads),
 			"-t", strconv.Itoa(timeoutSec),
 			"-d", delayStr,
 			"--json",
 		}
 
-		res, runErr := app.Tools.Run(ctx, toolName, args)
+		res, runErr := app.Tools.RunOpts(ctx, toolName, args, backend.ExecOptions{StdinPath: targetsFile})
 		if runErr != nil {
-			// Bail regardless of whether app.Log is set — the continue must NOT be
-			// gated on app.Log != nil, or a nil Log would fall through to a
-			// nil-res deref (same class as the testssl live all-mode regression).
-			if app.Log != nil {
-				app.Log.Debug("vulns.fray: fray error (best_effort — continuing)",
-					"category", cat, "err", runErr)
+			if firstErr == nil {
+				firstErr = runErr
+			}
+			app.Log.Debug("vulns.fray: fray error (best_effort — continuing)",
+				"category", cat, "err", runErr)
+			// A tool that never started will not start for the next category
+			// either; one dispatch_failed record per run is enough.
+			if coreerrors.IsDispatchFailure(runErr) {
+				break
 			}
 			continue
 		}
@@ -218,10 +221,18 @@ func (t *FrayTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 		totalBypassed += bypassed
 
 		// XCUT-07: log only bypass_rate + category (never payload strings).
-		if app.Log != nil && bypassed > 0 {
+		if bypassed > 0 {
 			app.Log.Info("vulns.fray: bypass detected",
 				"category", cat, "bypassed_count", bypassed)
 		}
+	}
+
+	if !frayRan && firstErr != nil {
+		// No category ran. Say whether that is because fray is not installed or
+		// because it failed — the two need different operators.
+		status, reason := task.ClassifyToolErr(firstErr)
+		app.Log.Info("vulns.fray: fray not run — skipping", "reason", reason)
+		return task.Result{Status: status, Reason: reason}, nil
 	}
 
 	// Step 5: Write inputs/findings.fray.jsonl (multi-writer staging contract — doc.go).
@@ -236,9 +247,7 @@ func (t *FrayTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 	stagingPath := filepath.Join(inputsDir, "findings.fray.jsonl")
 	stageVulnFindings(app, "vulns.fray", stagingPath, frayRan, allFindings)
 
-	if app.Log != nil {
-		app.Log.Info("vulns.fray: completed", "total_bypassed", totalBypassed)
-	}
+	app.Log.Info("vulns.fray: completed", "total_bypassed", totalBypassed)
 
 	return task.Result{
 		Status: task.StatusDone,
@@ -253,11 +262,16 @@ func (t *FrayTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 //   - payload / payloads — bypass technique strings (the "secret" of the finding)
 //   - request / response — raw HTTP content
 //   - body — response body that may contain reflected payloads
+//
+// bypass_rate is a STRING on the wire ("0.0%", observed `fray test --json`
+// 2026-10-07). It was declared float64 here, so every line failed to decode and
+// was skipped — a bypass could never have been recorded. The field is not used;
+// it is left out rather than typed, so a future change of its shape cannot
+// take the whole record down again.
 type frayOutputLine struct {
-	Target     string  `json:"target"`
-	Bypassed   int     `json:"bypassed"`
-	Total      int     `json:"total"`
-	BypassRate float64 `json:"bypass_rate"`
+	Target   string `json:"target"`
+	Bypassed int    `json:"bypassed"`
+	Total    int    `json:"total"`
 }
 
 // parseFrayOutput parses fray JSONL stdout for bypass findings.

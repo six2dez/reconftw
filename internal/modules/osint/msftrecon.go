@@ -4,24 +4,22 @@
 // inside domain_info: msftrecon.py -d <domain>) to enumerate the target's Azure
 // AD / Microsoft 365 tenant — the associated/federated domains, tenant ID, and
 // configuration that map the organisation's Microsoft footprint. Each surfaced
-// tenant domain becomes an informational OSINTFindingRecord (D-O4).
+// tenant domain becomes an informational OSINTFindingRecord.
 //
-// HIGH-VALUE LIST (D-O5): the tenant-domain list is preserved as the single-writer
+// HIGH-VALUE LIST: the tenant-domain list is preserved as the single-writer
 // human file osint/azure_tenant_domains.txt — exactly as v1 osint.sh:598 writes it
 // (the output-tree name is a public contract). On tool failure the file is left
 // empty (v1 osint.sh:602), never partially written.
 //
-// SEEDING (D-O1): root-domain-seeded — runs from app.Target.Domain alone, no URL
+// SEEDING: root-domain-seeded — runs from app.Target.Domain alone, no URL
 // corpus, no DependsOn edges, never bootstraps subs/web.
 //
-// FAILURE POLICY (D-O8, ARCH-09): best_effort. msftrecon failing / finding nothing
+// FAILURE POLICY (ARCH-09): best_effort. msftrecon failing / finding nothing
 // logs Debug and returns StatusDone with findings:0 — the run COMPLETES.
 //
-// THREAT MODEL (T-07-05-01): the domain string crosses into msftrecon argv via
+// THREAT MODEL: the domain string crosses into msftrecon argv via
 // Backend.Run's []string arg-vector (never a shell string); rootDomain validates a
 // registrable-domain shape before use.
-//
-// Source: .planning/phases/07-osint-e2e/07-05-PLAN.md Task 1.
 package osint
 
 import (
@@ -55,14 +53,14 @@ func (t *MSFTReconTask) Enabled(cfg *config.Config) bool {
 	return cfg.OSINT.MSFT.Enabled
 }
 
-// DependsOn returns nil — OSINT is root-domain-seeded (D-O1), no DAG edges.
+// DependsOn returns nil — OSINT is root-domain-seeded, no DAG edges.
 func (t *MSFTReconTask) DependsOn() []string { return nil }
 
 // Run executes msftrecon against the root domain and preserves the tenant-domain
-// list as osint/azure_tenant_domains.txt (D-O5 single-writer).
+// list as osint/azure_tenant_domains.txt (single-writer).
 //
 // Steps:
-//  1. Derive + validate the root domain (T-07-05-01).
+//  1. Derive + validate the root domain.
 //  2. Initialise osint/azure_tenant_domains.txt empty (v1 osint.sh:588).
 //  3. Run msftrecon (-d <domain>); on success overwrite the txt with raw stdout
 //     (v1 osint.sh:597-603), on failure leave it empty.
@@ -71,9 +69,7 @@ func (t *MSFTReconTask) DependsOn() []string { return nil }
 func (t *MSFTReconTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result, error) {
 	root := rootDomain(app)
 	if root == "" {
-		if app.Log != nil {
-			app.Log.Info("osint.msftrecon: no valid root domain — skipping")
-		}
+		app.Log.Info("osint.msftrecon: no valid root domain — skipping")
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
@@ -84,31 +80,29 @@ func (t *MSFTReconTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 	}
 	osintDir := filepath.Join(app.Target.WorkDir, "osint")
 	if err := os.MkdirAll(osintDir, 0o755); err != nil {
-		if app.Log != nil {
-			app.Log.Debug("osint.msftrecon: mkdir osint/ failed (best_effort)", "err", err)
-		}
+		app.Log.Debug("osint.msftrecon: mkdir osint/ failed (best_effort)", "err", err)
 	}
 
 	// Step 2: initialise the tenant-domains artefact empty (v1 osint.sh:588).
 	azureFile := filepath.Join(osintDir, "azure_tenant_domains.txt")
-	if wErr := os.WriteFile(azureFile, nil, 0o644); wErr != nil && app.Log != nil { //nolint:gosec
+	if wErr := os.WriteFile(azureFile, nil, 0o644); wErr != nil { //nolint:gosec
 		app.Log.Debug("osint.msftrecon: init azure_tenant_domains.txt failed", "err", wErr)
 	}
 
 	// Step 3: msftrecon — v1 arg vector (osint.sh:592): -d <domain>.
 	res, err := app.Tools.Run(ctx, "msftrecon", []string{"-d", root})
 	if err != nil {
-		// v1 osint.sh:600-602: log and continue with the empty artefact.
-		if app.Log != nil {
-			app.Log.Debug("osint.msftrecon: msftrecon failed (best_effort) — empty tenant list", "err", err)
-		}
-		return task.Result{Status: task.StatusDone, Stats: map[string]int{"findings": 0}}, nil
+		// Absent-vs-failed (task.ClassifyToolErr): a tool that did not run is a
+		// Skipped result with a Reason, never a silent findings:0 success.
+		status, reason := task.ClassifyToolErr(err)
+		app.Log.Info("osint.msftrecon: msftrecon not run — skipping", "reason", reason)
+		return task.Result{Status: status, Reason: reason}, nil
 	}
 
 	// Step 3 (cont.): on success, preserve the raw stdout as the human artefact
-	// (D-O5 single-writer, v1 osint.sh:598: cat msftrecon_output > azure_tenant_domains.txt).
+	// (single-writer, v1 osint.sh:598: cat msftrecon_output > azure_tenant_domains.txt).
 	if len(bytes.TrimSpace(res.Stdout)) > 0 {
-		if wErr := os.WriteFile(azureFile, res.Stdout, 0o644); wErr != nil && app.Log != nil { //nolint:gosec
+		if wErr := os.WriteFile(azureFile, res.Stdout, 0o644); wErr != nil { //nolint:gosec
 			app.Log.Debug("osint.msftrecon: write azure_tenant_domains.txt failed", "err", wErr)
 		}
 	}
@@ -122,16 +116,14 @@ func (t *MSFTReconTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 			Class:       "osint",
 			Source:      "msftrecon",
 			Category:    "azure-tenant",
-			PoCRedacted: line, // tenant domain — non-secret OSINT output (T-07-05-02 accept)
+			PoCRedacted: line, // tenant domain — non-secret OSINT output
 		})
 	}
 
 	// Step 5: write staging JSONL (multi-writer contract).
 	writeOSINTStaging(app, inputsDir, "findings.msftrecon.jsonl", records)
 
-	if app.Log != nil {
-		app.Log.Info("osint.msftrecon: completed", "findings", len(records))
-	}
+	app.Log.Info("osint.msftrecon: completed", "findings", len(records))
 	return task.Result{
 		Status: task.StatusDone,
 		Stats:  map[string]int{"findings": len(records)},

@@ -7,21 +7,21 @@
 //
 //	<tools_root>/JSA/venv/bin/python3 <tools_root>/JSA/jsa.py -f <url>
 //
-// RESEARCH §JSA — v1 form (web.sh:2008):
+// v1 form (web.sh:2008):
 //
 //	${tools}/JSA/venv/bin/python3 ${tools}/JSA/jsa.py -f <js_url>
 //
-// 18-05: IT COMES HOME. That two-part command line — an interpreter plus the
-// script it runs — is EXACTLY the shape 18-01 added Tool.ArgvPrefix for and
-// 18-02 taught the registry to derive from clone_interpreter + clone_entry. So
+// IT COMES HOME. That two-part command line — an interpreter plus the
+// script it runs — is EXACTLY the shape Tool.ArgvPrefix exists for, and the
+// registry derives it from clone_interpreter + clone_entry. So
 // the file no longer builds either path: Tool.Path is the venv python3,
 // Tool.ArgvPrefix is [jsa.py], and this Task supplies only ["-f", <url>].
 //
-// T-05-14 is SATISFIED MORE STRONGLY THAN BEFORE, not weakened. The old
+// The containment requirement is SATISFIED MORE STRONGLY THAN BEFORE, not weakened. The old
 // mitigation was "derive from cfg.Paths.DataDir, then os.Stat it" — a check the
 // module performed on a path the module built. The registry now joins the
 // coordinates under paths.tools_dir and REFUSES any result that escapes that
-// root (18-02 containment), which the module could not do for itself.
+// root (registry containment), which the module could not do for itself.
 //
 // clone_workdir is NOT declared for JSA, and that was checked rather than
 // assumed: `cd / && ~/Tools/JSA/venv/bin/python3 ~/Tools/JSA/jsa.py --help`
@@ -32,17 +32,15 @@
 // tools.lock owns the bound. The row said 300 and the file said 30 — a
 // DISAGREEMENT, reconciled by lowering the manifest to 30, because 30 is the
 // bound production has actually been enforcing and this dispatch is per URL.
-// See the JSA row's derivation and TestJSADeadlineMatchesItsFormerBound.
+// See the JSA row's derivation in tools.lock (its former pin test was a copy of
+// the TOML number and was deleted — internal/modules/DELETED_TESTS.md).
 //
 // Fan-out: goroutines bounded by a semaphore (safe concurrency for JSA).
 // ONE RECORDER ENTRY PER JS URL is the consequence, and it is the intended
 // gain: JSA's per-URL argv has never been visible in logs/tools.jsonl. On a
 // large JS corpus that is a lot of entries.
 //
-// Axiom: LocalBackend only (D-W13 — JSA has no axiom module).
-//
-// Source: .planning/phases/05-web-pipeline-e2e/05-04-PLAN.md Task 2;
-// .planning/phases/18-the-runner-seam-close-the-bypass/18-05-PLAN.md Task 2.
+// Axiom: LocalBackend only (JSA has no axiom module).
 package web
 
 import (
@@ -100,14 +98,12 @@ func (t *JsaTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result,
 	// Read JS URLs from artefacts/urls.jsonl.
 	jsURLs, err := readJSURLsFromJSONL(app)
 	if err != nil || len(jsURLs) == 0 {
-		if app.Log != nil {
-			app.Log.Info("web.jsa: no JS URLs in urls.jsonl — skipping")
-		}
+		app.Log.Info("web.jsa: no JS URLs in urls.jsonl — skipping")
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
 	// Fan-out: bounded goroutines per JS URL.
-	// Concurrency derived from config (WR-04: not hardcoded).
+	// Concurrency derived from config (not hardcoded).
 	// Conservative fallback for python venv tools.
 	maxConcurrency := cfg.Concurrency.MaxJobs
 	if maxConcurrency <= 0 {
@@ -151,27 +147,26 @@ func (t *JsaTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result,
 	}
 	wg.Wait()
 
-	// WR-07: ANY latched unresolvable is did-not-run for staging purposes — not
+	// ANY latched unresolvable is did-not-run for staging purposes — not
 	// only the all-or-nothing case.
 	//
 	// The old condition also required len(allRecords) == 0. If a handful of
 	// goroutines finished before the latch was set, the task fell through to
 	// StageJSONL with a TRUNCATED corpus and overwrote the previous run's complete
 	// one. The comment below claimed "a run in which JSA never executed cannot
-	// clear a previous run's URLs (F3 did-not-run)", which held only for the
+	// clear a previous run's URLs (did-not-run)", which held only for the
 	// all-or-nothing case — a partial run is precisely the case that silently
 	// destroys more than it replaces.
 	//
 	// An unresolvable JSA that produced nothing is a SKIP, exactly as before —
 	// and nothing is staged, so a run in which JSA never executed cannot clear a
-	// previous run's URLs (F3 did-not-run).
+	// previous run's URLs (did-not-run).
 	if unresolvable.Load() {
-		if app.Log != nil {
-			app.Log.Info("web.jsa: JSA unavailable — run reconftw install",
-				"records_discarded", len(allRecords))
-		}
+		app.Log.Info("web.jsa: JSA unavailable — run reconftw install",
+			"records_discarded", len(allRecords))
 		return task.Result{
 			Status:     task.StatusSkipped,
+			Reason:     task.ReasonToolAbsent,
 			Incomplete: len(allRecords) > 0,
 		}, nil
 	}
@@ -179,20 +174,18 @@ func (t *JsaTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result,
 	// StageJSONL called ONCE after all goroutines join (wg.Wait above).
 	// allRecords is fully populated (mutex-protected collector) — no concurrent writes.
 	//
-	// F3 (phase 15): staged UNCONDITIONALLY — StageJSONL removes the staging
+	// Staged UNCONDITIONALLY — StageJSONL removes the staging
 	// file when this run extracted no URLs, so a previous run's JSA output
 	// cannot be republished by the urls merge.
 	stagingPath := filepath.Join(app.Target.WorkDir, "inputs", "urls.jsa.jsonl")
-	if wErr := output.StageJSONL(stagingPath, allRecords); wErr != nil && app.Log != nil {
+	if wErr := output.StageJSONL(stagingPath, allRecords); wErr != nil {
 		app.Log.Debug("web.jsa: staging write failed",
 			"path", stagingPath, "err", wErr)
 	}
 
-	if app.Log != nil {
-		app.Log.Debug("web.jsa: completed",
-			"js_input_urls", len(jsURLs),
-			"urls_found", len(allRecords))
-	}
+	app.Log.Debug("web.jsa: completed",
+		"js_input_urls", len(jsURLs),
+		"urls_found", len(allRecords))
 
 	return task.Result{
 		Status: task.StatusDone,
@@ -203,11 +196,11 @@ func (t *JsaTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result,
 // runJSAForURL invokes jsa.py for a single JS URL through backend.Runner and
 // returns URLRecord JSONL lines plus whether the dispatch NEVER STARTED.
 //
-// The second return value is the distinction 18-01's typed errors made possible
+// The second return value is the distinction the Runner's typed errors made possible
 // and the old code could not draw: "JSA is not installed" and "JSA ran and found
 // nothing" both used to arrive here as a non-nil error over an empty buffer.
 // Conflating them is what let an absent tool report a clean empty result — the
-// outcome-mislabelling shape phase 16 spent two plans removing.
+// outcome-mislabelling shape the silent-success sweep removed.
 //
 // The interpreter and the script come from Tool.Path / Tool.ArgvPrefix; the
 // deadline comes from the JSA row's timeout_seconds. Neither is built here.
@@ -215,30 +208,26 @@ func runJSAForURL(ctx context.Context, app *appctx.AppContext, jsURL string) ([]
 	res, err := app.Tools.Run(ctx, jsaToolName, jsaArgs(jsURL))
 	if err != nil {
 		// BOTH ARMS LOG AT INFO OR ABOVE, and that is a change the move forced.
-		// Before 18-05 this function dispatched with exec.CommandContext, which
+		// This function used to dispatch with exec.CommandContext, which
 		// the internal/modules silent-success detector does not recognise as a
 		// tool call — so its Debug-only logging was invisible to the rule as well
 		// as to the operator. Coming onto the seam made the branch visible and
 		// TestSilentSuccess failed on it immediately. Raising the level is the
 		// fix the rule names; an allowlist entry is explicitly not.
 		if coreerrors.IsDispatchFailure(err) {
-			if app.Log != nil {
-				// WARN: an unresolvable JSA is operator-actionable and rare — the
-				// caller latches on the first one, so this fires at most a handful
-				// of times per run, not once per JS URL.
-				app.Log.Warn("web.jsa: JSA never started (unresolvable) — run reconftw install",
-					"url", jsURL, "err", err)
-			}
+			// WARN: an unresolvable JSA is operator-actionable and rare — the
+			// caller latches on the first one, so this fires at most a handful
+			// of times per run, not once per JS URL.
+			app.Log.Warn("web.jsa: JSA never started (unresolvable) — run reconftw install",
+				"url", jsURL, "err", err)
 			return nil, true
 		}
-		if app.Log != nil {
-			// INFO, not Warn: this is the per-URL best-effort arm and fires once
-			// per failing JS URL. Info is on the operator's screen (the default
-			// handler level) which is what the rule requires, without turning a
-			// large corpus into a wall of warnings.
-			app.Log.Info("web.jsa: jsa invocation failed for this URL (non-fatal)",
-				"url", jsURL, "err", err)
-		}
+		// INFO, not Warn: this is the per-URL best-effort arm and fires once
+		// per failing JS URL. Info is on the operator's screen (the default
+		// handler level) which is what the rule requires, without turning a
+		// large corpus into a wall of warnings.
+		app.Log.Info("web.jsa: jsa invocation failed for this URL (non-fatal)",
+			"url", jsURL, "err", err)
 		return nil, false
 	}
 
@@ -267,17 +256,17 @@ func runJSAForURL(ctx context.Context, app *appctx.AppContext, jsURL string) ([]
 	return lines, false
 }
 
-// resolveToolsDir is GONE (18-05 Task 2). It was the LAST of the three
-// hand-rolled tools-root resolvers 18-02 named, and the one the other two were
+// resolveToolsDir is GONE. It was the LAST of the three
+// hand-rolled tools-root resolvers the seam work named, and the one the other two were
 // copied from. Every consumer now comes through config.Config.ToolsRoot() over
 // paths.tools_dir — including the one place that still needs a raw path,
 // wordlistgen.go's getjswords leg.
 //
-// It read cfg.Paths.DataDir, which is exactly the hazard 17-06 wrote down:
+// It read cfg.Paths.DataDir, which is exactly the hazard already written down:
 // data_dir already meant the workspace root, so the same key meant two things.
 // Under a default config both resolvers answer $HOME/Tools identically; the
 // only behaviour that changes is for an operator who had set paths.data_dir and
-// relied on it as the tools root, and 18-02's migrator now pins v1's ${tools}
+// relied on it as the tools root, and the migrator now pins v1's ${tools}
 // to paths.tools_dir precisely so that operator is told where to move it.
 
 func init() { task.Register(&JsaTask{}) }

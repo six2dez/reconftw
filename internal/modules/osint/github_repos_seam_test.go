@@ -1,5 +1,5 @@
 // github_repos_seam_test.go — the proof that osint.github_repos's `git clone`
-// came home to backend.Runner (18-05 Verdict 2) WITH ITS HARDENING INTACT.
+// came home to backend.Runner WITH ITS HARDENING INTACT.
 //
 // THE CONTROL IS THE PRE-MOVE INVOCATION, captured from github_repos.go as it
 // stood at f436d2e BEFORE the edit:
@@ -10,7 +10,7 @@
 //	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0")
 //	githubReposCloneTimeout = 300 * time.Second
 //
-// T-18-05-02 IS THE POINT OF THIS FILE. Those two hardening measures are the only
+// THAT HARDENING IS THE POINT OF THIS FILE. Those two measures are the only
 // mitigations standing between an attacker-influenced repository URL and git's
 // ext:: transport (RCE) or an interactive credential prompt (a hung scan). The
 // register requires them to survive the move WHICHEVER verdict was reached, so
@@ -73,6 +73,7 @@ func newGitCloneTestApp(t *testing.T, gitPath, workDir string) *appctx.AppContex
 	reg := backend.NewToolRegistry()
 	reg.Register(&backend.Tool{Name: githubReposGitTool, Path: gitPath})
 	return &appctx.AppContext{
+		Log:    appctx.NopLogger(),
 		Tools:  backend.NewRunner(&backend.LocalBackend{}, reg, nil),
 		Cfg:    config.Defaults(),
 		Target: &appctx.Target{Domain: "example.com", WorkDir: workDir},
@@ -81,7 +82,7 @@ func newGitCloneTestApp(t *testing.T, gitPath, workDir string) *appctx.AppContex
 
 // TestGitCloneHardeningSurvivesTheMove asserts the COMPLETE argv the process
 // received and that GIT_TERMINAL_PROMPT reached its ENVIRONMENT — the two halves
-// of T-18-05-02.
+// of the git-clone hardening.
 func TestGitCloneHardeningSurvivesTheMove(t *testing.T) {
 	recDir := t.TempDir()
 	gitPath := writeGitRecorderScript(t, recDir)
@@ -109,7 +110,7 @@ func TestGitCloneHardeningSurvivesTheMove(t *testing.T) {
 	// Named explicitly as well as positionally: this one element is an RCE
 	// mitigation, and "the slices are equal" would not say so at a failure site.
 	if got[0] != "-c" || got[1] != "protocol.ext.allow=never" {
-		t.Fatalf("the ext:: transport hardening is missing from argv: %v (T-18-05-02)", got)
+		t.Fatalf("the ext:: transport hardening is missing from argv: %v", got)
 	}
 
 	envData, err := os.ReadFile(filepath.Join(recDir, "env.txt")) //nolint:gosec // test-owned temp path
@@ -119,7 +120,7 @@ func TestGitCloneHardeningSurvivesTheMove(t *testing.T) {
 	if strings.TrimSpace(string(envData)) != "GIT_TERMINAL_PROMPT=0" {
 		t.Fatalf("git's environment carried %q, want GIT_TERMINAL_PROMPT=0 — without it an "+
 			"auth-required clone hangs on an interactive credential prompt instead of "+
-			"failing fast (T-18-05-02)", strings.TrimSpace(string(envData)))
+			"failing fast", strings.TrimSpace(string(envData)))
 	}
 	// And it must NOT be on argv: ExecOptions.Env is the argv-free seam (ARCH-02).
 	for _, a := range got {
@@ -182,7 +183,7 @@ func TestGitCloneIsRecorded(t *testing.T) {
 		t.Fatalf("no start record naming %q in logs/tools.jsonl:\n%s", githubReposGitTool, data)
 	}
 	// The hardening is VISIBLE in the record — an operator reading tools.jsonl can
-	// now confirm it was applied, which was impossible before 18-05.
+	// now confirm it was applied, which was impossible before the Runner move.
 	joined := strings.Join(argv, " ")
 	if !strings.Contains(joined, "protocol.ext.allow=never") {
 		t.Fatalf("the recorded argv does not show the ext:: hardening: %v", argv)
@@ -195,7 +196,7 @@ func TestGitCloneIsRecorded(t *testing.T) {
 }
 
 // TestGitCloneDegradesWhenGitIsUnresolvable pins the failure policy across the
-// move. github_repos is best_effort throughout (D-O8): an absent git used to
+// move. github_repos is best_effort throughout: an absent git used to
 // surface as an exec.LookPath error the caller logged and continued past, and it
 // must still be a non-nil error the caller can degrade on — never a panic, and
 // never a nil that makes an un-cloned directory look cloned.
@@ -204,6 +205,7 @@ func TestGitCloneDegradesWhenGitIsUnresolvable(t *testing.T) {
 	reg := backend.NewToolRegistry()
 	reg.Register(&backend.Tool{Name: githubReposGitTool}) // registered, Path empty
 	app := &appctx.AppContext{
+		Log:    appctx.NopLogger(),
 		Tools:  backend.NewRunner(&backend.LocalBackend{}, reg, nil),
 		Cfg:    config.Defaults(),
 		Target: &appctx.Target{Domain: "example.com", WorkDir: workDir},

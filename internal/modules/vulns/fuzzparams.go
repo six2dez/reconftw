@@ -1,7 +1,7 @@
 // fuzzparams.go — FuzzparamsTask: nuclei DAST parameter fuzzing on deduped URL corpus.
 //
 // FuzzparamsTask reads artefacts/urls.jsonl ONLY (the deduped URL corpus from
-// Phase 5 — equivalent to v1 webs/url_extract_nodupes.txt). It does NOT
+// the web stage — equivalent to v1 webs/url_extract_nodupes.txt). It does NOT
 // aggregate gf buckets or webs_all (unlike NucleiDASTTask which merges both).
 //
 // The distinction: NucleiDASTTask runs DAST templates on the full gf+url corpus;
@@ -31,8 +31,6 @@
 // PAYLOAD REDACTION (XCUT-07):
 // nuclei DAST stdout contains matched payload/response data — NEVER logged at
 // Info/Warn. Only template-id + severity + count. PayloadRedacted = "***".
-//
-// Source: .planning/phases/06-vulnerability-scanning-e2e/06-07-PLAN.md Task 1.
 package vulns
 
 import (
@@ -90,20 +88,16 @@ func (t *FuzzparamsTask) Run(ctx context.Context, app *appctx.AppContext) (task.
 			fmt.Errorf("vulns.fuzzparams: mkdir inputs/: %w", err)
 	}
 
-	// Step 1 & 2: Resolve URL corpus via D-V5 precedence (--urls ctx > artefacts/urls.jsonl).
+	// Step 1 & 2: Resolve URL corpus via precedence (--urls ctx > artefacts/urls.jsonl).
 	// FuzzparamsTask does NOT aggregate gf buckets (distinct from NucleiDASTTask).
 	// Equivalent to v1 fuzzparams() reading webs/url_extract_nodupes.txt.
 	urlsPath, resolveErr := resolveURLInput(ctx, app)
 	if resolveErr != nil || urlsPath == "" {
-		if app.Log != nil {
-			app.Log.Info("vulns.fuzzparams: no URL corpus available — skipping")
-		}
+		app.Log.Info("vulns.fuzzparams: no URL corpus available — skipping")
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 	if info, statErr := os.Stat(urlsPath); statErr != nil || info.Size() == 0 {
-		if app.Log != nil {
-			app.Log.Info("vulns.fuzzparams: URL corpus absent or empty — skipping", "path", urlsPath)
-		}
+		app.Log.Info("vulns.fuzzparams: URL corpus absent or empty — skipping", "path", urlsPath)
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
@@ -116,10 +110,8 @@ func (t *FuzzparamsTask) Run(ctx context.Context, app *appctx.AppContext) (task.
 		fuzzTemplates = filepath.Join(cfg.Paths.NucleiTemplates, "dast")
 	}
 	if _, statErr := os.Stat(fuzzTemplates); statErr != nil {
-		if app.Log != nil {
-			app.Log.Info("vulns.fuzzparams: fuzz templates path not accessible — skipping",
-				"path", fuzzTemplates, "err", statErr)
-		}
+		app.Log.Info("vulns.fuzzparams: fuzz templates path not accessible — skipping",
+			"path", fuzzTemplates, "err", statErr)
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
@@ -151,15 +143,13 @@ func (t *FuzzparamsTask) Run(ctx context.Context, app *appctx.AppContext) (task.
 	eventCh, streamErr := app.Tools.Stream(ctx, toolName, args)
 	// nucleiRan records whether nuclei was actually DISPATCHED. A dispatch
 	// failure means the binary is absent: the task observed nothing and must not
-	// clear a previous run's staging (F3 did-not-run — staging.go).
+	// clear a previous run's staging (did-not-run rule — staging.go).
 	nucleiRan := streamErr == nil
 	if streamErr != nil {
-		if app.Log != nil {
-			app.Log.Debug("vulns.fuzzparams: stream error (best_effort)", "err", streamErr)
-		}
+		app.Log.Debug("vulns.fuzzparams: stream error (best_effort)", "err", streamErr)
 		// Non-fatal per best_effort policy.
 	} else {
-		// F6 (phase 15): consume the TERMINAL error before reading stagingFile —
+		// Terminal error: consume the TERMINAL error before reading stagingFile —
 		// a nuclei that exited non-zero leaves a truncated file, or none at all,
 		// in which case the read would return the PREVIOUS run's output.
 		// XCUT-07: raw nuclei output routed to run.log only; never to Info terminal.
@@ -172,15 +162,13 @@ func (t *FuzzparamsTask) Run(ctx context.Context, app *appctx.AppContext) (task.
 	// Step 5: Parse staging file → VulnFindingRecord slice.
 	data, readErr := os.ReadFile(stagingFile) //nolint:gosec // path within WorkDir
 	if readErr != nil && !os.IsNotExist(readErr) {
-		if app.Log != nil {
-			app.Log.Debug("vulns.fuzzparams: read staging file error", "err", readErr)
-		}
+		app.Log.Debug("vulns.fuzzparams: read staging file error", "err", readErr)
 	}
 	findings := parseFuzzparamsOutput(data)
 
 	// Step 6: Write inputs/findings.fuzzparams.jsonl (staging contract — doc.go).
 	//
-	// F3 (phase 15): staged through stageVulnFindings so a clean run REMOVES the
+	// Run isolation: staged through stageVulnFindings so a clean run REMOVES the
 	// previous run's staging rather than republishing DAST findings that have
 	// since been fixed.
 	//
@@ -191,9 +179,7 @@ func (t *FuzzparamsTask) Run(ctx context.Context, app *appctx.AppContext) (task.
 	stageVulnFindings(app, "vulns.fuzzparams", stagingPath, nucleiRan, findings)
 
 	// XCUT-07: log only template-id + severity + count, never raw matched-at / extracted-results.
-	if app.Log != nil {
-		app.Log.Info("vulns.fuzzparams: completed", "findings", len(findings))
-	}
+	app.Log.Info("vulns.fuzzparams: completed", "findings", len(findings))
 
 	return task.Result{
 		Status: task.StatusDone,
@@ -244,10 +230,10 @@ func parseFuzzparamsOutput(data []byte) []VulnFindingRecord {
 			// ("https://target.example.com"), which the hostname-matching
 			// scope gate would reject outright.
 			Host: findingHost(nl.Host),
-			// Phase 4/5 SARIF-compatible fields.
+			// Base SARIF-compatible fields.
 			Severity:   nl.Info.Severity,
 			Confidence: "medium",
-			// Phase 6 vuln-class fields.
+			// Vuln-class fields.
 			VulnClass:       vulnClass,
 			PayloadRedacted: "***", // XCUT-07: raw DAST payload never stored
 			Engine:          "nuclei-fuzzparams",
@@ -260,13 +246,13 @@ func parseFuzzparamsOutput(data []byte) []VulnFindingRecord {
 // cmd/reconftw/modules.go blank-imports this package to trigger registration.
 func init() { task.Register(&FuzzparamsTask{}) }
 
-// resolveToolsDirVulns is GONE (18-05 Task 2). It existed solely so bypass4xx.go
+// resolveToolsDirVulns is GONE. It existed solely so bypass4xx.go
 // could join the tools root itself and reach ~/Tools/nomore403/nomore403, and
 // bypass4xx.go now asks the registry instead. It was one of THREE hand-rolled
 // copies of the same resolver, and — like web.resolveToolsDir — it read
-// cfg.Paths.DataDir, which 17-06 recorded as the hazard: data_dir already meant
+// cfg.Paths.DataDir, which the config-path hardening recorded as the hazard: data_dir already meant
 // the workspace root. The tools root is named once, at config.Config.ToolsRoot()
-// over paths.tools_dir (18-02).
+// over paths.tools_dir.
 
 // (host-extraction helper removed — unused; the web package owns the canonical
 // implementation if FuzzparamsTask ever needs per-URL host attribution.)

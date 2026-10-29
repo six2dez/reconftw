@@ -221,7 +221,7 @@ func RunSubsAsync(ctx context.Context, opts RunOptions) (err error) {
 	// v1 bash-shape _compat/ tree from the final subdomains.jsonl (+ any takeover/
 	// enrichment artefacts). Missing hosts/urls/findings sources are skipped, not
 	// fatal — best-effort, never fails the scan.
-	writeCompatTree(app, workdir)
+	writeCompatTree(app, workdir, cfg.Output.Compat.ReconSymlink)
 
 	persistScanToStore(ctx, boot, opts, "subs")
 	return nil

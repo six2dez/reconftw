@@ -242,3 +242,35 @@ func readAppctxSource(t *testing.T, basename string) string {
 	}
 	return string(body)
 }
+
+// TestBootNilLoggerIsReplaced pins the app.Log guarantee: a nil logger handed
+// to Boot never reaches the AppContext, so module code may log without a guard.
+func TestBootNilLoggerIsReplaced(t *testing.T) {
+	cfg := newTestConfig()
+	tgt, err := appctx.NewTarget("example.com", nil, t.TempDir())
+	if err != nil {
+		t.Fatalf("NewTarget: %v", err)
+	}
+	app, err := appctx.Boot(context.Background(), nil, cfg, tgt, &stubScheduler{max: 2},
+		appctx.BootOptions{Checkpoint: &stubCP{}, DisableToolRecorder: true})
+	if err != nil {
+		t.Fatalf("Boot with nil logger: %v", err)
+	}
+	if app.Log == nil {
+		t.Fatal("Boot(nil logger) left app.Log nil — modules call app.Log without a guard")
+	}
+	// Must be usable, not merely non-nil.
+	app.Log.Info("boot nil-logger probe")
+}
+
+// TestNopLoggerDiscards pins the helper test literals use for AppContext.Log.
+func TestNopLoggerDiscards(t *testing.T) {
+	l := appctx.NopLogger()
+	if l == nil {
+		t.Fatal("NopLogger() returned nil")
+	}
+	if l.Enabled(context.Background(), slog.LevelError) {
+		t.Error("NopLogger() reports LevelError enabled; it must discard everything")
+	}
+	l.Error("must not panic")
+}

@@ -1,6 +1,6 @@
 // ffuf_real_fixture_test.go — parseFFUFOutput against REAL captured ffuf output.
 //
-// Plan 16-07 Task 2's census found parseFFUFOutput and parseFFUFJSONL classified
+// The parser census found parseFFUFOutput and parseFFUFJSONL classified
 // third-party and NEVER reached by a test that passes captured output through
 // them. A captured ffuf fixture already sat in testdata/fixtures/ffuf/ — nothing
 // decoded it with the production parser, which is precisely the shape that let

@@ -15,20 +15,18 @@
 //	L3 (field-level): the OSINTFindingRecord carries ONLY the non-secret locator
 //	    (the spec/endpoint URL); ValueRedacted="***".
 //
-// Logs report ONLY counts (T-07-04-01 mitigate).
+// Logs report ONLY counts.
 //
-// OPPORTUNISTIC ENRICHMENT (D-O2): SwaggerTask reads discovered hosts from the
+// OPPORTUNISTIC ENRICHMENT: SwaggerTask reads discovered hosts from the
 // workspace artefacts (artefacts/hosts.jsonl or artefacts/urls.jsonl) IF present,
 // looping sj per host/URL (graphql.go per-URL pattern). When NO workspace hosts
 // exist, it logs an Info note and runs the company-seeded SwaggerSpy pass only —
-// it NEVER fails or bootstraps subs/web (best_effort, D-O1). Workspace hosts are
-// already scope-filtered by Phase 5, bounding the probe set (T-07-04-03).
+// it NEVER fails or bootstraps subs/web (best_effort). Workspace hosts are
+// already scope-filtered by the web stage, bounding the probe set.
 //
-// SEEDING (D-O1): root-domain-seeded — no DependsOn edges.
-// FAILURE POLICY (D-O8): best_effort — engine failure / empty output logs Debug
+// SEEDING: root-domain-seeded — no DependsOn edges.
+// FAILURE POLICY: best_effort — engine failure / empty output logs Debug
 // and returns StatusDone.
-//
-// Source: .planning/phases/07-osint-e2e/07-04-PLAN.md Task 2.
 package osint
 
 import (
@@ -45,11 +43,12 @@ import (
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
 	"github.com/six2dez/reconftw/internal/core/config"
+	"github.com/six2dez/reconftw/internal/core/output"
 	"github.com/six2dez/reconftw/internal/core/task"
 )
 
-// swaggerMaxHosts bounds the opportunistic per-host sj loop (D-O8 conservative
-// cap against attacker-influenced workspace hosts — T-07-04-03).
+// swaggerMaxHosts bounds the opportunistic per-host sj loop (conservative
+// cap against attacker-influenced workspace hosts).
 const swaggerMaxHosts = 100
 
 // SwaggerTask runs SwaggerSpy + sj for OSINT-09 (secret-emitting).
@@ -71,26 +70,24 @@ func (t *SwaggerTask) Enabled(cfg *config.Config) bool {
 	return cfg.OSINT.Swagger.Enabled
 }
 
-// DependsOn returns nil — Swagger scanning is root-domain-seeded (D-O1). The
-// workspace-host enrichment (D-O2) is OPPORTUNISTIC, not a DAG edge.
+// DependsOn returns nil — Swagger scanning is root-domain-seeded. The
+// workspace-host enrichment is OPPORTUNISTIC, not a DAG edge.
 func (t *SwaggerTask) DependsOn() []string { return nil }
 
-// Run executes SwaggerSpy (company-seeded) + sj (per workspace host, D-O2) with
+// Run executes SwaggerSpy (company-seeded) + sj (per workspace host) with
 // full XCUT-07 redaction.
 //
 // Steps:
-//  1. Derive + validate the root domain (T-07-04-04).
+//  1. Derive + validate the root domain.
 //  2. Run SwaggerSpy (-s <domain>); parse stdout → redacted records.
-//  3. D-O2: read workspace hosts (artefacts/hosts.jsonl|urls.jsonl) IF present;
+//  3. read workspace hosts (artefacts/hosts.jsonl|urls.jsonl) IF present;
 //     when absent, log Info and skip the sj per-host loop (best_effort).
 //  4. Loop sj per host/URL; parse output → redacted records.
 //  5. Write inputs/findings.swagger.jsonl (multi-writer staging) — all redacted.
 func (t *SwaggerTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result, error) {
 	root := rootDomain(app)
 	if root == "" {
-		if app.Log != nil {
-			app.Log.Info("osint.swagger: no valid root domain — skipping")
-		}
+		app.Log.Info("osint.swagger: no valid root domain — skipping")
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
@@ -100,14 +97,11 @@ func (t *SwaggerTask) Run(ctx context.Context, app *appctx.AppContext) (task.Res
 			fmt.Errorf("osint.swagger: mkdir inputs/: %w", err)
 	}
 
-	var logger *slog.Logger
-	if app.Log != nil {
-		logger = app.Log
-	}
+	logger := app.Log
 	var records []OSINTFindingRecord
 	// engineRan records whether AT LEAST ONE engine invocation was dispatched.
 	// If neither SwaggerSpy nor sj is installed the task observed nothing and
-	// must not clear a previous run's staging (F3 did-not-run — see
+	// must not clear a previous run's staging (did-not-run rule — see
 	// writeOSINTStaging).
 	engineRan := false
 
@@ -115,15 +109,13 @@ func (t *SwaggerTask) Run(ctx context.Context, app *appctx.AppContext) (task.Res
 	// v1 arg vector (osint.sh:452): swaggerspy.py <domain>. Output may embed raw
 	// secrets — parsed for non-secret locators with L2 registration, NEVER logged.
 	if res, err := app.Tools.Run(ctx, "SwaggerSpy", []string{root}); err != nil {
-		if app.Log != nil {
-			app.Log.Debug("osint.swagger: SwaggerSpy run failed (best_effort)", "err", err)
-		}
+		app.Log.Debug("osint.swagger: SwaggerSpy run failed (best_effort)", "err", err)
 	} else {
 		engineRan = true
 		records = append(records, parseSwaggerOutput(res.Stdout, "swaggerspy", logger)...)
 	}
 
-	// --- Engine 2: sj (per workspace host, D-O2 opportunistic enrichment) ------
+	// --- Engine 2: sj (per workspace host, opportunistic enrichment) ------
 	//
 	// SCHEME-BEARING URLs, not bare hosts. sj resolves the `-u` value as a URL:
 	//
@@ -135,26 +127,24 @@ func (t *SwaggerTask) Run(ctx context.Context, app *appctx.AppContext) (task.Res
 	//
 	// readWorkspaceHosts returns hosts.jsonl's "host" field, which is a BARE
 	// HOST — so all 100 sj invocations in the phase-16 parity run were dead
-	// (16-06 §6.3).
+	// (a live-run finding).
 	//
 	// The scheme is READ, never fabricated: hosts.jsonl carries a "url" field
 	// written by HTTPXTask from httpx's own JSONL output, so it records the
 	// scheme httpx actually observed on that host. Concatenating a default
 	// "https://" would have invented a fact — and half the time the wrong one.
 	hosts, droppedNoScheme := readWorkspaceHostURLs(app.Target.WorkDir)
-	if droppedNoScheme > 0 && app.Log != nil {
+	if droppedNoScheme > 0 {
 		app.Log.Info("osint.swagger: workspace entries without a scheme were skipped for sj",
 			"dropped", droppedNoScheme,
 			"reason", "sj resolves -u as a URL; a bare host yields `unsupported protocol scheme`")
 	}
 	if len(hosts) == 0 {
-		// D-O2: log-skip when absent — best_effort, NOT an error/bootstrap.
-		if app.Log != nil {
-			app.Log.Info("osint.swagger: no workspace hosts (artefacts/hosts.jsonl|urls.jsonl) — running company-seeded only")
-		}
+		// log-skip when absent — best_effort, NOT an error/bootstrap.
+		app.Log.Info("osint.swagger: no workspace hosts (artefacts/hosts.jsonl|urls.jsonl) — running company-seeded only")
 	} else {
 		if len(hosts) > swaggerMaxHosts {
-			hosts = hosts[:swaggerMaxHosts] // conservative cap (D-O8)
+			hosts = hosts[:swaggerMaxHosts] // conservative cap
 		}
 		for _, host := range hosts {
 			if ctx.Err() != nil {
@@ -163,9 +153,7 @@ func (t *SwaggerTask) Run(ctx context.Context, app *appctx.AppContext) (task.Res
 			// v1 sj auto-analysis arg vector: sj automate -u <url>.
 			res, err := app.Tools.Run(ctx, "sj", []string{"automate", "-u", host})
 			if err != nil {
-				if app.Log != nil {
-					app.Log.Debug("osint.swagger: sj run failed (best_effort)", "host", host, "err", err)
-				}
+				app.Log.Debug("osint.swagger: sj run failed (best_effort)", "host", host, "err", err)
 				continue
 			}
 			engineRan = true
@@ -174,18 +162,16 @@ func (t *SwaggerTask) Run(ctx context.Context, app *appctx.AppContext) (task.Res
 	}
 
 	// Step 5: write staging JSONL — every record is already REDACTED.
-	// F3: a run that found no exposed Swagger/OpenAPI document REMOVES the
+	// Run isolation: a run that found no exposed Swagger/OpenAPI document REMOVES the
 	// staging file rather than republishing one that has since been secured.
 	if engineRan {
 		writeOSINTStaging(app, inputsDir, "findings.swagger.jsonl", records)
-	} else if app.Log != nil {
-		app.Log.Debug("osint.swagger: no engine ran — staging preserved (F3 did-not-run)")
+	} else {
+		app.Log.Debug("osint.swagger: no engine ran — staging preserved (did-not-run rule)")
 	}
 
 	// XCUT-07: log ONLY the count, never the raw matches.
-	if app.Log != nil {
-		app.Log.Info("osint.swagger: completed", "leaks_found", len(records), "hosts_scanned", len(hosts))
-	}
+	app.Log.Info("osint.swagger: completed", "leaks_found", len(records), "hosts_scanned", len(hosts))
 	return task.Result{
 		Status: task.StatusDone,
 		Stats:  map[string]int{"leaks_found": len(records), "hosts_scanned": len(hosts)},
@@ -229,11 +215,11 @@ func parseSwaggerOutput(data []byte, engine string, logger *slog.Logger) []OSINT
 	return records
 }
 
-// readWorkspaceHosts reads discovered hosts opportunistically (D-O2) from the
+// readWorkspaceHosts reads discovered hosts opportunistically from the
 // workspace artefacts: artefacts/hosts.jsonl first, then artefacts/urls.jsonl.
 // Returns nil when neither is present (the log-skip path). Each line may be a
 // plain string or a JSON object with a "host"/"url" field. Already scope-filtered
-// by Phase 5 (T-07-04-03).
+// by the web stage.
 func readWorkspaceHosts(workDir string) []string {
 	seen := make(map[string]struct{})
 	var out []string
@@ -250,36 +236,23 @@ func readWorkspaceHosts(workDir string) []string {
 	}
 
 	// 1) artefacts/hosts.jsonl
-	hostsPath := filepath.Join(workDir, "artefacts", "hosts.jsonl")
-	if data, err := os.ReadFile(hostsPath); err == nil { //nolint:gosec // within WorkDir
-		for _, h := range parseHostLines(data, "host") {
-			add(h)
-		}
+	for _, h := range readHostLines(filepath.Join(workDir, "artefacts", "hosts.jsonl"), "host") {
+		add(h)
 	}
 	// 2) artefacts/urls.jsonl (host extracted from each URL)
-	urlsPath := filepath.Join(workDir, "artefacts", "urls.jsonl")
-	if data, err := os.ReadFile(urlsPath); err == nil { //nolint:gosec // within WorkDir
-		for _, u := range parseHostLines(data, "url") {
-			add(u)
-		}
+	for _, u := range readHostLines(filepath.Join(workDir, "artefacts", "urls.jsonl"), "url") {
+		add(u)
 	}
 	return out
 }
 
-// parseHostLines parses a JSONL artefact, extracting the named field from each
-// JSON object (or the raw line when it is a plain string).
-func parseHostLines(data []byte, field string) []string {
-	if len(bytes.TrimSpace(data)) == 0 {
-		return nil
-	}
+// readHostLines reads a JSONL artefact, extracting the named field from each
+// JSON object (or the raw line when it is a plain string). A missing or
+// unreadable file yields nothing: these are best-effort input sources.
+func readHostLines(path, field string) []string {
 	var out []string
-	sc := bufio.NewScanner(bytes.NewReader(data))
-	sc.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
-	for sc.Scan() {
-		line := bytes.TrimSpace(sc.Bytes())
-		if len(line) == 0 {
-			continue
-		}
+	_ = output.ForEachJSONLLine(path, 0, func(line []byte) error {
+		line = bytes.TrimSpace(line)
 		if line[0] == '{' {
 			var rec map[string]json.RawMessage
 			if err := json.Unmarshal(line, &rec); err == nil {
@@ -287,14 +260,14 @@ func parseHostLines(data []byte, field string) []string {
 					var s string
 					if json.Unmarshal(v, &s) == nil && s != "" {
 						out = append(out, s)
-						continue
 					}
 				}
 			}
-			continue
+			return nil
 		}
-		out = append(out, strings.TrimSpace(string(line)))
-	}
+		out = append(out, string(line))
+		return nil
+	})
 	return out
 }
 
@@ -339,12 +312,7 @@ func readWorkspaceHostURLs(workDir string) (urls []string, droppedNoScheme int) 
 		{"hosts.jsonl", "url"},
 		{"urls.jsonl", "url"},
 	} {
-		path := filepath.Join(workDir, "artefacts", src.file)
-		data, err := os.ReadFile(path) //nolint:gosec // within WorkDir
-		if err != nil {
-			continue
-		}
-		for _, v := range parseHostLines(data, src.field) {
+		for _, v := range readHostLines(filepath.Join(workDir, "artefacts", src.file), src.field) {
 			add(v)
 		}
 	}

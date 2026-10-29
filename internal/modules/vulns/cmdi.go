@@ -9,11 +9,11 @@
 //
 //	commix --batch -m <tmpRceFile> --output-dir <commixOutDir>
 //
-// DEEP LIMIT GATE (T-06-03-03):
+// DEEP LIMIT GATE:
 // If URL count > cfg.Advanced.DeepLimit and !cfg.Advanced.Deep → StatusSkipped.
 // Mirrors v1 command_injection() DEEP_LIMIT check (vulns.sh:713).
 //
-// PAYLOAD REDACTION (XCUT-07, T-06-03-02):
+// PAYLOAD REDACTION (XCUT-07):
 // commix stdout contains shell command output from the target — NEVER logged at
 // Info/Warn. Only finding count is logged. PayloadRedacted and PoCRedacted are
 // always "***" in every VulnFindingRecord.
@@ -21,8 +21,6 @@
 // HEARTBEAT (XCUT-09):
 // Backend.Stream used for commix — can run >10 min per URL set against complex
 // targets; the UI must never appear stuck.
-//
-// Source: .planning/phases/06-vulnerability-scanning-e2e/06-03-PLAN.md Task 2.
 package vulns
 
 import (
@@ -66,7 +64,7 @@ func (t *CMDITask) DependsOn() []string { return []string{"vulns.gf"} }
 //  1. Read inputs/gf/rce.txt — skip if empty (no rce gf candidates).
 //  2. qsreplace FUZZ pipeline: pipe through qsreplace FUZZ; filter "FUZZ" lines;
 //     write to inputs/tmp_rce.txt.
-//  3. Deep-limit gate (T-06-03-03): skip if URL count > DeepLimit and !Deep.
+//  3. Deep-limit gate: skip if URL count > DeepLimit and !Deep.
 //  4. Run commix --batch -m <tmpRceFile> --output-dir via Backend.Stream (XCUT-09).
 //  5. Parse commix output for "[+]" injection confirmation lines.
 //  6. Write inputs/findings.cmdi.jsonl via output.WriteJSONL.
@@ -78,10 +76,8 @@ func (t *CMDITask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 	gfBucket := filepath.Join(app.Target.WorkDir, "inputs", "gf", "rce.txt")
 	bucketData, err := os.ReadFile(gfBucket) //nolint:gosec // path within WorkDir
 	if err != nil || len(bytes.TrimSpace(bucketData)) == 0 {
-		if app.Log != nil {
-			app.Log.Info("vulns.cmdi: gf/rce bucket empty — CMDi skipped",
-				"bucket", gfBucket)
-		}
+		app.Log.Info("vulns.cmdi: gf/rce bucket empty — CMDi skipped",
+			"bucket", gfBucket)
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
@@ -105,9 +101,7 @@ func (t *CMDITask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 		}
 	}
 	if len(fuzzLines) == 0 {
-		if app.Log != nil {
-			app.Log.Info("vulns.cmdi: no FUZZ candidates after qsreplace — CMDi skipped")
-		}
+		app.Log.Info("vulns.cmdi: no FUZZ candidates after qsreplace — CMDi skipped")
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
@@ -119,21 +113,19 @@ func (t *CMDITask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 			fmt.Errorf("vulns.cmdi: write tmp_rce.txt: %w", wErr)
 	}
 
-	// Step 3: Deep-limit gate (T-06-03-03 — DoS mitigation).
+	// Step 3: Deep-limit gate (DoS mitigation).
 	// v1: if [[ $DEEP == true ]] || [[ $URL_COUNT -le $DEEP_LIMIT ]]
 	deepLimit := cfg.Advanced.DeepLimit
 	if deepLimit <= 0 {
 		deepLimit = 500 // v1 default DEEP_LIMIT
 	}
 	if !cfg.Advanced.Deep && len(fuzzLines) > deepLimit {
-		if app.Log != nil {
-			app.Log.Info("vulns.cmdi: too many URLs — skipped (use --deep to override)",
-				"url_count", len(fuzzLines), "deep_limit", deepLimit)
-		}
+		app.Log.Info("vulns.cmdi: too many URLs — skipped (use --deep to override)",
+			"url_count", len(fuzzLines), "deep_limit", deepLimit)
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
-	// commix output directory — within workDir (T-06-03-04 path containment).
+	// commix output directory — within workDir.
 	commixOutDir := filepath.Join(app.Target.WorkDir, "inputs", "commix_output")
 	if err := os.MkdirAll(commixOutDir, 0o755); err != nil {
 		return task.Result{Status: task.StatusErrored},
@@ -155,19 +147,17 @@ func (t *CMDITask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 	eventCh, streamErr := app.Tools.Stream(ctx, toolName, args)
 	// commixRan records whether commix was actually DISPATCHED. A dispatch
 	// failure means the binary is absent, so the task observed nothing and must
-	// not clear a previous run's staging (F3 did-not-run — staging.go).
+	// not clear a previous run's staging (did-not-run rule — staging.go).
 	commixRan := streamErr == nil
 	if streamErr != nil {
 		// Non-fatal per best_effort policy — commix may not be installed.
-		if app.Log != nil {
-			app.Log.Debug("vulns.cmdi: commix stream error (best_effort)", "err", streamErr)
-		}
+		app.Log.Debug("vulns.cmdi: commix stream error (best_effort)", "err", streamErr)
 	} else {
 		// Step 5: Drain event channel; detect injection confirmation lines.
-		// XCUT-07 / T-06-03-02: commix stdout may contain shell output from target.
+		// XCUT-07: commix stdout may contain shell output from target.
 		// NEVER log raw lines at Info/Warn. Only count at Debug.
 		//
-		// F6 (phase 15) accumulator shape: latch the TERMINAL error inside the
+		// Terminal-error accumulator shape: latch the TERMINAL error inside the
 		// loop and act on it after. `streamErr` is already taken by the DISPATCH
 		// error above, whose log-and-continue body is untouched.
 		for ev := range eventCh {
@@ -187,12 +177,10 @@ func (t *CMDITask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 					strings.Contains(lower, "vulnerable")) {
 				confirmedCount++
 				// XCUT-07: raw line content NEVER logged; only count.
-				if app.Log != nil {
-					app.Log.Debug("vulns.cmdi: commix injection confirmed", "count", confirmedCount)
-				}
+				app.Log.Debug("vulns.cmdi: commix injection confirmed", "count", confirmedCount)
 			}
 		}
-		// F6: a commix that exited non-zero produced partial confirmations and
+		// Terminal error: a commix that exited non-zero produced partial confirmations and
 		// may have left a partial (or a PREVIOUS run's) output directory. Neither
 		// the stdout count nor the directory scan below can be trusted, so return
 		// before either is used — and before the staging write, which leaves the
@@ -237,17 +225,15 @@ func (t *CMDITask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 	// scan target instead of confirmedCount identical copies that would collapse
 	// in the merge regardless. The count stays in the log.
 	if len(findings) == 0 && confirmedCount > 0 {
-		if app.Log != nil {
-			app.Log.Debug("vulns.cmdi: commix confirmed on stdout with no per-target "+
-				"output dir — recording one finding against the scan target",
-				"indicators", confirmedCount)
-		}
+		app.Log.Debug("vulns.cmdi: commix confirmed on stdout with no per-target "+
+			"output dir — recording one finding against the scan target",
+			"indicators", confirmedCount)
 		findings = append(findings, newRec(app.Target.Domain))
 	}
 
 	// Step 6: Write inputs/findings.cmdi.jsonl.
 	//
-	// F3 (phase 15): staged through stageVulnFindings, which REMOVES the file
+	// Run isolation: staged through stageVulnFindings, which REMOVES the file
 	// when commix ran and confirmed nothing — otherwise an injection that has
 	// since been patched kept being republished by every later merge.
 	//
@@ -258,9 +244,7 @@ func (t *CMDITask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 	stageVulnFindings(app, "vulns.cmdi", stagingPath, commixRan, findings)
 
 	// XCUT-07: log only count, never raw RCE payloads or target shell output.
-	if app.Log != nil {
-		app.Log.Info("vulns.cmdi: completed", "cmdi_findings", len(findings))
-	}
+	app.Log.Info("vulns.cmdi: completed", "cmdi_findings", len(findings))
 
 	return task.Result{
 		Status: task.StatusDone,
@@ -306,7 +290,7 @@ func parseCommixOutputDir(dir string) []string {
 
 // cmdiReplaceParams replaces all query-parameter values with "FUZZ" in each
 // URL line of the input byte slice. Lines without query params are dropped.
-// Implements the qsreplace FUZZ step in pure Go (T-05-17 shell-injection mitigation).
+// Implements the qsreplace FUZZ step in pure Go (shell-injection mitigation).
 // Mirrors sqliReplaceParams — same logic, separate function for clarity.
 func cmdiReplaceParams(data []byte) []byte {
 	sc := bufio.NewScanner(bytes.NewReader(data))

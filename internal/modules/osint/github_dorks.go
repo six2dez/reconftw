@@ -3,21 +3,19 @@
 // GitHubDorksTask runs dorks_hunter seeded by the company name (the registrable
 // label of the root domain — the `unfurl format %r` analog, v1 osint.sh:23).
 //
-// KEY GATE (D-O8): GitHub OSINT sources are key-gated. The gate reads the
+// KEY GATE: GitHub OSINT sources are key-gated. The gate reads the
 // cfg.Paths.GitHubTokens token FILE (v1 $GITHUB_TOKENS is a path to a file of
 // tokens, one per line). When that path is empty or the file is empty/absent,
 // the Task logs an Info line naming the variable (NEVER the value) and returns
 // StatusSkipped — logged, never silent (mirrors web/nuclei.go:108-128).
 //
-// SECRET HANDLING (XCUT-07 / T-07-03-02): the token is read from disk and passed
+// SECRET HANDLING (XCUT-07): the token is read from disk and passed
 // to the subprocess via a 0600 temp token-file (never argv, never logged). The
 // raw token value is NEVER written to a log line.
 //
-// SEEDING (D-O1): root-domain / company-seeded, no DependsOn edges.
-// FAILURE POLICY (D-O8): best_effort — tool failure / empty output logs Debug
+// SEEDING: root-domain / company-seeded, no DependsOn edges.
+// FAILURE POLICY: best_effort — tool failure / empty output logs Debug
 // and returns StatusDone with findings:0.
-//
-// Source: .planning/phases/07-osint-e2e/07-03-PLAN.md Task 1.
 package osint
 
 import (
@@ -50,31 +48,27 @@ func (t *GitHubDorksTask) Enabled(cfg *config.Config) bool {
 	return cfg.OSINT.GoogleDorks.Enabled
 }
 
-// DependsOn returns nil — OSINT is root-domain-seeded (D-O1), no DAG edges.
+// DependsOn returns nil — OSINT is root-domain-seeded, no DAG edges.
 func (t *GitHubDorksTask) DependsOn() []string { return nil }
 
 // Run executes dorks_hunter against the company / root domain.
 //
 // Steps:
 //  1. Derive + validate the root domain.
-//  2. Key gate (D-O8): require a non-empty cfg.Paths.GitHubTokens file →
+//  2. Key gate: require a non-empty cfg.Paths.GitHubTokens file →
 //     logged StatusSkipped when absent.
-//  3. Run dorks_hunter (-d <domain> -o <out>) — conservative defaults (D-O8).
+//  3. Run dorks_hunter (-d <domain> -o <out>) — conservative defaults.
 //  4. Parse hits into informational records; write staging JSONL.
 func (t *GitHubDorksTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result, error) {
 	root := rootDomain(app)
 	if root == "" {
-		if app.Log != nil {
-			app.Log.Info("osint.github_dorks: no valid root domain — skipping")
-		}
+		app.Log.Info("osint.github_dorks: no valid root domain — skipping")
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
-	// Step 2: GITHUB_TOKEN key gate (D-O8, logged-never-silent).
+	// Step 2: GITHUB_TOKEN key gate (logged-never-silent).
 	if _, ok := readGitHubToken(app); !ok {
-		if app.Log != nil {
-			app.Log.Info("osint.github_dorks: no GITHUB_TOKEN (cfg.paths.github_tokens) — skipping")
-		}
+		app.Log.Info("osint.github_dorks: no GITHUB_TOKEN (cfg.paths.github_tokens) — skipping")
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
@@ -85,20 +79,19 @@ func (t *GitHubDorksTask) Run(ctx context.Context, app *appctx.AppContext) (task
 	}
 	osintDir := filepath.Join(app.Target.WorkDir, "osint")
 	if err := os.MkdirAll(osintDir, 0o755); err != nil {
-		if app.Log != nil {
-			app.Log.Debug("osint.github_dorks: mkdir osint/ failed (best_effort)", "err", err)
-		}
+		app.Log.Debug("osint.github_dorks: mkdir osint/ failed (best_effort)", "err", err)
 	}
 
 	// Step 3: dorks_hunter — v1 arg vector (osint.sh:23): -d <domain> -o <out>.
-	// Conservative defaults; no rate flags beyond the tool's built-in throttle (D-O8).
+	// Conservative defaults; no rate flags beyond the tool's built-in throttle.
 	dorksOut := filepath.Join(osintDir, "dorks.txt")
 	res, err := app.Tools.Run(ctx, "dorks_hunter", []string{"-d", root, "-o", dorksOut})
 	if err != nil {
-		if app.Log != nil {
-			app.Log.Debug("osint.github_dorks: dorks_hunter run failed (best_effort)", "err", err)
-		}
-		return task.Result{Status: task.StatusDone, Stats: map[string]int{"findings": 0}}, nil
+		// Absent-vs-failed (task.ClassifyToolErr): a tool that did not run is a
+		// Skipped result with a Reason, never a silent findings:0 success.
+		status, reason := task.ClassifyToolErr(err)
+		app.Log.Info("osint.github_dorks: dorks_hunter not run — skipping", "reason", reason)
+		return task.Result{Status: status, Reason: reason}, nil
 	}
 
 	// Step 4: parse hits. dorks_hunter writes osint/dorks.txt; also parse stdout
@@ -111,9 +104,7 @@ func (t *GitHubDorksTask) Run(ctx context.Context, app *appctx.AppContext) (task
 
 	writeOSINTStaging(app, inputsDir, "findings.github_dorks.jsonl", records)
 
-	if app.Log != nil {
-		app.Log.Info("osint.github_dorks: completed", "findings", len(records))
-	}
+	app.Log.Info("osint.github_dorks: completed", "findings", len(records))
 	return task.Result{
 		Status: task.StatusDone,
 		Stats:  map[string]int{"findings": len(records)},

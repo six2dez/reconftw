@@ -14,6 +14,7 @@ package config
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/go-playground/validator/v10"
@@ -73,7 +74,68 @@ func Validate(cfg *Config) error {
 			Message: fmt.Sprintf("validation failed: rule %q (param=%q)", fe.Tag(), fe.Param()),
 		}
 	}
+	return ValidateScopeFiles(cfg)
+}
+
+// ValidateScopeFiles checks that subdomains.scope.include_file and
+// subdomains.scope.exclude_file, when set, name readable regular files. Validate
+// calls it on every Load; handlers.ResolveRunPlan calls it again after the
+// --include-file/--exclude-file CLI flags are applied, because those land after
+// Load and would otherwise bypass the check. A missing scope list must fail
+// before a scan starts — silently scanning without the exclusions the operator
+// asked for is the one outcome this feature exists to prevent.
+//
+// The error names the key, never the path value (SECURITY rule above).
+func ValidateScopeFiles(cfg *Config) error {
+	if cfg == nil {
+		return nil
+	}
+	for _, sf := range []struct{ key, path string }{
+		{"subdomains.scope.include_file", cfg.Subdomains.Scope.IncludeFile},
+		{"subdomains.scope.exclude_file", cfg.Subdomains.Scope.ExcludeFile},
+	} {
+		if strings.TrimSpace(sf.path) == "" {
+			continue
+		}
+		if err := checkReadableFile(sf.path); err != nil {
+			return &coreerrors.ConfigError{
+				File: "(merged)", Line: 0, Key: sf.key,
+				Message: "scope list is not a readable file: " + err.Error(),
+			}
+		}
+	}
 	return nil
+}
+
+var errNotRegularFile = stdErrorsNew("not a regular file")
+
+// checkReadableFile reports why path is not a readable regular file. The
+// returned error carries only the OS reason, not the path (the caller's
+// ConfigError already names the key).
+func checkReadableFile(path string) error {
+	st, err := os.Stat(path)
+	if err != nil {
+		return stripPath(err)
+	}
+	if !st.Mode().IsRegular() {
+		return errNotRegularFile
+	}
+	f, err := os.Open(path) //nolint:gosec // operator-supplied scope list path
+	if err != nil {
+		return stripPath(err)
+	}
+	_ = f.Close()
+	return nil
+}
+
+// stripPath reduces an *os.PathError to its underlying errno so the path value
+// never reaches an error message.
+func stripPath(err error) error {
+	var pe *os.PathError
+	if stdAs(err, &pe) {
+		return pe.Err
+	}
+	return err
 }
 
 // errorsAs is a tiny stderrors.As wrapper kept inline to avoid importing

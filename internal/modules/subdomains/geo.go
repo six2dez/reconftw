@@ -9,14 +9,12 @@
 //
 // NOTE: In production, cfg.APIKeys.PDCP is a log.Secret type which auto-redacts
 // in structured log output (Layer 1 ADR §10). The Redactor.Register() call for
-// Layer 2 is performed at Boot time (Plan 06 main.go) per ADR §10.3 build order.
+// Layer 2 is performed at Boot time (main.go) per ADR §10.3 build order.
 // This Task does not need to call RegisterSecret again — it is already registered
 // by the time any Task.Run is invoked.
 //
 // SubGeoTask.Enabled uses cfg.Subdomains.Enabled (parent flag). There is NO
 // cfg.Subdomains.Geo struct — per doc.go W5 note.
-//
-// Source: .planning/phases/04-subdomains-e2e-axiom-integration/04-05-PLAN.md Task 2.
 package subdomains
 
 import (
@@ -111,10 +109,8 @@ func (SubGeoTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result,
 
 	res, err := app.Tools.Run(ctx, toolName, httpxArgs)
 	if err != nil {
-		if app.Log != nil {
-			app.Log.Debug("geo: httpx run failed or tool not registered",
-				"tool", toolName, "err", err.Error())
-		}
+		app.Log.Debug("geo: httpx run failed or tool not registered",
+			"tool", toolName, "err", err.Error())
 		return task.Result{
 			Status: task.StatusDone,
 			Stats:  map[string]int{"hosts_enriched": 0},
@@ -206,19 +202,17 @@ func (SubGeoTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result,
 	// runs strictly BEFORE httpx, and because Tree.Append REPLACES rather than
 	// appends, geo's ASN/country/city enrichment does not survive httpx in any
 	// run that probes. (That loss is a pre-existing defect, out of scope for the
-	// F3 work in phase 15 and recorded rather than silently fixed here.)
+	// write-or-remove work and recorded rather than silently fixed here.)
 	//
-	// Consequence for F3: httpx (web/httpx.go) is the authoritative "hosts"
+	// Consequence for the empty-publish rule: httpx (web/httpx.go) is the authoritative "hosts"
 	// writer and owns the empty publish. geo KEEPS this len(records) > 0 guard,
 	// because in a subs-only or passive run httpx never runs, and an empty
 	// publish from geo would erase a previous web run's hosts that no producer
 	// in this run ever looked at — strictly worse than leaving them.
 	if len(records) > 0 {
 		if err := app.Tree.Append("hosts", records); err != nil {
-			if app.Log != nil {
-				app.Log.Debug("geo: Tree.Append(hosts) failed",
-					"err", err.Error(), "records", len(records))
-			}
+			app.Log.Debug("geo: Tree.Append(hosts) failed",
+				"err", err.Error(), "records", len(records))
 			return task.Result{Status: task.StatusErrored},
 				fmt.Errorf("geo: Tree.Append(hosts): %w", err)
 		}
@@ -238,9 +232,7 @@ func lookupIPInfo(ctx context.Context, client *http.Client, baseURL, pdcpKey, ip
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		if app.Log != nil {
-			app.Log.Debug("geo: ipinfo request build failed", "ip", ip, "err", err.Error())
-		}
+		app.Log.Debug("geo: ipinfo request build failed", "ip", ip, "err", err.Error())
 		return geoResult{}
 	}
 
@@ -251,26 +243,20 @@ func lookupIPInfo(ctx context.Context, client *http.Client, baseURL, pdcpKey, ip
 
 	resp, err := client.Do(req)
 	if err != nil {
-		if app.Log != nil {
-			// Log at Debug ONLY — response may contain key traces (W2 fix).
-			app.Log.Debug("geo: ipinfo request failed", "ip", ip, "err", err.Error())
-		}
+		// Log at Debug ONLY — response may contain key traces (W2 fix).
+		app.Log.Debug("geo: ipinfo request failed", "ip", ip, "err", err.Error())
 		return geoResult{}
 	}
 	defer resp.Body.Close() //nolint:errcheck // read/cleanup path
 
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 4096))
 	if err != nil {
-		if app.Log != nil {
-			app.Log.Debug("geo: ipinfo response read failed", "ip", ip, "err", err.Error())
-		}
+		app.Log.Debug("geo: ipinfo response read failed", "ip", ip, "err", err.Error())
 		return geoResult{}
 	}
 
 	// Log response body at Debug ONLY (W2 fix — never Info/Warn/Error).
-	if app.Log != nil {
-		app.Log.Debug("geo: ipinfo response", "ip", ip, "status", resp.StatusCode)
-	}
+	app.Log.Debug("geo: ipinfo response", "ip", ip, "status", resp.StatusCode)
 
 	var data struct {
 		Org     string `json:"org"`     // e.g. "AS15133 Edgecast Inc."
@@ -278,9 +264,7 @@ func lookupIPInfo(ctx context.Context, client *http.Client, baseURL, pdcpKey, ip
 		City    string `json:"city"`    // e.g. "Norwell"
 	}
 	if err := json.Unmarshal(body, &data); err != nil {
-		if app.Log != nil {
-			app.Log.Debug("geo: ipinfo parse failed", "ip", ip, "err", err.Error())
-		}
+		app.Log.Debug("geo: ipinfo parse failed", "ip", ip, "err", err.Error())
 		return geoResult{}
 	}
 

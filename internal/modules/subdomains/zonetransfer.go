@@ -4,10 +4,8 @@
 // cfg.Subdomains.ZoneTransfer.Enabled is checked TWICE:
 //  1. In Enabled() — used by filterByModuleAndEnabled in the command layer.
 //  2. In Run() — defense in depth because Scheduler does NOT call Enabled()
-//     before Run (REVIEWS finding #4). Run() returns StatusSkipped immediately
+//     before Run. Run() returns StatusSkipped immediately
 //     if Enabled is false, preventing accidental AXFR without user consent.
-//
-// Source: .planning/phases/04-subdomains-e2e-axiom-integration/04-05-PLAN.md Task 2.
 package subdomains
 
 import (
@@ -30,7 +28,7 @@ import (
 // inputs/resolved.zonetransfer.txt for consumption by the final MergeStage.
 //
 // The task is explicitly opt-in: cfg.Subdomains.ZoneTransfer.Enabled must
-// be true. This is checked in BOTH Enabled() and Run() (REVIEWS finding #4).
+// be true. This is checked in BOTH Enabled() and Run().
 type ZoneTransferTask struct{}
 
 // Name returns the task identifier.
@@ -58,14 +56,12 @@ func (ZoneTransferTask) DependsOn() []string { return nil }
 //
 // GATE: Re-checks cfg.Subdomains.ZoneTransfer.Enabled in Run() body.
 // Returns StatusSkipped if false (defense in depth — Scheduler does not
-// call Enabled() per REVIEWS finding #4).
+// call Enabled()).
 func (ZoneTransferTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result, error) {
-	// In-Run gate (REVIEWS finding #4 fix): re-check even if Enabled() was called.
+	// In-Run gate: re-check even if Enabled() was called.
 	if !app.Cfg.Subdomains.ZoneTransfer.Enabled {
-		if app.Log != nil {
-			app.Log.Info("zone_transfer_skipped_not_enabled",
-				"domain", app.Target.Domain)
-		}
+		app.Log.Info("zone_transfer_skipped_not_enabled",
+			"domain", app.Target.Domain)
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
@@ -74,15 +70,13 @@ func (ZoneTransferTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 	// Look up NS records for the target domain.
 	nsRecords, err := lookupNS(ctx, domain)
 	if err != nil || len(nsRecords) == 0 {
-		if app.Log != nil {
-			app.Log.Debug("zonetransfer: no NS records found or lookup failed",
-				"domain", domain, "err", func() string {
-					if err != nil {
-						return err.Error()
-					}
-					return "no records"
-				}())
-		}
+		app.Log.Debug("zonetransfer: no NS records found or lookup failed",
+			"domain", domain, "err", func() string {
+				if err != nil {
+					return err.Error()
+				}
+				return "no records"
+			}())
 		// Write empty staging file and return done.
 		stagingPath, wErr := writeZoneTransferStagingFile(app, nil)
 		if wErr != nil {
@@ -118,16 +112,14 @@ func (ZoneTransferTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 
 	stagingPath, wErr := writeZoneTransferStagingFile(app, allSubdomains)
 	if wErr != nil {
-		if app.Log != nil {
-			app.Log.Debug("zonetransfer: write staging file failed", "err", wErr.Error())
-		}
+		app.Log.Debug("zonetransfer: write staging file failed", "err", wErr.Error())
 		return task.Result{
 			Status: task.StatusDone,
 			Stats:  map[string]int{"subdomains_found": len(allSubdomains)},
 		}, nil
 	}
 
-	if app.Log != nil && len(allSubdomains) > 0 {
+	if len(allSubdomains) > 0 {
 		app.Log.Debug("zonetransfer: AXFR succeeded",
 			"domain", domain, "subdomains_found", len(allSubdomains))
 	}
@@ -170,10 +162,8 @@ func attemptAXFR(ctx context.Context, app *appctx.AppContext, domain, nsServer s
 
 	res, err := app.Tools.Run(ctx, "dnsx", args)
 	if err != nil {
-		if app.Log != nil {
-			app.Log.Debug("zonetransfer: dnsx AXFR failed",
-				"ns", nsServer, "domain", domain, "err", err.Error())
-		}
+		app.Log.Debug("zonetransfer: dnsx AXFR failed",
+			"ns", nsServer, "domain", domain, "err", err.Error())
 		return nil
 	}
 
@@ -198,7 +188,7 @@ func attemptAXFR(ctx context.Context, app *appctx.AppContext, domain, nsServer s
 // REMOVES that file when subdomains is empty. Returns the staging path in both
 // cases.
 //
-// F3 (phase 15): write-or-REMOVE via output.StageLines. Calling it asserts "the
+// Write-or-REMOVE via output.StageLines. Calling it asserts "the
 // AXFR attempt RAN and yielded exactly these hostnames", so a run where the zone
 // transfer is now refused clears the previous run's file instead of leaving it
 // for MergeAllSubdomains (which globs inputs/resolved.*.txt) to republish.

@@ -1,7 +1,4 @@
-// passive_test.go — GAP-2 soft-fail tests for the passive RunStage.
-//
-// Source: .planning/phases/04-subdomains-e2e-axiom-integration/04-09-PLAN.md
-// Task 2: TestPassiveSoftFail + TestPassiveSoftFailScopeErrorPropagates.
+// passive_test.go — soft-fail tests for the passive RunStage.
 //
 // These tests verify that:
 //  1. A single flaky passive source error does NOT abort the stage (PolicyBestEffort).
@@ -45,8 +42,6 @@ func (f fakeTask) Run(ctx context.Context, _ *appctx.AppContext) (task.Result, e
 
 // TestPassiveSoftFail: one erroring passive task (ToolError/network flakiness)
 // must NOT abort the stage — RunStage("subdomains.passive", ...) returns nil.
-//
-// Source: GAP-2 plan 04-09 Task 2.
 func TestPassiveSoftFail(t *testing.T) {
 	ctx := context.Background()
 
@@ -83,8 +78,6 @@ func TestPassiveSoftFail(t *testing.T) {
 
 // TestPassiveSoftFailScopeErrorPropagates: a ScopeError returned by a passive task
 // MUST be re-propagated even in best_effort mode — scope violations are never swallowed.
-//
-// Source: GAP-2 plan 04-09 Task 2 + T-04-09-01 threat mitigation.
 func TestPassiveSoftFailScopeErrorPropagates(t *testing.T) {
 	ctx := context.Background()
 
@@ -127,7 +120,7 @@ func TestPassiveSoftFailScopeErrorPropagates(t *testing.T) {
 // TestPassiveSoftFailOutOfScopePropagates: an OutOfScope returned by a passive task
 // must also be re-propagated (OutOfScope shares the ErrScope sentinel with ScopeError).
 //
-// Source: GAP-2 plan 04-09 Task 2 + errors.go comments (both structs use ErrScope).
+// Both error structs use ErrScope (see errors.go).
 func TestPassiveSoftFailOutOfScopePropagates(t *testing.T) {
 	ctx := context.Background()
 
@@ -161,7 +154,7 @@ func TestPassiveSoftFailOutOfScopePropagates(t *testing.T) {
 }
 
 // TestPassiveSpineStaysFailFast: resolve/brute stages with module="subdomains"
-// must still use fail_fast — the spine is not softened by GAP-2.
+// must still use fail_fast — the spine is not softened by soft-fail.
 func TestPassiveSpineStaysFailFast(t *testing.T) {
 	ctx := context.Background()
 

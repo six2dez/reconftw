@@ -22,12 +22,12 @@
 //	python3 <sstimap_dir>/sstimap.py --level <l> --no-color [--legacy]
 //	        [--generic] [--delay <d>] [-H <header>] --load-urls <tmpfile>
 //
-// PAYLOAD REDACTION (XCUT-07, T-06-04-02):
+// PAYLOAD REDACTION (XCUT-07):
 // SSTI confirmation output may contain template evaluation results (e.g., "49"
 // from {{7*7}}). MUST NEVER be logged. Only "confirmed/not" count at Info.
 // PayloadRedacted and PoCRedacted are always "***" in every VulnFindingRecord.
 //
-// RATE LIMITING / DELAY (D-V6 / T-06-04-03 DoS mitigation):
+// RATE LIMITING / DELAY (DoS mitigation):
 // TInjA: cfg.Advanced.Tools.TInjA.RateLimit (default 0 = unlimited; omit -r),
 //
 //	cfg.Advanced.Tools.TInjA.Timeout (default 15s).
@@ -37,8 +37,6 @@
 //	cfg.Advanced.Tools.SSTImap.Delay (default 0 = no delay; omit when 0),
 //	cfg.Advanced.Tools.SSTImap.Legacy,
 //	cfg.Advanced.Tools.SSTImap.Generic.
-//
-// Source: .planning/phases/06-vulnerability-scanning-e2e/06-04-PLAN.md Task 2.
 package vulns
 
 import (
@@ -96,9 +94,7 @@ func (t *SSTITask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 	gfBucket := filepath.Join(app.Target.WorkDir, "inputs", "gf", "ssti.txt")
 	bucketData, err := os.ReadFile(gfBucket) //nolint:gosec // path within WorkDir
 	if err != nil || len(bytes.TrimSpace(bucketData)) == 0 {
-		if app.Log != nil {
-			app.Log.Info("vulns.ssti: gf/ssti bucket empty — SSTI skipped", "bucket", gfBucket)
-		}
+		app.Log.Info("vulns.ssti: gf/ssti bucket empty — SSTI skipped", "bucket", gfBucket)
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
@@ -112,9 +108,7 @@ func (t *SSTITask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 	// Mirrors v1: qsreplace "FUZZ" <gf/ssti.txt | sed '/FUZZ/!d' | anew -q .tmp/tmp_ssti.txt
 	fuzzLines := sstiReplaceParams(bucketData)
 	if len(fuzzLines) == 0 {
-		if app.Log != nil {
-			app.Log.Info("vulns.ssti: no FUZZ candidates after qsreplace — SSTI skipped")
-		}
+		app.Log.Info("vulns.ssti: no FUZZ candidates after qsreplace — SSTI skipped")
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
@@ -132,17 +126,15 @@ func (t *SSTITask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 		deepLimit = 500 // v1 DEEP_LIMIT default
 	}
 	if !cfg.Advanced.Deep && len(fuzzLines) > deepLimit {
-		if app.Log != nil {
-			app.Log.Info("vulns.ssti: too many URLs — skipped (use --deep to override)",
-				"url_count", len(fuzzLines), "deep_limit", deepLimit)
-		}
+		app.Log.Info("vulns.ssti: too many URLs — skipped (use --deep to override)",
+			"url_count", len(fuzzLines), "deep_limit", deepLimit)
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
 	// Step 4: Resolve engine and dispatch.
 	engine := cfg.Vulns.SSTI.Engine
 	if engine == "" {
-		engine = "TInjA" // default (D-V6 / 06-CONTEXT.md §SSTI engine selection)
+		engine = "TInjA" // default engine
 	}
 
 	var findings []VulnFindingRecord
@@ -157,7 +149,7 @@ func (t *SSTITask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 		findings, scanErr = runTInjA(ctx, app, fuzzLines, cfg)
 	}
 
-	// F6 (phase 15): a TERMINAL engine failure (the scanner ran and exited badly)
+	// Terminal error: a TERMINAL engine failure (the scanner ran and exited badly)
 	// escalates and discards whatever it had gathered; a DISPATCH failure (the
 	// engine is not installed) keeps its existing best-effort log-and-continue.
 	// Returning here also leaves the staging file untouched — a crashed scanner
@@ -165,13 +157,13 @@ func (t *SSTITask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 	if isTerminalStreamError(scanErr) {
 		return task.Result{Status: task.StatusErrored}, scanErr
 	}
-	if scanErr != nil && app.Log != nil {
+	if scanErr != nil {
 		app.Log.Debug("vulns.ssti: engine error (best_effort)", "engine", engine, "err", scanErr)
 	}
 
 	// Step 6: Write inputs/findings.ssti.jsonl.
 	//
-	// F3 (phase 15): staged through stageVulnFindings so a run in which the
+	// Run isolation: staged through stageVulnFindings so a run in which the
 	// engine confirmed no template injection REMOVES the previous run's staging
 	// instead of republishing an SSTI that has since been fixed.
 	//
@@ -182,11 +174,9 @@ func (t *SSTITask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 	stagingPath := filepath.Join(inputsDir, "findings.ssti.jsonl")
 	stageVulnFindings(app, "vulns.ssti", stagingPath, scanErr == nil, findings)
 
-	// XCUT-07 (T-06-04-02): log only count; NEVER log template evaluation results
+	// XCUT-07: log only count; NEVER log template evaluation results
 	// (e.g., "49" from {{7*7}}).
-	if app.Log != nil {
-		app.Log.Info("vulns.ssti: completed", "engine", engine, "findings", len(findings))
-	}
+	app.Log.Info("vulns.ssti: completed", "engine", engine, "findings", len(findings))
 
 	return task.Result{
 		Status: task.StatusDone,
@@ -205,7 +195,7 @@ func (t *SSTITask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 // We parse it for isWebpageVulnerable==true or any parameter where
 // isParameterVulnerable==true (v1 jq filter vulns.sh:477-479).
 //
-// XCUT-07 (T-06-04-02): TInjA output may contain template eval results.
+// XCUT-07: TInjA output may contain template eval results.
 // NEVER log at Info/Warn. Only confirmed count at Debug.
 func runTInjA(ctx context.Context, app *appctx.AppContext,
 	fuzzLines []string, cfg *config.Config,
@@ -253,13 +243,13 @@ func runTInjA(ctx context.Context, app *appctx.AppContext,
 		return nil, fmt.Errorf("vulns.ssti: TInjA stream error: %w", streamErr)
 	}
 
-	// F6 (phase 15) — T-15-14-01. This is the highest-value site in the vulns
+	// This is the highest-value site in the vulns
 	// sweep: the very next statement reads the TInjA report DIRECTORY, and those
 	// reports are not cleared between runs. A TInjA killed mid-scan therefore
 	// used to have LAST run's reports parsed and published as this run's verdict,
 	// with nothing anywhere recording that the scan had died. Return before the
 	// read.
-	// XCUT-07 (T-06-04-02): NEVER log raw TInjA stdout (template eval results).
+	// XCUT-07: NEVER log raw TInjA stdout (template eval results).
 	if drainErr := backend.Drain(eventCh); drainErr != nil {
 		return nil, terminalStreamError(toolName, drainErr)
 	}
@@ -285,7 +275,7 @@ type tinjAParameter struct {
 // parseTInjAReports reads all JSONL files in reportDir, parses for vulnerability
 // confirmation, and returns VulnFindingRecord slice.
 //
-// XCUT-07 (T-06-04-02): certainty string and URL may appear in TInjA output;
+// XCUT-07: certainty string and URL may appear in TInjA output;
 // we only log the hostname (not the full URL or certainty expression).
 func parseTInjAReports(reportDir string, app *appctx.AppContext) ([]VulnFindingRecord, error) {
 	entries, err := os.ReadDir(reportDir)
@@ -330,16 +320,14 @@ func parseTInjAReports(reportDir string, app *appctx.AppContext) ([]VulnFindingR
 
 			// XCUT-07: extract host only — never write raw URL or template result.
 			host := sstiExtractHost(rep.URL)
-			if app.Log != nil {
-				// XCUT-07: only log the hostname, not the certainty string or URL.
-				app.Log.Debug("vulns.ssti: TInjA SSTI confirmed", "host", host)
-			}
+			// XCUT-07: only log the hostname, not the certainty string or URL.
+			app.Log.Debug("vulns.ssti: TInjA SSTI confirmed", "host", host)
 			records = append(records, VulnFindingRecord{
 				Host: host, // scope-gate locator (findings:host|url)
-				// Phase 4/5 inherited SARIF-compatible fields.
+				// Inherited SARIF-compatible fields.
 				Severity:   "critical",
 				Confidence: "high",
-				// Phase 6 vuln-class fields.
+				// Vuln-class fields.
 				VulnClass:       "ssti",
 				MatchedParam:    host,  // hostname only — no raw payload (XCUT-07)
 				PayloadRedacted: "***", // XCUT-07: raw SSTI payload never written
@@ -360,16 +348,16 @@ func parseTInjAReports(reportDir string, app *appctx.AppContext) ([]VulnFindingR
 //	        [--generic] [--delay <d>] [-H <header>] --load-urls <tmpfile>
 //
 // SSTImap path is sourced from cfg.Paths.DataDir+"/../tools/SSTImap" as the
-// canonical v2 tool installation path (T-06-04-04 — sstiMapPath sourced from
+// canonical v2 tool installation path (sstiMapPath sourced from
 // trusted config, not user input). Falls back to "sstimap.py" on PATH if
 // configured path is absent (best_effort).
 //
-// XCUT-07 (T-06-04-02): SSTImap stdout may contain template evaluation probes
+// XCUT-07: SSTImap stdout may contain template evaluation probes
 // and results. NEVER log raw output at Info/Warn. Only count at Info.
 func runSSTImap(ctx context.Context, app *appctx.AppContext,
 	tmpSSTIFile string, cfg *config.Config,
 ) ([]VulnFindingRecord, error) {
-	// Locate SSTImap installation (T-06-04-04 — trusted config path, not user input).
+	// Locate SSTImap installation (trusted config path, not user input).
 	sstiMapScript, sstiMapPython, found := resolveSSTImapPath(cfg)
 
 	level := cfg.Advanced.Tools.SSTImap.Level
@@ -399,9 +387,7 @@ func runSSTImap(ctx context.Context, app *appctx.AppContext,
 			"--level", strconv.Itoa(level),
 			"--no-color",
 		}
-		if app.Log != nil {
-			app.Log.Debug("vulns.ssti: SSTImap canonical path not found — trying PATH fallback")
-		}
+		app.Log.Debug("vulns.ssti: SSTImap canonical path not found — trying PATH fallback")
 	}
 
 	if legacy {
@@ -425,10 +411,10 @@ func runSSTImap(ctx context.Context, app *appctx.AppContext,
 	}
 
 	// Drain stream; parse for confirmation indicators.
-	// XCUT-07 (T-06-04-02): SSTImap output may contain template eval results (e.g.,
+	// XCUT-07: SSTImap output may contain template eval results (e.g.,
 	// "49" from {{7*7}}). NEVER log raw lines at Info/Warn.
 	//
-	// F6 (phase 15) accumulator shape: latch the TERMINAL error inside the loop
+	// Terminal-error accumulator shape: latch the TERMINAL error inside the loop
 	// and check it after.
 	var confirmedURLs []string
 	var termErr error
@@ -440,10 +426,8 @@ func runSSTImap(ctx context.Context, app *appctx.AppContext,
 		// SSTImap prints "confirmed" or "identified" on SSTI confirmation.
 		// Extract only the URL from the line for XCUT-07-safe storage.
 		if strings.Contains(line, "confirmed") || strings.Contains(line, "identified") {
-			if app.Log != nil {
-				// XCUT-07: never log the raw confirmation line (may contain eval result).
-				app.Log.Debug("vulns.ssti: SSTImap confirmation indicator detected")
-			}
+			// XCUT-07: never log the raw confirmation line (may contain eval result).
+			app.Log.Debug("vulns.ssti: SSTImap confirmation indicator detected")
 			// Extract URL from the line (SSTImap prints "URL: http://..." on confirm).
 			// We parse the raw (not lowercased) event line for URL extraction.
 			rawLine := strings.TrimSpace(string(ev.Line))
@@ -460,7 +444,7 @@ func runSSTImap(ctx context.Context, app *appctx.AppContext,
 		}
 	}
 
-	// F6: SSTImap ended badly, so the confirmations gathered so far are a partial
+	// Terminal error: SSTImap ended badly, so the confirmations gathered so far are a partial
 	// scan. Discard them rather than publish them as this run's verdict.
 	if termErr != nil {
 		return nil, terminalStreamError(toolName, termErr)
@@ -475,10 +459,10 @@ func runSSTImap(ctx context.Context, app *appctx.AppContext,
 		host := sstiExtractHost(rawURL)
 		records = append(records, VulnFindingRecord{
 			Host: host, // scope-gate locator (findings:host|url)
-			// Phase 4/5 inherited SARIF-compatible fields.
+			// Inherited SARIF-compatible fields.
 			Severity:   "critical",
 			Confidence: "high",
-			// Phase 6 vuln-class fields.
+			// Vuln-class fields.
 			VulnClass:       "ssti",
 			MatchedParam:    host,  // hostname only — no raw payload (XCUT-07)
 			PayloadRedacted: "***", // XCUT-07: raw SSTI payload never written
@@ -491,7 +475,7 @@ func runSSTImap(ctx context.Context, app *appctx.AppContext,
 
 // resolveSSTImapPath locates the SSTImap script and venv python3.
 //
-// Canonical installation path (T-06-04-04 — sourced from trusted config):
+// Canonical installation path (sourced from trusted config):
 //   - cfg.Paths.DataDir/../tools/SSTImap/sstimap.py (script)
 //   - cfg.Paths.DataDir/../tools/SSTImap/venv/bin/python3 (venv python)
 //
@@ -606,7 +590,7 @@ func extractSSTImapURL(line string) string {
 // so this function returned "" and the record was written with an EMPTY
 // locator. output.FilterInScope DROPS a findings record with neither host nor
 // url, so a CONFIRMED CRITICAL SSTI was still being discarded at the scope
-// boundary and the fallback never actually worked. Found by the plan-15-14
+// boundary and the fallback never actually worked. Found by the staging-lifecycle
 // regression test that was written to prove the fallback was undisturbed;
 // it proved instead that it had never functioned.
 //

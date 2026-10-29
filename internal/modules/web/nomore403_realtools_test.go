@@ -7,7 +7,7 @@
 //
 //	go test -tags realtools -count=1 -run TestNomore403RealCloneDispatches ./internal/modules/web/
 //
-// SAFETY (T-18-05-04). 17-04's arg-vector census started a real nomore403 out of
+// SAFETY. the arg-vector census started a real nomore403 out of
 // $HOME/Tools and logged `signal: killed`. So this test:
 //
 //   - targets an httptest server on LOOPBACK ONLY. No third party is contacted,
@@ -92,6 +92,7 @@ func TestNomore403RealCloneDispatches(t *testing.T) {
 	cfg := config.Defaults()
 	cfg.Vulns.Bypass4xx.Enabled = true
 	app := &appctx.AppContext{
+		Log:    appctx.NopLogger(),
 		Tools:  backend.NewRunner(&backend.LocalBackend{}, reg, nil),
 		Cfg:    cfg,
 		Target: &appctx.Target{Domain: "127.0.0.1", WorkDir: workDir},

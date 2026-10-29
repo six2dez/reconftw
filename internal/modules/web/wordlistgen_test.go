@@ -1,4 +1,4 @@
-// wordlistgen_test.go — behavior tests for WebWordlistGenTask (13-04 Task 3).
+// wordlistgen_test.go — behavior tests for WebWordlistGenTask .
 //
 // Internal (package web) to override the unexported roboxtractor / getjswords
 // runner seams and reach the shared corpus writers (writeWellknownTargets,
@@ -25,6 +25,7 @@ func newWordlistgenApp(t *testing.T, isIP bool) *appctx.AppContext {
 	cfg.Web.Wordlist = config.WebWordlist{Enabled: true, RobotsEnabled: true}
 	cfg.Web.JS.GetJSWordsPython = "python3"
 	return &appctx.AppContext{
+		Log:    appctx.NopLogger(),
 		Cfg:    cfg,
 		Target: &appctx.Target{Domain: "example.com", WorkDir: t.TempDir(), IsIP: isIP},
 	}
@@ -138,7 +139,7 @@ func TestWebWordlistGenGetJSWords(t *testing.T) {
 
 // TestWebWordlistGenIndependentDegrade proves that a failure in one generator
 // never prevents the other from producing its artefact — and never errors the
-// task (T-13-04-02).
+// task.
 func TestWebWordlistGenIndependentDegrade(t *testing.T) {
 	t.Run("roboxtractor_fails_getjswords_runs", func(t *testing.T) {
 		app := newWordlistgenApp(t, false)

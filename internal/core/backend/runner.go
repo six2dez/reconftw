@@ -24,6 +24,19 @@ import (
 	coreerrors "github.com/six2dez/reconftw/internal/core/errors"
 )
 
+// ErrToolNotRegistered is the Inner of the *ToolError Run/Stream return when
+// toolName has no registry entry. It travels INSIDE a ToolError with
+// NeverStarted set, so all three checks hold at once:
+//
+//	errors.Is(err, backend.ErrToolNotRegistered)  — this exact cause
+//	coreerrors.IsDispatchFailure(err)             — "the process never started"
+//	errors.Is(err, coreerrors.ErrTool)            — still a tool failure
+//
+// The absent-vs-failed policy (task.ClassifyToolErr) keys on the second; this
+// sentinel exists so a caller or test can name the first without matching the
+// message text.
+var ErrToolNotRegistered = stderrors.New("tool not registered")
+
 // Runner orchestrates backend dispatch through registry + rate limiter.
 type Runner struct {
 	Backend  Backend
@@ -122,7 +135,7 @@ func (r *Runner) RunOpts(ctx context.Context, toolName string, args []string, op
 		return nil, &coreerrors.ToolError{
 			Tool:     toolName,
 			ExitCode: -1,
-			Inner:    stderrors.New("tool not registered"),
+			Inner:    ErrToolNotRegistered,
 			// NO PROCESS WAS CREATED. recordDispatchFailure above writes
 			// OutcomeDispatchFailed, and ToolError.Is only matches ErrDispatch when
 			// NeverStarted is set — without this flag the record said dispatch_failed
@@ -177,7 +190,7 @@ func (r *Runner) StreamOpts(ctx context.Context, toolName string, args []string,
 		return nil, &coreerrors.ToolError{
 			Tool:     toolName,
 			ExitCode: -1,
-			Inner:    stderrors.New("tool not registered"),
+			Inner:    ErrToolNotRegistered,
 			// NO PROCESS WAS CREATED. recordDispatchFailure above writes
 			// OutcomeDispatchFailed, and ToolError.Is only matches ErrDispatch when
 			// NeverStarted is set — without this flag the record said dispatch_failed

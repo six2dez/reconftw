@@ -1,7 +1,7 @@
 // apileaks_test.go — XCUT-07 three-layer redaction assertions for the
 // secret-emitting API/SaaS-leak Tasks (OSINT-08 postman, OSINT-09 swagger).
 //
-// CRITICAL (T-07-04-01): porch-pirate/postleaksNg/SwaggerSpy/sj surface LIVE API
+// CRITICAL: porch-pirate/postleaksNg/SwaggerSpy/sj surface LIVE API
 // tokens. These tests prove the raw secret VALUE is NEVER propagated to a record
 // (L3, ValueRedacted="***") and IS registered with the slog Redactor (L2) so it
 // is scrubbed from logs. Synthetic FAKE secrets verify redaction without
@@ -120,7 +120,7 @@ func TestParseSwaggerOutput_RedactsAndRegisters(t *testing.T) {
 }
 
 func TestReadWorkspaceHosts_OpportunisticAndAbsent(t *testing.T) {
-	// Absent: no artefacts dir → nil (the D-O2 log-skip path).
+	// Absent: no artefacts dir → nil (the log-skip path).
 	if hosts := readWorkspaceHosts(t.TempDir()); hosts != nil {
 		t.Fatalf("expected nil hosts when artefacts absent, got %v", hosts)
 	}

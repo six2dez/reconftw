@@ -1,4 +1,4 @@
-// staging.go — the vulns package's half of the F3 run-isolation contract.
+// staging.go — the vulns package's half of the run-isolation contract.
 //
 // Every vuln scanner used to write its staging file only when it had data:
 //
@@ -7,7 +7,7 @@
 // so a run that observed NOTHING left the previous run's staging file on disk
 // and MergeVulnsFindings republished it. A REMEDIATED VULNERABILITY reappeared
 // in the report, SARIF, store and notifications of every later run as though
-// this run had confirmed it — the finding-level expression of audit finding F3.
+// this run had confirmed it — the finding-level expression of the run-isolation audit finding.
 //
 // stageVulnFindings replaces that shape. It is deliberately the ONLY staging
 // entry point in this package so the write-or-remove decision lives in one
@@ -26,7 +26,7 @@
 // The `ran == false` half is not defensive padding: without it this migration
 // would CONVERT a staleness bug into a data-loss bug on any host that has not
 // installed an optional scanner — the same call made for web/jsluice.go in
-// plan 15-13.
+// the silent-success sweep.
 //
 // WHAT DOES NOT BELONG HERE. Three other kinds of file live under inputs/ and
 // must keep their raw unconditional writes (see internal/core/output/staging.go
@@ -43,8 +43,6 @@
 //   - Raw tool output that this package parses (inputs/nuclei_dast_raw.jsonl,
 //     inputs/fuzzparams_raw.jsonl, …). Those are scanner-native schemas, not
 //     staging records.
-//
-// Source: .planning/phases/15-release-gates-run-isolation-store-integrity/15-14-PLAN.md
 package vulns
 
 import (
@@ -54,7 +52,7 @@ import (
 	"github.com/six2dez/reconftw/internal/core/output"
 )
 
-// stageVulnFindings publishes findings to stagingPath under the F3
+// stageVulnFindings publishes findings to stagingPath under the run-isolation
 // write-or-remove contract, or preserves the file when the scanner never ran.
 //
 // taskName is the dot-namespaced task identifier ("vulns.sqli") and is used
@@ -70,8 +68,8 @@ func stageVulnFindings(app *appctx.AppContext, taskName, stagingPath string,
 	if !ran {
 		// The scanner did not observe the corpus, so it has no standing to
 		// delete what a previous run observed. Preserve, and say so.
-		if app != nil && app.Log != nil {
-			app.Log.Debug(taskName+": scanner did not run — staging preserved (F3 did-not-run)",
+		if app != nil {
+			app.Log.Debug(taskName+": scanner did not run — staging preserved (did-not-run rule)",
 				"path", stagingPath)
 		}
 		return
@@ -84,7 +82,7 @@ func stageVulnFindings(app *appctx.AppContext, taskName, stagingPath string,
 		}
 		lines = append(lines, b)
 	}
-	if wErr := output.StageJSONL(stagingPath, lines); wErr != nil && app != nil && app.Log != nil {
+	if wErr := output.StageJSONL(stagingPath, lines); wErr != nil && app != nil {
 		app.Log.Debug(taskName+": staging write failed", "path", stagingPath, "err", wErr)
 	}
 }

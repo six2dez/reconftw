@@ -1,11 +1,9 @@
-// csprecon_test.go — TDD tests for SubCspreconTask (PAR-01, 13-02 Task 1).
+// csprecon_test.go — TDD tests for SubCspreconTask (PAR-01).
 //
 // Verifies the subdomains-stage csprecon discovery task: metadata + gate, the
 // plain-line in-scope staging write (inputs/resolved.csprecon.txt), the anchored
 // off-scope filter (extract/csp.Extract), and the aux best-effort degrade
 // (csprecon tool error → StatusDone, never StatusErrored).
-//
-// Source: .planning/phases/13-domain-parity/13-02-PLAN.md Task 1.
 package subdomains_test
 
 import (
@@ -113,7 +111,7 @@ func TestCspreconTaskStagesInScopeHosts(t *testing.T) {
 			t.Errorf("resolved.csprecon.txt missing in-scope %q; got:\n%s", want, content)
 		}
 	}
-	// Off-scope hosts filtered out (T-13-02-01).
+	// Off-scope hosts filtered out.
 	for _, bad := range []string{"evil.com", "attacker.net"} {
 		if strings.Contains(content, bad) {
 			t.Errorf("resolved.csprecon.txt contains off-scope %q — csp.Extract filter bypassed", bad)
@@ -155,7 +153,7 @@ func TestCspreconTaskDegradesOnToolError(t *testing.T) {
 		t.Errorf("status = %q, want done (aux best-effort degrade)", res.Status)
 	}
 
-	// F3 (phase 15): the degrade path contributes NO hostnames, and
+	// Write-or-remove: the degrade path contributes NO hostnames, and
 	// writeResolvedStagingFile is now write-or-REMOVE, so the staging file must
 	// be ABSENT rather than present-and-empty. MergeAllSubdomains globs
 	// inputs/resolved.*.txt, so absent and empty are identical for the merge —
@@ -164,7 +162,7 @@ func TestCspreconTaskDegradesOnToolError(t *testing.T) {
 	staged := filepath.Join(workDir, "inputs", "resolved.csprecon.txt")
 	if _, err := os.Stat(staged); !os.IsNotExist(err) {
 		body, _ := os.ReadFile(staged) //nolint:gosec // test-controlled temp path
-		t.Errorf("degrade must leave no staging file at %s (write-or-remove, F3); "+
+		t.Errorf("degrade must leave no staging file at %s (write-or-remove); "+
 			"stat err = %v, contents = %q", staged, err, string(body))
 	}
 }

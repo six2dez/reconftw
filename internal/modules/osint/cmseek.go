@@ -3,24 +3,22 @@
 // CMSeeKTask runs CMSeeK over the discovered web hosts (v1 modules/web.sh:1781,
 // cmseek.py -l webs/webs_all.txt --batch -r) to fingerprint the CMS powering each
 // host (WordPress, Joomla, Drupal, …). Each fingerprint becomes an informational
-// OSINTFindingRecord (D-O4) — a CMS identity is OSINT context, not a vuln.
+// OSINTFindingRecord — a CMS identity is OSINT context, not a vuln.
 //
-// OPPORTUNISTIC ENRICHMENT (D-O2): CMSeeK is a v1 web.sh function (host-corpus
+// OPPORTUNISTIC ENRICHMENT: CMSeeK is a v1 web.sh function (host-corpus
 // seeded). It reads the discovered hosts from the workspace artefacts
 // (artefacts/hosts.jsonl or artefacts/urls.jsonl) IF present, looping per host.
 // When NO workspace hosts exist it logs an Info note and returns StatusSkipped —
-// it NEVER fails or bootstraps subs/web (best_effort, D-O1/D-O2). Workspace hosts
-// are already scope-filtered by Phase 5, bounding the probe set (T-07-05-05).
+// it NEVER fails or bootstraps subs/web (best_effort). Workspace hosts
+// are already scope-filtered by the web stage, bounding the probe set.
 //
-// SEEDING (D-O1): no DependsOn edges — the workspace-host enrichment is
+// SEEDING: no DependsOn edges — the workspace-host enrichment is
 // opportunistic, not a DAG edge.
-// FAILURE POLICY (D-O8, ARCH-09): best_effort.
+// FAILURE POLICY (ARCH-09): best_effort.
 //
-// THREAT MODEL (T-07-05-05): host list read from scope-filtered workspace
+// THREAT MODEL: host list read from scope-filtered workspace
 // artefacts only; per-host []string argv (never a shell string); a conservative
 // host cap bounds the probe volume.
-//
-// Source: .planning/phases/07-osint-e2e/07-05-PLAN.md Task 1.
 package osint
 
 import (
@@ -36,8 +34,8 @@ import (
 	"github.com/six2dez/reconftw/internal/core/task"
 )
 
-// cmseekMaxHosts bounds the opportunistic per-host CMSeeK loop (D-O8 conservative
-// cap against attacker-influenced workspace hosts — T-07-05-05).
+// cmseekMaxHosts bounds the opportunistic per-host CMSeeK loop (conservative
+// cap against attacker-influenced workspace hosts).
 const cmseekMaxHosts = 100
 
 // CMSeeKTask runs CMSeeK for OSINT-12 (CMS fingerprint).
@@ -59,26 +57,24 @@ func (t *CMSeeKTask) Enabled(cfg *config.Config) bool {
 	return cfg.OSINT.CMS.Enabled && cfg.OSINT.CMS.CMSeeKEnabled
 }
 
-// DependsOn returns nil — the workspace-host enrichment (D-O2) is OPPORTUNISTIC,
+// DependsOn returns nil — the workspace-host enrichment is OPPORTUNISTIC,
 // not a DAG edge.
 func (t *CMSeeKTask) DependsOn() []string { return nil }
 
-// Run executes CMSeeK per workspace host (D-O2 opportunistic enrichment).
+// Run executes CMSeeK per workspace host (opportunistic enrichment).
 //
 // Steps:
-//  1. D-O2: read workspace hosts (artefacts/hosts.jsonl|urls.jsonl) IF present;
+//  1. read workspace hosts (artefacts/hosts.jsonl|urls.jsonl) IF present;
 //     absent → log Info + StatusSkipped (best_effort, NO fail/bootstrap).
 //  2. Loop CMSeeK per host (web.sh:1784 arg vector -u <host> --batch -r).
 //  3. Parse CMS fingerprints into informational records.
 //  4. Write inputs/findings.cmseek.jsonl (multi-writer staging).
 func (t *CMSeeKTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result, error) {
-	// Step 1: D-O2 opportunistic host read.
+	// Step 1: opportunistic host read.
 	hosts := readWorkspaceHosts(app.Target.WorkDir)
 	if len(hosts) == 0 {
-		// D-O2: log-skip when absent — best_effort, NOT an error/bootstrap.
-		if app.Log != nil {
-			app.Log.Info("osint.cmseek: no workspace hosts (artefacts/hosts.jsonl|urls.jsonl) — skipping (D-O2)")
-		}
+		// log-skip when absent — best_effort, NOT an error/bootstrap.
+		app.Log.Info("osint.cmseek: no workspace hosts (artefacts/hosts.jsonl|urls.jsonl) — skipping")
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
@@ -89,14 +85,14 @@ func (t *CMSeeKTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resu
 	}
 
 	if len(hosts) > cmseekMaxHosts {
-		hosts = hosts[:cmseekMaxHosts] // conservative cap (D-O8)
+		hosts = hosts[:cmseekMaxHosts] // conservative cap
 	}
 
 	var records []OSINTFindingRecord
 	// cmseekRan records whether AT LEAST ONE host was actually scanned, and
 	// cancelled records an interrupted loop. Neither an absent CMSeeK nor a
 	// cancelled run observed the corpus, so neither may clear a previous run's
-	// staging (F3 did-not-run — see writeOSINTStaging).
+	// staging (did-not-run rule — see writeOSINTStaging).
 	cmseekRan := false
 	cancelled := false
 	for _, host := range hosts {
@@ -108,9 +104,7 @@ func (t *CMSeeKTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resu
 		// The batch flag is non-interactive; -r reads the bundled signature DB.
 		res, err := app.Tools.Run(ctx, "cmseek", []string{"-u", host, "--batch", "-r"})
 		if err != nil {
-			if app.Log != nil {
-				app.Log.Debug("osint.cmseek: CMSeeK run failed (best_effort)", "host", host, "err", err)
-			}
+			app.Log.Debug("osint.cmseek: CMSeeK run failed (best_effort)", "host", host, "err", err)
 			continue
 		}
 		cmseekRan = true
@@ -126,17 +120,15 @@ func (t *CMSeeKTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resu
 	}
 
 	// Step 4: write staging JSONL (multi-writer contract).
-	// F3: a run that fingerprinted no CMS REMOVES the staging file rather than
+	// Run isolation: a run that fingerprinted no CMS REMOVES the staging file rather than
 	// republishing a CMS the target has since migrated away from.
 	if cmseekRan && !cancelled {
 		writeOSINTStaging(app, inputsDir, "findings.cmseek.jsonl", records)
-	} else if app.Log != nil {
-		app.Log.Debug("osint.cmseek: CMSeeK did not scan the host list — staging preserved (F3 did-not-run)")
+	} else {
+		app.Log.Debug("osint.cmseek: CMSeeK did not scan the host list — staging preserved (did-not-run rule)")
 	}
 
-	if app.Log != nil {
-		app.Log.Info("osint.cmseek: completed", "findings", len(records), "hosts_scanned", len(hosts))
-	}
+	app.Log.Info("osint.cmseek: completed", "findings", len(records), "hosts_scanned", len(hosts))
 	return task.Result{
 		Status: task.StatusDone,
 		Stats:  map[string]int{"findings": len(records), "hosts_scanned": len(hosts)},

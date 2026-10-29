@@ -112,7 +112,12 @@ func TestE2EToolRecorderCapturesRealArgv(t *testing.T) {
 
 	cmd := exec.Command(bin, "subs", "--target", "example.com", "-o", dataDir)
 	cmd.Dir = work
-	cmd.Env = hermeticResolverEnv(t, "PATH="+pathDir+":"+os.Getenv("PATH"))
+	// The stub dir plus the minimal system set ONLY — never os.Getenv("PATH").
+	// With the developer's PATH appended, every other registered tool resolved
+	// on a provisioned box and this "hermetic" tracer ran subfinder's siblings
+	// against the real network for ~115 s (21-04). Absent tools dispatch_fail,
+	// which is what the record is supposed to show.
+	cmd.Env = hermeticResolverEnv(t, "PATH="+pathDir+":/usr/bin:/bin")
 	out, _ := cmd.CombinedOutput() // a task may skip; the recording is what matters
 
 	recs := toolRecords(t, dataDir)

@@ -1,6 +1,6 @@
-// testssl.go — TestSSLTask: testssl.sh TLS misconfiguration scanner (D-V3).
+// testssl.go — TestSSLTask: testssl.sh TLS misconfiguration scanner.
 //
-// TestSSLTask is a D-V3 fold-in from vulns.sh test_ssl(), per plan 06-08
+// TestSSLTask is a fold-in from vulns.sh test_ssl(), for parity
 // (VULN-14 parity completeness gate).
 //
 // INPUT PRECEDENCE (mirrors v1 test_ssl() lines 594-597):
@@ -15,7 +15,7 @@
 // testssl.sh is a bash script invoked via app.Tools.Run as "testssl.sh".
 // The binary must be on PATH or configured via cfg.Advanced.Tools.<entry>.
 //
-// XCUT-07 / T-06-08-03:
+// XCUT-07:
 // testssl.sh output may include certificate details in error cases. Raw stdout
 // is NEVER logged at Info/Warn. Only severity category counts at Info.
 //
@@ -24,9 +24,7 @@
 //
 // NOTE: testssl.sh produces plain-text output, not JSON. v2 records each
 // finding as a structured tsslRecord (severity + description from the output
-// line). Raw lines NEVER reach Info logging (XCUT-07 / T-06-08-03).
-//
-// Source: .planning/phases/06-vulnerability-scanning-e2e/06-08-PLAN.md Task 2.
+// line). Raw lines NEVER reach Info logging (XCUT-07).
 package vulns
 
 import (
@@ -41,10 +39,11 @@ import (
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
 	"github.com/six2dez/reconftw/internal/core/config"
+	"github.com/six2dez/reconftw/internal/core/output"
 	"github.com/six2dez/reconftw/internal/core/task"
 )
 
-// TestSSLTask runs testssl.sh TLS misconfiguration scanner (D-V3, VULN-14).
+// TestSSLTask runs testssl.sh TLS misconfiguration scanner (VULN-14).
 type TestSSLTask struct{}
 
 // Name returns the globally unique dot-namespaced task identifier.
@@ -80,13 +79,11 @@ func (t *TestSSLTask) Run(ctx context.Context, app *appctx.AppContext) (task.Res
 
 	// Step 1: Resolve input file (mirrors v1 test_ssl() precedence).
 	targetsData, err := resolveTestSSLInput(workDir)
-	if err != nil && app.Log != nil {
+	if err != nil {
 		app.Log.Debug("vulns.testssl: input resolution error (best_effort)", "err", err)
 	}
 	if len(targetsData) == 0 {
-		if app.Log != nil {
-			app.Log.Info("vulns.testssl: no IP/host targets — skipping")
-		}
+		app.Log.Info("vulns.testssl: no IP/host targets — skipping")
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
@@ -116,7 +113,7 @@ func (t *TestSSLTask) Run(ctx context.Context, app *appctx.AppContext) (task.Res
 	args := []string{"--quiet", "--color", "0", "-U", "-iL", targetsFile}
 
 	res, runErr := app.Tools.Run(ctx, toolName, args)
-	if runErr != nil && app.Log != nil {
+	if runErr != nil {
 		// testssl.sh may exit non-zero even when it produces findings.
 		// Non-fatal per best_effort policy — parse whatever stdout was produced.
 		app.Log.Debug("vulns.testssl: testssl.sh exit error (best_effort — parsing output)",
@@ -125,13 +122,16 @@ func (t *TestSSLTask) Run(ctx context.Context, app *appctx.AppContext) (task.Res
 	// A hard failure (unregistered binary, spawn/rate-limit error) returns a nil
 	// res; only a non-zero EXIT still returns a populated res whose Stdout may hold
 	// findings. Guard the nil so a missing testssl.sh degrades to skipped, never a
-	// nil-pointer panic (live all-mode regression, 2026-08).
+	// nil-pointer panic (live all-mode regression, 2026-08). The Reason says
+	// whether testssl.sh was absent or failed (task.ClassifyToolErr).
 	if res == nil {
-		return task.Result{Status: task.StatusSkipped}, nil
+		status, reason := task.ClassifyToolErr(runErr)
+		app.Log.Info("vulns.testssl: testssl.sh not run — skipping", "reason", reason)
+		return task.Result{Status: status, Reason: reason}, nil
 	}
 
 	// Step 4: Parse stdout for TLS finding lines.
-	// XCUT-07 / T-06-08-03: raw testssl.sh stdout NEVER logged at Info/Warn.
+	// XCUT-07: raw testssl.sh stdout NEVER logged at Info/Warn.
 	// Only category counts are surfaced.
 	records := parseTestSSLOutput(res.Stdout)
 
@@ -146,17 +146,15 @@ func (t *TestSSLTask) Run(ctx context.Context, app *appctx.AppContext) (task.Res
 			lines = append(lines, b)
 		}
 		if len(lines) > 0 {
-			if wErr := app.Tree.Append("testssl", lines); wErr != nil && app.Log != nil {
+			if wErr := app.Tree.Append("testssl", lines); wErr != nil {
 				app.Log.Debug("vulns.testssl: Tree.Append failed",
 					"records", len(lines), "err", wErr)
 			}
 		}
 	}
 
-	// XCUT-07 / T-06-08-03: log only finding count, never raw testssl output.
-	if app.Log != nil {
-		app.Log.Info("vulns.testssl: completed", "findings", len(records))
-	}
+	// XCUT-07: log only finding count, never raw testssl output.
+	app.Log.Info("vulns.testssl: completed", "findings", len(records))
 
 	return task.Result{
 		Status: task.StatusDone,
@@ -165,7 +163,7 @@ func (t *TestSSLTask) Run(ctx context.Context, app *appctx.AppContext) (task.Res
 }
 
 // tsslRecord is the artefacts/testssl.jsonl schema for a TLS misconfiguration finding.
-// XCUT-07 / T-06-08-03: no raw certificate content or key material is stored.
+// XCUT-07: no raw certificate content or key material is stored.
 type tsslRecord struct {
 	Severity    string `json:"severity"`
 	Category    string `json:"category,omitempty"`
@@ -195,7 +193,7 @@ var testSSLSeverityPrefixes = []struct {
 // tsslRecord slice. Only vulnerability/misconfiguration finding lines are
 // retained (lines containing severity indicators).
 //
-// XCUT-07 / T-06-08-03: raw certificate details and key material NEVER stored.
+// XCUT-07: raw certificate details and key material NEVER stored.
 // Only the severity category + a sanitized description fragment are written.
 func parseTestSSLOutput(data []byte) []tsslRecord {
 	if len(bytes.TrimSpace(data)) == 0 {
@@ -286,41 +284,28 @@ func resolveTestSSLInput(workDir string) ([]byte, error) {
 		return data, nil
 	}
 
-	// Priority 2: artefacts/hosts.jsonl — extract hostnames.
+	// Priority 2: artefacts/hosts.jsonl — extract hostnames. The file may be
+	// JSON-per-line or plain hostnames; a missing file is "no input".
 	hostsPath := filepath.Join(workDir, "artefacts", "hosts.jsonl")
-	data, err := os.ReadFile(hostsPath) //nolint:gosec // path within WorkDir
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, nil
-		}
-		return nil, err
-	}
-	if len(bytes.TrimSpace(data)) == 0 {
-		return nil, nil
-	}
-
-	// hosts.jsonl may be JSON-per-line or plain hostnames.
 	var hosts []string
-	sc := bufio.NewScanner(bytes.NewReader(data))
-	sc.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
-	for sc.Scan() {
-		line := bytes.TrimSpace(sc.Bytes())
-		if len(line) == 0 {
-			continue
-		}
+	err := output.ForEachJSONLLine(hostsPath, 0, func(line []byte) error {
+		line = bytes.TrimSpace(line)
 		// Try JSON with "host" field.
 		var rec struct {
 			Host string `json:"host"`
 		}
 		if err := json.Unmarshal(line, &rec); err == nil && rec.Host != "" {
 			hosts = append(hosts, rec.Host)
-			continue
+			return nil
 		}
 		// Plain hostname line.
-		h := strings.TrimSpace(string(line))
-		if h != "" && !strings.HasPrefix(h, "{") {
+		if h := string(line); !strings.HasPrefix(h, "{") {
 			hosts = append(hosts, h)
 		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	if len(hosts) == 0 {

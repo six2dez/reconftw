@@ -4,7 +4,7 @@
 // because two known-good templates (`keycloak-openid-config`, `oidc-detect`) did
 // not fire in v2's full nuclei run and fired instantly in a targeted two-template
 // probe against the same host, same box, same template directory. Four benign
-// explanations were each eliminated by observation (16-06-PARITY.md §6.1). What
+// explanations were each eliminated by observation (the parity record). What
 // remained was not a wrong number but an ABSENCE: "nuclei ran and exited 0" was
 // compatible with nuclei having executed 49 templates or 13,000, and nothing in
 // the workspace could tell those apart.
@@ -34,7 +34,6 @@
 // Per-template answerability exists for FIXTURE runs, where the trace volume is
 // bounded and the target is loopback: scripts/nuclei-coverage-probe.sh enables
 // `-tlog` on its own invocations and answers the per-template question there.
-// See 17-05-NUCLEI-COVERAGE.md.
 //
 // ─────────────────────────────────────────────────────────────────────────────
 // UNKNOWN IS NOT ZERO
@@ -144,7 +143,7 @@ type NucleiCoverage struct {
 	FindingsParsed *int `json:"findings_parsed"`
 
 	// TerminatedEarly marks a group whose stream ended badly. Its findings are
-	// discarded by the F6 rule, but the coverage record is written anyway:
+	// discarded by the terminal-error rule, but the coverage record is written anyway:
 	// coverage evidence about a failed run is worth more than evidence about a
 	// clean one.
 	TerminatedEarly  bool   `json:"terminated_early"`

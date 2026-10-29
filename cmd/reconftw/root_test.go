@@ -143,7 +143,7 @@ func TestDeprecationWarningShortAliases(t *testing.T) {
 		{"-w", "web"},
 		{"-n", "osint"},
 		{"-z", "zen"},
-		{"-y", "deep"},
+		// no -y: v1's -y was --ai; rejectRemovedV1Flags refuses it (alias_test.go).
 		// Global short alias --vps via -v (axiom).
 		{"-v", "vps"},
 	}
@@ -205,7 +205,6 @@ func TestShortAliasShorthandsWired(t *testing.T) {
 		"web":               "w",
 		"osint":             "n",
 		"zen":               "z",
-		"deep":              "y",
 		"target-deprecated": "d",
 		"list-deprecated":   "l",
 		"vps":               "v",

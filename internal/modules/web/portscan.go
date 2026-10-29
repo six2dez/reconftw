@@ -1,4 +1,4 @@
-// portscan.go — WebPortscanTask: active-recon port scanning (PAR-04).
+// portscan.go — WebPortscanTask: active-recon port scanning.
 //
 // Name: "web.portscan"  DependsOn: nil (sequential stage; reads workspace files)
 //
@@ -9,27 +9,25 @@
 // invoked. WebPortscanTask reads that previously-dead config and ports the
 // bash portscan + service_fingerprint flow (modules/web.sh:600-923):
 //
-//	IP-seed (subdomains/subdomains_ips.txt, 13-01) → cdncheck CDN filter →
+//	IP-seed (subdomains/subdomains_ips.txt) → cdncheck CDN filter →
 //	passive (smap + shodan internetdb) → active (naabu discovers ports →
 //	nmap targeted service scan) → nmapurls feedback → nerva fingerprint.
 //
 // It produces the standard host artefacts AND hosts/portscan_active.gnmap
-// (the spray input PAR-02/13-07 depends on) plus the nerva fingerprint
+// (the spray input depends on) plus the nerva fingerprint
 // output. hakoriginfinder (CDN bypass) + cdncheck already exist as Go
 // tasks/tools — this task REUSES their output, it does NOT re-implement them.
 //
-// PRIVILEGE NOTE (T-13-03-01): the active nmap SYN scan needs root/setcap
-// (Docker setcap for naabu/nmap added in Phase 11). On an unprivileged host
+// PRIVILEGE NOTE: the active nmap SYN scan needs root/setcap
+// (the Docker image setcaps naabu/nmap). On an unprivileged host
 // the ACTIVE path degrades (StatusDone + warning); the PASSIVE path (smap +
 // shodan internetdb) works without privileges and is the default-safe target.
-// A missing tool NEVER fails the web pipeline (D-O2 opportunistic).
+// A missing tool NEVER fails the web pipeline (opportunistic).
 //
 // WIRING NOTE: this file IMPLEMENTS WebPortscanTask (self-registered) but does
-// NOT edit stage lists — plan 13-08 adds a "web.portscan" stage to
+// NOT edit stage lists — the stage wiring adds a "web.portscan" stage to
 // web.go/composite.go/stub_subcommands.go and wires web.MergeStage(ctx, app,
 // "hosts") after it so the HostRecord staging files reach the store.
-//
-// Source: .planning/phases/13-domain-parity/13-03-PLAN.md Task 1 + Task 2.
 package web
 
 import (
@@ -63,12 +61,12 @@ type portscanHostPort struct {
 }
 
 // shodanHTTPClient is the bounded client for the keyless shodan internetdb
-// GET (XCUT-07: no secret — the IP is the scan target, not sensitive).
+// GET (no secret — the IP is the scan target, not sensitive).
 var shodanHTTPClient = &http.Client{Timeout: 15 * time.Second}
 
 // shodanInternetDBGet fetches https://internetdb.shodan.io/<ip>. It is a
 // package var so unit tests can inject a canned response WITHOUT real network
-// I/O (mirrors 13-01's hakip2hostRunner seam). Best-effort: a per-IP error is
+// I/O (mirrors hakip2hostRunner's seam). Best-effort: a per-IP error is
 // swallowed by the caller.
 var shodanInternetDBGet = func(ctx context.Context, ip string) ([]byte, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
@@ -100,7 +98,7 @@ func (t *WebPortscanTask) Enabled(cfg *config.Config) bool {
 
 // DependsOn returns nil: portscan is a sequential stage that reads workspace
 // files (subdomains/subdomains_ips.txt, hosts/cdn_providers.txt,
-// hosts/origin_ips.txt); plan 13-08 places it in the stage order.
+// hosts/origin_ips.txt); the stage wiring places it in the stage order.
 func (t *WebPortscanTask) DependsOn() []string { return nil }
 
 // Run implements the bash portscan flow (web.sh:600-817) via app.Tools.
@@ -116,12 +114,10 @@ func (t *WebPortscanTask) Run(ctx context.Context, app *appctx.AppContext) (task
 		}
 	}
 
-	// 1. IP-seed from subdomains/subdomains_ips.txt (13-01) + IP-literal target.
+	// 1. IP-seed from subdomains/subdomains_ips.txt + IP-literal target.
 	ips := portscanReadIPSeed(app)
 	if len(ips) == 0 {
-		if app.Log != nil {
-			app.Log.Info("web.portscan: no IP seed (subdomains_ips.txt empty / no IP target) — skipping")
-		}
+		app.Log.Info("web.portscan: no IP seed (subdomains_ips.txt empty / no IP target) — skipping")
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 	ipsFile := filepath.Join(hostsDir, "ips.txt")
@@ -144,9 +140,7 @@ func (t *WebPortscanTask) Run(ctx context.Context, app *appctx.AppContext) (task
 	}
 	ipsNoCDNFile := filepath.Join(tmpDir, "ips_nocdn.txt")
 	_ = os.WriteFile(ipsNoCDNFile, []byte(strings.Join(ipsNoCDN, "\n")+"\n"), 0o644) //nolint:gosec,errcheck
-	if app.Log != nil {
-		app.Log.Debug("web.portscan: resolved IPs", "total", len(ips), "no_cdn", len(ipsNoCDN))
-	}
+	app.Log.Debug("web.portscan: resolved IPs", "total", len(ips), "no_cdn", len(ipsNoCDN))
 
 	// 3. Passive (unprivileged): smap + shodan internetdb.
 	if ps.PassiveEnabled {
@@ -165,7 +159,7 @@ func (t *WebPortscanTask) Run(ctx context.Context, app *appctx.AppContext) (task
 	portscanNmapURLsFeedback(app, hostsDir)
 
 	// 6. Emit HostRecord JSONL (open host:port) to the "hosts" staging file so it
-	// reaches the store via web.MergeStage(ctx, app, "hosts") (wired in 13-08).
+	// reaches the store via web.MergeStage(ctx, app, "hosts") (wired).
 	portscanWriteHostRecords(app, openPorts, "portscan")
 
 	// 7. nerva service fingerprint (best-effort enrichment tail; bash parity —
@@ -269,9 +263,7 @@ func portscanCDNIPs(ctx context.Context, app *appctx.AppContext, ips []string, h
 	args := []string{"-silent", "-resp", "-cdn", "-waf", "-nc", "-i", ipsFile}
 	res, err := app.Tools.Run(ctx, "cdncheck", args)
 	if err != nil {
-		if app.Log != nil {
-			app.Log.Info("web.portscan: cdncheck absent/failed — scanning all IPs", "err", err)
-		}
+		app.Log.Info("web.portscan: cdncheck absent/failed — scanning all IPs", "err", err)
 		return cdn
 	}
 	if res != nil && len(res.Stdout) > 0 {
@@ -307,6 +299,7 @@ func portscanParseCDNLines(data []byte) []string {
 // portscanOriginIPs consumes origin IPs recovered by web.hakoriginfinder. It
 // reads hosts/origin_ips.txt (bash-contract) if present, else falls back to the
 // origin_ip fields of artefacts/origins.jsonl (what the Go task actually writes).
+
 func portscanOriginIPs(app *appctx.AppContext) []string {
 	seen := make(map[string]bool)
 	var out []string
@@ -330,21 +323,17 @@ func portscanOriginIPs(app *appctx.AppContext) []string {
 	}
 
 	jsonl := filepath.Join(app.Target.WorkDir, "artefacts", "origins.jsonl")
-	f, err := os.Open(jsonl) //nolint:gosec
-	if err != nil {
-		return out
-	}
-	defer f.Close() //nolint:errcheck
-	scanner := bufio.NewScanner(f)
-	scanner.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
-	for scanner.Scan() {
+	// Best-effort seed: a missing or unreadable origins.jsonl just means no
+	// extra IPs, and a malformed record is skipped.
+	_ = output.ForEachJSONLLine(jsonl, 0, func(line []byte) error {
 		var rec struct {
 			OriginIP string `json:"origin_ip"`
 		}
-		if json.Unmarshal(scanner.Bytes(), &rec) == nil {
+		if json.Unmarshal(line, &rec) == nil {
 			add(rec.OriginIP)
 		}
-	}
+		return nil
+	})
 	return out
 }
 
@@ -360,9 +349,7 @@ func portscanPassiveSmap(ctx context.Context, app *appctx.AppContext, ipsNoCDN [
 	}
 	res, err := app.Tools.Run(ctx, "smap", []string{"-iL", ipsNoCDNFile})
 	if err != nil {
-		if app.Log != nil {
-			app.Log.Info("web.portscan: smap absent/failed — skipping passive scan", "err", err)
-		}
+		app.Log.Info("web.portscan: smap absent/failed — skipping passive scan", "err", err)
 		return
 	}
 	if res != nil {
@@ -380,9 +367,7 @@ func portscanPassiveShodan(ctx context.Context, app *appctx.AppContext, ips []st
 	for _, ip := range ips {
 		body, err := shodanInternetDBGet(ctx, ip)
 		if err != nil {
-			if app.Log != nil {
-				app.Log.Debug("web.portscan: shodan internetdb fetch failed", "ip", ip, "err", err)
-			}
+			app.Log.Debug("web.portscan: shodan internetdb fetch failed", "ip", ip, "err", err)
 			continue
 		}
 		parts = append(parts, strings.ReplaceAll(strings.TrimSpace(string(body)), "\n", ""))
@@ -413,16 +398,14 @@ func portscanActive(ctx context.Context, app *appctx.AppContext, ps config.WebPo
 		naabuOpen := filepath.Join(hostsDir, "naabu_open.txt")
 		args := []string{"-list", ipsNoCDNFile, "-silent", "-rate", strconv.Itoa(ps.Naabu.Rate)}
 		// Naabu.Ports is a multi-token string ("--top-ports 1000") — split into
-		// argv, NEVER pass as a single arg (T-13-03-02).
+		// argv, NEVER pass as a single arg.
 		args = append(args, strings.Fields(ps.Naabu.Ports)...)
-		// -duc: disable-update-check — PD-tool hang guard on blocked DNS (T-13-03-03).
+		// -duc: disable-update-check — PD-tool hang guard on blocked DNS.
 		args = append(args, "-duc", "-o", naabuOpen)
 
 		res, err := app.Tools.Run(ctx, "naabu", args)
 		if err != nil {
-			if app.Log != nil {
-				app.Log.Info("web.portscan: naabu absent/failed — falling back to legacy nmap", "err", err)
-			}
+			app.Log.Info("web.portscan: naabu absent/failed — falling back to legacy nmap", "err", err)
 		} else {
 			raw := portscanReadOrStdout(naabuOpen, res)
 			// Ensure the bash-contract file exists even when the backend streamed
@@ -435,9 +418,7 @@ func portscanActive(ctx context.Context, app *appctx.AppContext, ps config.WebPo
 				targetedBase := filepath.Join(hostsDir, "portscan_active_targeted")
 				nmapArgs := []string{"-p", csv, "-iL", ipsNoCDNFile, "-oA", targetedBase}
 				if _, nerr := app.Tools.Run(ctx, "nmap", nmapArgs); nerr != nil {
-					if app.Log != nil {
-						app.Log.Info("web.portscan: nmap targeted scan failed (privilege/absent) — degrading", "err", nerr)
-					}
+					app.Log.Info("web.portscan: nmap targeted scan failed (privilege/absent) — degrading", "err", nerr)
 				} else {
 					usedTargeted = true
 					portscanCopyTargetedOutputs(hostsDir)
@@ -450,9 +431,7 @@ func portscanActive(ctx context.Context, app *appctx.AppContext, ps config.WebPo
 	if !usedTargeted {
 		base := filepath.Join(hostsDir, "portscan_active")
 		if _, err := app.Tools.Run(ctx, "nmap", []string{"-iL", ipsNoCDNFile, "-oA", base}); err != nil {
-			if app.Log != nil {
-				app.Log.Info("web.portscan: legacy nmap failed (privilege/absent) — degrading", "err", err)
-			}
+			app.Log.Info("web.portscan: legacy nmap failed (privilege/absent) — degrading", "err", err)
 		}
 	}
 
@@ -564,9 +543,7 @@ func portscanNmapURLsFeedback(app *appctx.AppContext, hostsDir string) {
 	if err := os.MkdirAll(websDir, 0o755); err == nil {
 		portscanAppendLines(filepath.Join(websDir, "webs.txt"), urls)
 	}
-	if app.Log != nil {
-		app.Log.Debug("web.portscan: nmapurls feedback", "urls", len(urls))
-	}
+	app.Log.Debug("web.portscan: nmapurls feedback", "urls", len(urls))
 }
 
 // nmapXMLRun is the minimal nmap -oX schema needed to derive web URLs.
@@ -647,9 +624,9 @@ func portscanNmapXMLURLs(data []byte) []string {
 
 // portscanWriteHostRecords writes the open host:port results as HostRecord JSONL
 // to inputs/hosts.<producer>.jsonl (the web "hosts" single-writer staging file);
-// plan 13-08 wires web.MergeStage(ctx, app, "hosts") to consolidate to the store.
+// web.MergeStage(ctx, app, "hosts") consolidates it to the store.
 //
-// F3 (phase 15): this is a write-or-REMOVE stage. Calling it is the statement
+// This is a write-or-REMOVE stage. Calling it is the statement
 // "portscan ran and these are ALL the open ports it saw this run", so an empty
 // pairs slice clears a previous run's staging rather than leaving it for the
 // hosts merge to republish. Callers that did NOT run the scan must not call it.
@@ -662,7 +639,7 @@ func portscanWriteHostRecords(app *appctx.AppContext, pairs []portscanHostPort, 
 		}
 	}
 	staging := filepath.Join(app.Target.WorkDir, "inputs", "hosts."+producer+".jsonl")
-	if err := output.StageJSONL(staging, lines); err != nil && app.Log != nil {
+	if err := output.StageJSONL(staging, lines); err != nil {
 		app.Log.Debug("web.portscan: hosts staging write failed", "path", staging, "err", err)
 	}
 }
@@ -802,10 +779,8 @@ func portscanServiceFingerprint(ctx context.Context, app *appctx.AppContext, ps 
 		return
 	}
 	if fp.Engine != "nerva" {
-		if app.Log != nil {
-			app.Log.Info("web.portscan: unsupported service-fingerprint engine — skipping",
-				"engine", fp.Engine)
-		}
+		app.Log.Info("web.portscan: unsupported service-fingerprint engine — skipping",
+			"engine", fp.Engine)
 		return
 	}
 
@@ -827,7 +802,7 @@ func portscanServiceFingerprint(ctx context.Context, app *appctx.AppContext, ps 
 		}
 	}
 	if len(targets) == 0 {
-		// F3 (phase 15): fingerprinting IS enabled and RAN this invocation; it
+		// Fingerprinting IS enabled and RAN this invocation; it
 		// simply has no open host:port to fingerprint. That is "ran and found
 		// nothing", so clear a previous run's nerva staging. (The disabled and
 		// nerva-absent paths return without clearing — they did not run.)
@@ -853,9 +828,7 @@ func portscanServiceFingerprint(ctx context.Context, app *appctx.AppContext, ps 
 	args := []string{"--json", "-l", targetsFile, "-w", strconv.Itoa(timeoutMS), "-o", fpPath}
 	res, err := app.Tools.Run(ctx, "nerva", args)
 	if err != nil {
-		if app.Log != nil {
-			app.Log.Info("web.portscan: nerva absent/failed — skipping service fingerprint", "err", err)
-		}
+		app.Log.Info("web.portscan: nerva absent/failed — skipping service fingerprint", "err", err)
 		return
 	}
 
@@ -865,9 +838,7 @@ func portscanServiceFingerprint(ctx context.Context, app *appctx.AppContext, ps 
 		_ = os.WriteFile(fpPath, raw, 0o644) //nolint:gosec,errcheck
 	}
 	portscanWriteFingerprintRecords(app, raw)
-	if app.Log != nil {
-		app.Log.Debug("web.portscan: nerva service fingerprint complete", "targets", len(targets))
-	}
+	app.Log.Debug("web.portscan: nerva service fingerprint complete", "targets", len(targets))
 }
 
 // portscanNaabuNF2Pairs parses naabu_open.txt lines with EXACTLY one colon and a
@@ -915,7 +886,7 @@ func portscanServiceFPTargets(pairs []portscanHostPort) []string {
 // to inputs/hosts.nerva.jsonl (a distinct "hosts" single-writer staging file so
 // the fingerprints reach the store via web.MergeStage(ctx, app, "hosts")).
 //
-// F3 (phase 15): write-or-REMOVE. Calling it asserts "nerva ran and these are
+// Write-or-REMOVE. Calling it asserts "nerva ran and these are
 // ALL the fingerprints it produced this run", so empty raw clears a previous
 // run's inputs/hosts.nerva.jsonl instead of letting the hosts merge republish
 // it. The nerva-absent and fingerprint-disabled paths return BEFORE calling it.
@@ -952,7 +923,7 @@ func portscanWriteFingerprintRecords(app *appctx.AppContext, raw []byte) {
 		}
 	}
 	staging := filepath.Join(app.Target.WorkDir, "inputs", "hosts.nerva.jsonl")
-	if err := output.StageJSONL(staging, lines); err != nil && app.Log != nil {
+	if err := output.StageJSONL(staging, lines); err != nil {
 		app.Log.Debug("web.portscan: nerva staging write failed", "path", staging, "err", err)
 	}
 }

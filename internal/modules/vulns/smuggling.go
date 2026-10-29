@@ -7,7 +7,7 @@
 // DEPENDENCY: DependsOn ["vulns.gf"] — smuggling() v1 runs after the URL corpus
 // is ready; the gf DAG root ensures that corpus is finalized before this task.
 //
-// INPUT: artefacts/urls.jsonl — host URL list from Phase 5 web probe (D-V5).
+// INPUT: artefacts/urls.jsonl — host URL list from the web probe.
 // smugglex does NOT need gf-pattern-filtered input; it tests all web hosts
 // (v1 smuggling() reads webs/webs_all.txt, the unfiltered host list).
 //
@@ -18,12 +18,12 @@
 // v2 adaptation: host list piped to smugglex via stdin; -f plain produces
 // one JSON record per finding on stdout (smugglex JSON mode).
 //
-// PAYLOAD REDACTION (XCUT-07, T-06-06-02):
+// PAYLOAD REDACTION (XCUT-07):
 // smugglex stdout contains raw HTTP smuggling payloads and PoC HTTP requests.
 // These MUST NOT appear in logs. Only finding count is logged at Info.
 // PayloadRedacted and PoCRedacted are always "***" in every VulnFindingRecord.
 //
-// SUBPROCESS SAFETY (FOUND-09, T-06-06-01):
+// SUBPROCESS SAFETY (FOUND-09):
 // Backend.Stream uses LocalBackend which sets SysProcAttr.Setpgid=true and
 // WaitDelay for all subprocess invocations — orphan processes are kill-tree safe.
 // No raw exec.Command calls in SmugglingTask code.
@@ -31,8 +31,6 @@
 // HEARTBEAT (XCUT-09):
 // Backend.Stream used for smugglex — the Rust binary can be slow on large host
 // sets; the UI must never appear stuck.
-//
-// Source: .planning/phases/06-vulnerability-scanning-e2e/06-06-PLAN.md Task 1.
 package vulns
 
 import (
@@ -86,15 +84,13 @@ func (t *SmugglingTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 	const toolName = "smugglex"
 	cfg := app.Cfg
 
-	// Step 1: Resolve URL corpus via D-V5 precedence (--urls ctx > artefacts/urls.jsonl).
+	// Step 1: Resolve URL corpus via precedence (--urls ctx > artefacts/urls.jsonl).
 	hostURLs, err := readURLsWithCtx(ctx, app)
-	if err != nil && app.Log != nil {
+	if err != nil {
 		app.Log.Debug("vulns.smuggling: read URL corpus error (best_effort)", "err", err)
 	}
 	if len(hostURLs) == 0 {
-		if app.Log != nil {
-			app.Log.Info("vulns.smuggling: no host URLs in URL corpus — skipping")
-		}
+		app.Log.Info("vulns.smuggling: no host URLs in URL corpus — skipping")
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
@@ -118,10 +114,8 @@ func (t *SmugglingTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 		deepLimit = 500 // v1 default DEEP_LIMIT
 	}
 	if !cfg.Advanced.Deep && len(hostURLs) > deepLimit {
-		if app.Log != nil {
-			app.Log.Info("vulns.smuggling: too many URLs — skipped (use --deep to override)",
-				"url_count", len(hostURLs), "deep_limit", deepLimit)
-		}
+		app.Log.Info("vulns.smuggling: too many URLs — skipped (use --deep to override)",
+			"url_count", len(hostURLs), "deep_limit", deepLimit)
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
@@ -142,13 +136,11 @@ func (t *SmugglingTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 	res, runErr := app.Tools.Run(ctx, toolName, args)
 	// smugglexRan records whether smugglex was actually DISPATCHED. A dispatch
 	// failure means the binary is absent: the task observed nothing and must not
-	// clear a previous run's staging (F3 did-not-run — staging.go).
+	// clear a previous run's staging (did-not-run rule — staging.go).
 	smugglexRan := runErr == nil
 	if runErr != nil {
 		// Non-fatal per best_effort policy — smugglex may not be installed.
-		if app.Log != nil {
-			app.Log.Debug("vulns.smuggling: smugglex run error (best_effort)", "err", runErr)
-		}
+		app.Log.Debug("vulns.smuggling: smugglex run error (best_effort)", "err", runErr)
 	} else {
 		// Step 5: Parse stdout JSON lines for detected findings.
 		// smugglex -f plain outputs one JSON record per finding.
@@ -168,7 +160,7 @@ func (t *SmugglingTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 
 	// Step 6: Write inputs/findings.smuggling.jsonl.
 	//
-	// F3 (phase 15): staged through stageVulnFindings so a run that detected no
+	// Run isolation: staged through stageVulnFindings so a run that detected no
 	// desync REMOVES the previous run's staging instead of republishing a
 	// smuggling vector that has since been closed.
 	//
@@ -179,9 +171,7 @@ func (t *SmugglingTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 	stageVulnFindings(app, "vulns.smuggling", stagingPath, smugglexRan, findings)
 
 	// XCUT-07: log only count, never raw smuggling payloads or PoC HTTP requests.
-	if app.Log != nil {
-		app.Log.Info("vulns.smuggling: completed", "smuggling_findings", len(findings))
-	}
+	app.Log.Info("vulns.smuggling: completed", "smuggling_findings", len(findings))
 
 	return task.Result{
 		Status: task.StatusDone,
@@ -201,7 +191,7 @@ type smugglexFinding struct {
 // parseSmugglingOutput parses smugglex JSON-lines output and appends confirmed
 // VulnFindingRecord entries to findings. Returns the count of confirmed findings.
 //
-// XCUT-07 / T-06-06-02: raw smuggling payload/PoC HTTP requests MUST NOT be
+// XCUT-07: raw smuggling payload/PoC HTTP requests MUST NOT be
 // written to records or logs. Only the host is extracted for MatchedParam.
 // PayloadRedacted and PoCRedacted are always "***".
 func parseSmugglingOutput(data []byte, findings *[]VulnFindingRecord) int {

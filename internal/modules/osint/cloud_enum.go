@@ -6,26 +6,24 @@
 // OSINTFindingRecords with a security severity (medium/high), NOT informational
 // records — a public bucket is an exploitable misconfiguration.
 //
-// CONSERVATIVE V1 CAPS (D-O8): cloud_enum is a noisy source. It ships with the
+// CONSERVATIVE V1 CAPS: cloud_enum is a noisy source. It ships with the
 // conservative v1 thread cap (CLOUD_ENUM_S3_THREADS=20, core.sh:309) and the
 // "optimized" profile (CLOUD_ENUM_S3_PROFILE, core.sh:308 → quickscan). These
-// bound probe volume against attacker-influenced hosts (T-07-04-03).
+// bound probe volume against attacker-influenced hosts.
 //
-// SEEDING (D-O1): company + root-domain-seeded — no DependsOn edges. The company
+// SEEDING: company + root-domain-seeded — no DependsOn edges. The company
 // label (companyName) and the registrable root cross into cloud_enum's []string
-// argv via the -k keyword flags (never a shell string — T-07-04-04).
+// argv via the -k keyword flags (never a shell string).
 //
 // HEARTBEAT (XCUT-09): cloud_enum can run long; it is invoked via app.Tools.Stream
-// and the event channel is drained so the scheduler heartbeat keeps ticking
-// (T-07-04-05). Bucket lines surface on stdout and are collected for parsing.
+// and the event channel is drained so the scheduler heartbeat keeps ticking.
+// Bucket lines surface on stdout and are collected for parsing.
 //
-// HIGH-VALUE LIST (D-O5): the discovered bucket list is preserved as the
+// HIGH-VALUE LIST: the discovered bucket list is preserved as the
 // single-writer human file osint/cloud_enum.txt (v1 osint.sh:725 anew target).
 //
-// FAILURE POLICY (D-O8): best_effort — tool failure / empty output logs Debug and
+// FAILURE POLICY: best_effort — tool failure / empty output logs Debug and
 // returns StatusDone with findings:0.
-//
-// Source: .planning/phases/07-osint-e2e/07-04-PLAN.md Task 1.
 package osint
 
 import (
@@ -40,8 +38,8 @@ import (
 	"github.com/six2dez/reconftw/internal/core/task"
 )
 
-// cloudEnumDefaultThreads is the conservative v1 thread cap (D-O8,
-// CLOUD_ENUM_S3_THREADS=20, core.sh:309) used when config carries no override.
+// cloudEnumDefaultThreads is the conservative v1 thread cap
+// (CLOUD_ENUM_S3_THREADS=20, core.sh:309) used when config carries no override.
 const cloudEnumDefaultThreads = 20
 
 // cloudEnumProfile is the conservative v1 default profile (CLOUD_ENUM_S3_PROFILE,
@@ -66,24 +64,22 @@ func (t *CloudEnumTask) Enabled(cfg *config.Config) bool {
 	return cfg.OSINT.Cloud.Enabled
 }
 
-// DependsOn returns nil — cloud_enum is company/root-domain-seeded (D-O1).
+// DependsOn returns nil — cloud_enum is company/root-domain-seeded.
 func (t *CloudEnumTask) DependsOn() []string { return nil }
 
 // Run executes cloud_enum across S3/GCP/Azure with the conservative v1 caps.
 //
 // Steps:
-//  1. Derive + validate the root domain → company name (T-07-04-04).
+//  1. Derive + validate the root domain → company name.
 //  2. Build the cloud_enum arg vector with conservative threads + quickscan.
 //  3. Stream cloud_enum (XCUT-09 heartbeat); collect stdout bucket lines.
-//  4. Preserve osint/cloud_enum.txt (D-O5 single-writer).
+//  4. Preserve osint/cloud_enum.txt (single-writer).
 //  5. Parse exposed buckets into security-severity OSINTFindingRecords.
 //  6. Write inputs/findings.cloud_enum.jsonl (multi-writer staging).
 func (t *CloudEnumTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result, error) {
 	root := rootDomain(app)
 	if root == "" {
-		if app.Log != nil {
-			app.Log.Info("osint.cloud_enum: no valid root domain — skipping")
-		}
+		app.Log.Info("osint.cloud_enum: no valid root domain — skipping")
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 	company := companyName(root)
@@ -96,7 +92,7 @@ func (t *CloudEnumTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 	osintDir := filepath.Join(app.Target.WorkDir, "osint")
 	_ = os.MkdirAll(osintDir, 0o755) //nolint:errcheck // best_effort
 
-	threads := cloudEnumDefaultThreads // conservative v1 cap (D-O8)
+	threads := cloudEnumDefaultThreads // conservative v1 cap
 
 	// v1 arg vector (core.sh:380-399): -k <company> -k <domain> -k <label>
 	//                                  -t <threads> -qs (optimized/quickscan).
@@ -116,15 +112,13 @@ func (t *CloudEnumTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 	var termErr error
 	// cloudEnumRan records whether cloud_enum was actually DISPATCHED. An absent
 	// binary means this task observed nothing and must not clear a previous
-	// run's staging (F3 did-not-run — see writeOSINTStaging).
+	// run's staging (did-not-run rule — see writeOSINTStaging).
 	cloudEnumRan := false
 	if ev, sErr := app.Tools.Stream(ctx, "cloud_enum", args); sErr != nil {
-		if app.Log != nil {
-			app.Log.Debug("osint.cloud_enum: stream error (best_effort)", "err", sErr)
-		}
+		app.Log.Debug("osint.cloud_enum: stream error (best_effort)", "err", sErr)
 	} else {
 		cloudEnumRan = true
-		// F6 (phase 15) accumulator shape: latch the TERMINAL error inside the
+		// Terminal-error accumulator shape: latch the TERMINAL error inside the
 		// loop and act on it after. `sErr` above is the DISPATCH error and keeps
 		// its untouched best-effort branch.
 		for e := range ev {
@@ -140,7 +134,7 @@ func (t *CloudEnumTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 			}
 			bucketLines = append(bucketLines, line)
 		}
-		// F6: cloud_enum exited non-zero, so the bucket list above covers only
+		// Terminal error: cloud_enum exited non-zero, so the bucket list above covers only
 		// part of the keyword space. Return before the list is preserved and
 		// before the staging write: publishing a partial enumeration as this
 		// run's result would report a still-open bucket as closed, and clearing
@@ -151,11 +145,11 @@ func (t *CloudEnumTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 		}
 	}
 
-	// Step 4: preserve the high-value bucket list (D-O5 single-writer).
+	// Step 4: preserve the high-value bucket list (single-writer).
 	if len(bucketLines) > 0 {
 		listPath := filepath.Join(osintDir, "cloud_enum.txt")
 		if wErr := os.WriteFile(listPath,
-			[]byte(strings.Join(bucketLines, "\n")+"\n"), 0o644); wErr != nil && app.Log != nil { //nolint:gosec
+			[]byte(strings.Join(bucketLines, "\n")+"\n"), 0o644); wErr != nil { //nolint:gosec
 			app.Log.Debug("osint.cloud_enum: write cloud_enum.txt failed", "err", wErr)
 		}
 	}
@@ -164,18 +158,16 @@ func (t *CloudEnumTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 	records := parseCloudEnumLines(bucketLines)
 
 	// Step 6: write staging JSONL (multi-writer contract).
-	// F3: a run that found no exposed bucket REMOVES the staging file, so a
+	// Run isolation: a run that found no exposed bucket REMOVES the staging file, so a
 	// bucket that has since been locked down stops being republished as still
 	// world-readable.
 	if cloudEnumRan {
 		writeOSINTStaging(app, inputsDir, "findings.cloud_enum.jsonl", records)
-	} else if app.Log != nil {
-		app.Log.Debug("osint.cloud_enum: cloud_enum did not run — staging preserved (F3 did-not-run)")
+	} else {
+		app.Log.Debug("osint.cloud_enum: cloud_enum did not run — staging preserved (did-not-run rule)")
 	}
 
-	if app.Log != nil {
-		app.Log.Info("osint.cloud_enum: completed", "buckets", len(records))
-	}
+	app.Log.Info("osint.cloud_enum: completed", "buckets", len(records))
 	return task.Result{
 		Status: task.StatusDone,
 		Stats:  map[string]int{"buckets": len(records)},
@@ -195,7 +187,7 @@ func labelOf(domain string) string {
 // reported bucket is classified by provider (cloud-bucket-{s3,gcp,azure}) and
 // assigned a security severity: a PUBLIC/OPEN bucket is high (an exploitable
 // exposure); any other reported (existing/protected) bucket is medium. Bucket
-// names are the intended OSINT finding, NOT a credential (T-07-04-02 accept), so
+// names are the intended OSINT finding, NOT a credential, so
 // the bucket locator is carried in PoCRedacted.
 func parseCloudEnumLines(lines []string) []OSINTFindingRecord {
 	var records []OSINTFindingRecord
@@ -216,7 +208,7 @@ func parseCloudEnumLines(lines []string) []OSINTFindingRecord {
 			Class:       "osint",
 			Source:      "cloud_enum",
 			Category:    category,
-			PoCRedacted: line, // bucket locator — non-secret OSINT finding (T-07-04-02)
+			PoCRedacted: line, // bucket locator — non-secret OSINT finding
 		})
 	}
 	return records

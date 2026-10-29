@@ -1,7 +1,4 @@
 // resolve_test.go — TDD tests for 6 active DNS resolution Tasks.
-//
-// Source: .planning/phases/04-subdomains-e2e-axiom-integration/04-02-PLAN.md
-// Task 1 behavior tests.
 package subdomains_test
 
 import (
@@ -192,7 +189,7 @@ func TestResolveTasksBuildNoPanic(t *testing.T) {
 }
 
 // -------------------------------------------------------------------------
-// Test 8 (13-01 Task 2): resolve DNS tasks degrade a tool-exec error to
+// Test 8: resolve DNS tasks degrade a tool-exec error to
 // StatusDone (CONTINUE_ON_TOOL_ERROR parity) instead of aborting the subs run.
 // -------------------------------------------------------------------------
 
@@ -221,7 +218,7 @@ func TestResolveDegradesOnToolError(t *testing.T) {
 				t.Fatalf("degrade must NOT return an error, got %v", err)
 			}
 
-			// The STATUS expectation is updated deliberately in phase 16.
+			// The STATUS expectation was updated deliberately when degrade became SKIP.
 			//
 			// It previously demanded StatusDone, which encoded a mistranslation of
 			// the parity requirement: v1's CONTINUE_ON_TOOL_ERROR means the RUN
@@ -287,10 +284,10 @@ func TestResolvePropagatesContextCancel(t *testing.T) {
 	}
 }
 
-// TestSubPTRTaskRemoved proves the dead SubPTRTask is gone (13-01 Task 2).
+// TestSubPTRTaskRemoved proves the dead SubPTRTask is gone.
 func TestSubPTRTaskRemoved(t *testing.T) {
 	if _, ok := task.Default.Lookup("subdomains.ptr"); ok {
-		t.Error("subdomains.ptr still registered — dead SubPTRTask must be removed (13-01 Task 2)")
+		t.Error("subdomains.ptr still registered — dead SubPTRTask must be removed")
 	}
 }
 
@@ -317,7 +314,7 @@ func (b *erroringBackend) HealthCheck(_ context.Context) error { return nil }
 func (b *erroringBackend) Capacity() int                       { return 1 }
 
 // -------------------------------------------------------------------------
-// Test 7 (13-01 Task 1): SubDNSTask persists the dnsregs records artefact +
+// Test 7: SubDNSTask persists the dnsregs records artefact +
 // subdomains_ips.txt AND stages in-scope hostnames harvested from the records.
 // -------------------------------------------------------------------------
 
@@ -405,6 +402,7 @@ func seedTestResolvers(cfg *config.Config, workDir string) {
 // newTestApp builds a minimal AppContext for resolve Task tests.
 func newTestApp(workDir string, runner *backend.Runner, tree *mockTree) *appctx.AppContext {
 	app := &appctx.AppContext{
+		Log:   appctx.NopLogger(),
 		Tools: runner,
 		Tree:  tree,
 		Target: &appctx.Target{
@@ -470,8 +468,8 @@ func (m *streamTrackingBackend) Stream(_ context.Context, _ *backend.Tool, _ []s
 func (m *streamTrackingBackend) HealthCheck(_ context.Context) error { return nil }
 func (m *streamTrackingBackend) Capacity() int                       { return 1 }
 
-// ExecOpts satisfies the backend.Backend options seam added in 18-01. It
-// PRESERVES this fake's pre-18-01 dispatch exactly: Runner.Run used to call
+// ExecOpts satisfies the backend.Backend options seam. It PRESERVES this
+// fake's original dispatch exactly: Runner.Run used to call
 // Backend.Exec and Runner.RunEnv used to call Backend.ExecEnv, and both now
 // arrive here, so the env-set case forwards to ExecEnv and the zero case to Exec.
 //

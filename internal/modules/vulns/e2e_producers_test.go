@@ -149,7 +149,7 @@ func TestE2ESprayIPResolvesToInScopeHost(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	app := &appctx.AppContext{Target: &appctx.Target{WorkDir: workDir, Domain: "example.com"}}
+	app := &appctx.AppContext{Log: appctx.NopLogger(), Target: &appctx.Target{WorkDir: workDir, Domain: "example.com"}}
 	in := []VulnFindingRecord{{Host: "10.0.0.5", VulnClass: "credential-spray", Engine: "brutespray"}}
 
 	got := sprayResolveScopeHosts(app, in)
@@ -184,7 +184,7 @@ func TestE2EScannerFindingsSurviveRealScopeGate(t *testing.T) {
 		[]byte(`{"host":"ssh.example.com","ip":"10.0.0.5"}`+"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	app := &appctx.AppContext{Tree: tree, Target: &appctx.Target{WorkDir: workDir, Domain: "example.com"}}
+	app := &appctx.AppContext{Log: appctx.NopLogger(), Tree: tree, Target: &appctx.Target{WorkDir: workDir, Domain: "example.com"}}
 
 	recs := sprayResolveScopeHosts(app, parseBrutesprayHits(
 		[]byte("[+] ssh 10.0.0.5:22 - login successful - admin:hunter2\n")))

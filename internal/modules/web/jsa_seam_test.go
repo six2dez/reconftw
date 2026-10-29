@@ -1,4 +1,4 @@
-// jsa_seam_test.go — the proof that web.jsa came home to backend.Runner (18-05)
+// jsa_seam_test.go — the proof that web.jsa came home to backend.Runner
 // with the interpreter-plus-script argv INTACT.
 //
 // THE CONTROL IS THE PRE-MOVE ARG VECTOR, captured from jsa.go as it stood at
@@ -109,6 +109,7 @@ func newJsaTestApp(t *testing.T, workDir, toolsRoot string) *appctx.AppContext {
 	cfg.Web.JS.Enabled = true
 	cfg.Concurrency.MaxJobs = 2
 	return &appctx.AppContext{
+		Log:    appctx.NopLogger(),
 		Tools:  backend.NewRunner(&backend.LocalBackend{}, reg, nil),
 		Cfg:    cfg,
 		Target: &appctx.Target{Domain: "example.com", WorkDir: workDir},
@@ -205,7 +206,7 @@ func TestJsaIsRecorded(t *testing.T) {
 
 // TestJsaSkipsWhenUnresolvable pins the FAILURE POLICY across the move.
 //
-// Before 18-05 an absent venv or jsa.py was caught by an os.Stat probe and the
+// Before the move an absent venv or jsa.py was caught by an os.Stat probe and the
 // Task returned StatusSkipped BEFORE reading any URL. After the move there is no
 // probe, so the same status has to fall out of the dispatch — otherwise an
 // uninstalled JSA would report StatusDone over zero results, which is a tool
@@ -230,6 +231,7 @@ func TestJsaSkipsWhenUnresolvable(t *testing.T) {
 	cfg.Web.JS.Enabled = true
 	cfg.Concurrency.MaxJobs = 2
 	app := &appctx.AppContext{
+		Log:    appctx.NopLogger(),
 		Tools:  backend.NewRunner(&backend.LocalBackend{}, reg, nil),
 		Cfg:    cfg,
 		Target: &appctx.Target{Domain: "example.com", WorkDir: workDir},
@@ -249,13 +251,13 @@ func TestJsaSkipsWhenUnresolvable(t *testing.T) {
 	}
 }
 
-// TestJsaUnresolvableMidRunDoesNotPublishATruncatedCorpus pins the WR-07 fix.
+// TestJsaUnresolvableMidRunDoesNotPublishATruncatedCorpus pins the mid-run latch fix.
 //
 // The skip condition also required len(allRecords) == 0. If a handful of the
 // per-URL goroutines finished before the unresolvable latch was set, the task fell
 // through to StageJSONL with a PARTIAL corpus and overwrote the previous run's
 // COMPLETE one. The comment claimed "a run in which JSA never executed cannot
-// clear a previous run's URLs (F3 did-not-run)" — true only for the
+// clear a previous run's URLs (did-not-run)" — true only for the
 // all-or-nothing case, and a partial run is precisely the one that destroys more
 // than it replaces.
 //

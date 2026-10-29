@@ -5,19 +5,17 @@
 // Wafw00fTask runs wafw00f against all probed hosts, parses its text output
 // via extract/waf.ExtractWafw00f, and writes WAFResult records to waf.jsonl.
 //
-// ARG VECTOR (RESEARCH §wafw00f — verbatim v1 form):
+// ARG VECTOR (verbatim v1 form):
 //
 //	wafw00f -i <hostsfile> -o <stagingfile>
 //
-// wafw00f is in the D-W13 axiom map; app.Tools.Run dispatches transparently
+// wafw00f is in the axiom map; app.Tools.Run dispatches transparently
 // to AxiomBackend or LocalBackend based on configuration.
 //
-// T-05-08: wafw00f output filtered to in-scope hosts via extract/waf.ExtractWafw00f.
-// T-05-10: tool stdout routed to run.log via app.Tools.Run, never terminal INFO.
+// Wafw00f output filtered to in-scope hosts via extract/waf.ExtractWafw00f.
+// Tool stdout routed to run.log via app.Tools.Run, never terminal INFO.
 //
-// [ASSUMED A15: wafw00f -i/-o flags are current — verify at install (DoD-1).]
-//
-// Source: .planning/phases/05-web-pipeline-e2e/05-03-PLAN.md Task 2.
+// [ASSUMED A15: wafw00f -i/-o flags are current — verify at install .]
 package web
 
 import (
@@ -35,7 +33,7 @@ import (
 	"github.com/six2dez/reconftw/internal/extract/waf"
 )
 
-// WAFRecord is the D-W11 waf.jsonl schema row.
+// WAFRecord is the waf.jsonl schema row.
 // Both wafw00f and cdncheck write into the same artefact file; fields unused
 // by the producing task are written as empty strings.
 type WAFRecord struct {
@@ -63,9 +61,7 @@ func (t *Wafw00fTask) Run(ctx context.Context, app *appctx.AppContext) (task.Res
 	// Collect URLs from hosts.jsonl.
 	urls, err := readHostURLsFromJSONL(app)
 	if err != nil || len(urls) == 0 {
-		if app.Log != nil {
-			app.Log.Info("web.wafw00f: no hosts in hosts.jsonl — skipping")
-		}
+		app.Log.Info("web.wafw00f: no hosts in hosts.jsonl — skipping")
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
@@ -91,11 +87,13 @@ func (t *Wafw00fTask) Run(ctx context.Context, app *appctx.AppContext) (task.Res
 
 	res, execErr := app.Tools.Run(ctx, toolName, args)
 	if execErr != nil {
-		if app.Log != nil {
-			app.Log.Info("web.wafw00f: binary absent or failed — skipping",
-				"err", execErr)
-		}
-		return task.Result{Status: task.StatusSkipped}, nil
+		// Absent-vs-failed policy (task.ClassifyToolErr): a wafw00f that never
+		// started is "tool absent"; one that could not be run for any other
+		// reason is degraded with its own account of why. Neither fails the
+		// scan (best_effort).
+		status, reason := task.ClassifyToolErr(execErr)
+		app.Log.Info("web.wafw00f: wafw00f not run — skipping", "reason", reason)
+		return task.Result{Status: status, Reason: reason}, nil
 	}
 
 	// Parse staging file output; fall back to stdout.
@@ -108,7 +106,7 @@ func (t *Wafw00fTask) Run(ctx context.Context, app *appctx.AppContext) (task.Res
 
 	results, _ := waf.ExtractWafw00f(raw, app.Target.Domain)
 
-	// F3 (phase 15): the old `if len(results) == 0 { return StatusDone }`
+	// The old `if len(results) == 0 { return StatusDone }`
 	// short-circuit left a previous run's inputs/waf.wafw00f.jsonl for the waf
 	// merge to republish, so a WAF that has since been removed kept appearing.
 	// wafw00f RAN (absent binary returned StatusSkipped above): stage
@@ -133,14 +131,12 @@ func (t *Wafw00fTask) Run(ctx context.Context, app *appctx.AppContext) (task.Res
 		lines = append(lines, b)
 	}
 	stagingPath := filepath.Join(app.Target.WorkDir, "inputs", "waf.wafw00f.jsonl")
-	if wErr := output.StageJSONL(stagingPath, lines); wErr != nil && app.Log != nil {
+	if wErr := output.StageJSONL(stagingPath, lines); wErr != nil {
 		app.Log.Debug("web.wafw00f: staging write failed",
 			"path", stagingPath, "err", wErr)
 	}
 
-	if app.Log != nil {
-		app.Log.Debug("web.wafw00f: completed", "waf_detected", len(results))
-	}
+	app.Log.Debug("web.wafw00f: completed", "waf_detected", len(results))
 	return task.Result{
 		Status: task.StatusDone,
 		Stats:  map[string]int{"waf_detected": len(results)},

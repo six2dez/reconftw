@@ -1,6 +1,6 @@
 // dag_test.go — Vulns task-DAG build + topological-order regression guard.
 //
-// These tests close the structural gap mirroring web/dag_test.go (Phase 5
+// These tests close the structural gap mirroring web/dag_test.go (the web stage
 // CR-01/CR-02/CR-03 lesson): the multi-writer staging tests call
 // MergeVulnsFindings directly and NEVER build the DAG, so a circular
 // DependsOn could pass `go build` and the whole unit suite while the
@@ -12,9 +12,7 @@
 //
 // TestVulnsDAGTopoOrder asserts the topological order places vulns.gf BEFORE
 // every scanner Task that DependsOn it. This catches a reintroduced backwards
-// edge AND a stage/DependsOn contradiction (mirrors Phase 5 CR-02).
-//
-// Source: .planning/phases/06-vulnerability-scanning-e2e/06-09-PLAN.md Task 1.
+// edge AND a stage/DependsOn contradiction (mirrors the web package).
 package vulns_test
 
 import (
@@ -37,7 +35,7 @@ func TestVulnsDAGBuilds(t *testing.T) {
 	}
 }
 
-// TestVulnsDAGTopoOrder verifies that vulns.gf (the DAG root, D-V4) topo-sorts
+// TestVulnsDAGTopoOrder verifies that vulns.gf (the DAG root) topo-sorts
 // BEFORE every scanner Task that DependsOn it. This is the structural contract
 // that keeps the whole pipeline from deadlocking at runtime.
 func TestVulnsDAGTopoOrder(t *testing.T) {

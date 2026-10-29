@@ -159,21 +159,15 @@ var silentSuccessAllowlist = map[string][]string{
 	"internal/modules/osint/cmseek.go":            {"CMSeeKTask.Run"},
 	"internal/modules/osint/domain_info.go":       {"DomainInfoTask.Run", "DomainInfoTask.runScopify"},
 	"internal/modules/osint/emails.go":            {"EmailsTask.Run", "EmailsTask.runLeakSearch"},
-	"internal/modules/osint/favirecon.go":         {"FaviReconTask.Run"},
-	"internal/modules/osint/gitdorks.go":          {"GitDorksTask.Run"},
 	"internal/modules/osint/github_actions.go":    {"GitHubActionsTask.Run"},
-	"internal/modules/osint/github_dorks.go":      {"GitHubDorksTask.Run"},
 	"internal/modules/osint/github_leaks.go":      {"GitHubLeaksTask.Run"},
 	"internal/modules/osint/github_repos.go":      {"GitHubReposTask.Run", "GitHubReposTask.runTitusScan", "GitHubReposTask.runTrufflehogScan"},
 	"internal/modules/osint/gqlspection.go":       {"GQLSpectionTask.Run"},
 	"internal/modules/osint/ip_info.go":           {"IPInfoTask.Run", "IPInfoTask.resolveIPs"},
 	"internal/modules/osint/metadata.go":          {"MetadataTask.Run"},
 	"internal/modules/osint/misconfig.go":         {"MisconfigTask.Run"},
-	"internal/modules/osint/msftrecon.go":         {"MSFTReconTask.Run"},
 	"internal/modules/osint/postman.go":           {"PostmanTask.Run"},
-	"internal/modules/osint/spoofy.go":            {"SpoofyTask.Run"},
 	"internal/modules/osint/swagger.go":           {"SwaggerTask.Run"},
-	"internal/modules/osint/xnldorker.go":         {"XnldorkerTask.Run"},
 	"internal/modules/subdomains/asn.go":          {"SubASNTask.Run"},
 	"internal/modules/subdomains/buckets.go":      {"SubBucketsTask.Run"},
 	"internal/modules/subdomains/csprecon.go":     {"SubCspreconTask.Run"},
@@ -181,7 +175,6 @@ var silentSuccessAllowlist = map[string][]string{
 	"internal/modules/subdomains/zonetransfer.go": {"attemptAXFR"},
 	"internal/modules/vulns/cmdi.go":              {"CMDITask.Run"},
 	"internal/modules/vulns/crlf.go":              {"CRLFTask.Run"},
-	"internal/modules/vulns/fray.go":              {"FrayTask.Run"},
 	"internal/modules/vulns/fuzzparams.go":        {"FuzzparamsTask.Run"},
 	"internal/modules/vulns/gf.go":                {"GFTask.Run"},
 	"internal/modules/vulns/graphql.go":           {"GraphQLTask.Run"},
@@ -207,7 +200,7 @@ var silentSuccessAllowlist = map[string][]string{
 // 16-02 Task 3 seed: 49 (osint 24, vulns 19, subdomains 5, web 1).
 // LOWER IT as sites are fixed. It may never be raised: a new tool-error branch
 // reports a non-Done status and logs at Info or above on the day it is written.
-const silentSuccessAllowlistSize = 49
+const silentSuccessAllowlistSize = 42
 
 // --- rules ------------------------------------------------------------------
 
@@ -350,25 +343,6 @@ func TestSilentSuccessSkipsTestdata(t *testing.T) {
 			t.Errorf("the real-tree walk reported a fixture: %s", v)
 		}
 	}
-}
-
-// TestSilentSuccessCensus records the size of rule B1's coverage. Numbers, not
-// adjectives: the next plan that picks this up needs to know what is left.
-func TestSilentSuccessCensus(t *testing.T) {
-	_, _, c := checkSilentSuccessFull(".", silentSuccessAllowlist)
-	t.Logf("silent-success census under internal/modules/:\n"+
-		"  files walked ................ %d\n"+
-		"  tool-invoking functions ..... %d\n"+
-		"  with an error branch ........ %d  (%d branches)\n"+
-		"  no error branch at all ...... %d\n"+
-		"  error bound to _ ............ %d\n"+
-		"  compliant ................... %d\n"+
-		"  violating ................... %d\n"+
-		"  allowlisted ................. %d\n"+
-		"  unclassified returns ........ %d\n"+
-		"  branches loudest at Info .... %d",
-		c.Files, c.ToolFuncs, c.WithErrBranch, c.Branches, c.NoErrorBranch,
-		c.DiscardedError, c.Compliant, c.Violating, c.Allowlisted, c.Unclassified, c.InfoLevel)
 }
 
 // TestSilentSuccessDetector proves the detector itself works, in BOTH

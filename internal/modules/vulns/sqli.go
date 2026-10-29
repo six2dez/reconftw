@@ -2,18 +2,18 @@
 //
 // SQLiTask reads inputs/gf/sqli.txt produced by GFTask, runs the URL set
 // through a qsreplace FUZZ pipeline, then dispatches to sqlmap (default-on)
-// and/or ghauri (default-off) based on per-engine config flags (D-V6).
+// and/or ghauri (default-off) based on per-engine config flags.
 //
 // DEPENDENCY: DependsOn ["vulns.gf"] — reads inputs/gf/sqli.txt bucket.
 //
-// ENGINE SELECTION (D-V6 conservative defaults):
+// ENGINE SELECTION (conservative defaults):
 //
 //	cfg.Vulns.SQLi.SQLMap (default true)  — run sqlmap
 //	cfg.Vulns.SQLi.Ghauri (default false) — run ghauri (opt-in)
 //
 // At least one engine must be enabled, else StatusSkipped.
 //
-// DEEP LIMIT GATE (T-06-03-03):
+// DEEP LIMIT GATE:
 // If URL count > cfg.Advanced.DeepLimit and !cfg.Advanced.Deep → StatusSkipped.
 // Mirrors v1 sqli() DEEP_LIMIT check (vulns.sh:528-529).
 //
@@ -23,15 +23,13 @@
 //	        --batch --disable-coloring --random-agent --output-dir=<dir>
 //	ghauri: ghauri -u <url> --batch -H <header> --force-ssl
 //
-// PAYLOAD REDACTION (XCUT-07, T-06-03-01):
+// PAYLOAD REDACTION (XCUT-07):
 // sqlmap/ghauri stdout contains raw SQL payloads — NEVER logged at Info/Warn.
 // PayloadRedacted and PoCRedacted are always "***" in every VulnFindingRecord.
 //
 // HEARTBEAT (XCUT-09):
 // Backend.Stream used for BOTH sqlmap and ghauri — sqlmap can run for hours
 // per URL set against complex targets; ghauri per URL can run >10 min.
-//
-// Source: .planning/phases/06-vulnerability-scanning-e2e/06-03-PLAN.md Task 1.
 package vulns
 
 import (
@@ -76,20 +74,18 @@ func (t *SQLiTask) DependsOn() []string { return []string{"vulns.gf"} }
 //  2. Read inputs/gf/sqli.txt — skip if empty (no sqli gf candidates).
 //  3. qsreplace FUZZ pipeline: pipe through qsreplace FUZZ; filter "FUZZ" lines;
 //     write to inputs/tmp_sqli.txt.
-//  4. Deep-limit gate (T-06-03-03): skip if URL count > DeepLimit and !Deep.
+//  4. Deep-limit gate: skip if URL count > DeepLimit and !Deep.
 //  5. If SQLMapEnabled: Stream sqlmap with -m flag; drain; parse sqlmapOutDir.
 //  6. If GhauriEnabled: for each URL, Stream ghauri; drain; parse output lines.
 //  7. Write inputs/findings.sqli.jsonl via output.WriteJSONL.
 func (t *SQLiTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result, error) {
 	cfg := app.Cfg
 
-	// Step 1: Engine selection — at least one must be enabled (D-V6 / T-06-03-03).
+	// Step 1: Engine selection — at least one must be enabled.
 	sqlmapEnabled := cfg.Vulns.SQLi.SQLMap
 	ghauriEnabled := cfg.Vulns.SQLi.Ghauri
 	if !sqlmapEnabled && !ghauriEnabled {
-		if app.Log != nil {
-			app.Log.Info("vulns.sqli: no engine enabled (sqlmap=false, ghauri=false) — SQLi skipped")
-		}
+		app.Log.Info("vulns.sqli: no engine enabled (sqlmap=false, ghauri=false) — SQLi skipped")
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
@@ -97,10 +93,8 @@ func (t *SQLiTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 	gfBucket := filepath.Join(app.Target.WorkDir, "inputs", "gf", "sqli.txt")
 	bucketData, err := os.ReadFile(gfBucket) //nolint:gosec // path within WorkDir
 	if err != nil || len(bytes.TrimSpace(bucketData)) == 0 {
-		if app.Log != nil {
-			app.Log.Info("vulns.sqli: gf/sqli bucket empty — SQLi skipped",
-				"bucket", gfBucket)
-		}
+		app.Log.Info("vulns.sqli: gf/sqli bucket empty — SQLi skipped",
+			"bucket", gfBucket)
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
@@ -124,9 +118,7 @@ func (t *SQLiTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 		}
 	}
 	if len(fuzzLines) == 0 {
-		if app.Log != nil {
-			app.Log.Info("vulns.sqli: no FUZZ candidates after qsreplace — SQLi skipped")
-		}
+		app.Log.Info("vulns.sqli: no FUZZ candidates after qsreplace — SQLi skipped")
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
@@ -138,17 +130,15 @@ func (t *SQLiTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 			fmt.Errorf("vulns.sqli: write tmp_sqli.txt: %w", wErr)
 	}
 
-	// Step 4: Deep-limit gate (T-06-03-03 — DoS mitigation).
+	// Step 4: Deep-limit gate (DoS mitigation).
 	// v1: if [[ $DEEP == true ]] || [[ $URL_COUNT -le $DEEP_LIMIT ]]
 	deepLimit := cfg.Advanced.DeepLimit
 	if deepLimit <= 0 {
 		deepLimit = 500 // v1 default DEEP_LIMIT
 	}
 	if !cfg.Advanced.Deep && len(fuzzLines) > deepLimit {
-		if app.Log != nil {
-			app.Log.Info("vulns.sqli: too many URLs — skipped (use --deep to override)",
-				"url_count", len(fuzzLines), "deep_limit", deepLimit)
-		}
+		app.Log.Info("vulns.sqli: too many URLs — skipped (use --deep to override)",
+			"url_count", len(fuzzLines), "deep_limit", deepLimit)
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
@@ -161,13 +151,13 @@ func (t *SQLiTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 	var findings []VulnFindingRecord
 	// engineRan records whether AT LEAST ONE enabled engine was actually
 	// dispatched. If neither sqlmap nor ghauri is installed the task observed
-	// nothing and must not clear a previous run's staging (F3 did-not-run —
+	// nothing and must not clear a previous run's staging (did-not-run rule —
 	// staging.go).
 	engineRan := false
 
 	// Step 5: sqlmap (XCUT-09 — Backend.Stream heartbeat; can run hours).
 	//
-	// F6 (phase 15): the helpers return (records, error) into a Run that logs
+	// Terminal error: the helpers return (records, error) into a Run that logs
 	// scanner errors best-effort, so a plain error would be swallowed exactly as
 	// before. isTerminalStreamError separates "the engine RAN and ended badly"
 	// (escalate, discard partial results, leave staging untouched) from "the
@@ -177,7 +167,7 @@ func (t *SQLiTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 		if isTerminalStreamError(sqlmapErr) {
 			return task.Result{Status: task.StatusErrored}, sqlmapErr
 		}
-		if sqlmapErr != nil && app.Log != nil {
+		if sqlmapErr != nil {
 			app.Log.Debug("vulns.sqli: sqlmap error (best_effort)", "err", sqlmapErr)
 		}
 		if sqlmapErr == nil {
@@ -192,7 +182,7 @@ func (t *SQLiTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 		if isTerminalStreamError(ghauriErr) {
 			return task.Result{Status: task.StatusErrored}, ghauriErr
 		}
-		if ghauriErr != nil && app.Log != nil {
+		if ghauriErr != nil {
 			app.Log.Debug("vulns.sqli: ghauri error (best_effort)", "err", ghauriErr)
 		}
 		if ghauriErr == nil {
@@ -203,7 +193,7 @@ func (t *SQLiTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 
 	// Step 7: Write inputs/findings.sqli.jsonl.
 	//
-	// F3 (phase 15): staged through stageVulnFindings so a run in which no engine
+	// Run isolation: staged through stageVulnFindings so a run in which no engine
 	// confirmed an injection REMOVES the previous run's staging instead of
 	// republishing a SQL injection that has since been patched.
 	//
@@ -216,9 +206,7 @@ func (t *SQLiTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 	stageVulnFindings(app, "vulns.sqli", stagingPath, engineRan, findings)
 
 	// XCUT-07: log only count, never raw SQLi payloads.
-	if app.Log != nil {
-		app.Log.Info("vulns.sqli: completed", "findings", len(findings))
-	}
+	app.Log.Info("vulns.sqli: completed", "findings", len(findings))
 
 	return task.Result{
 		Status: task.StatusDone,
@@ -262,7 +250,7 @@ func runSQLMap(ctx context.Context, app *appctx.AppContext,
 	// Drain stream — Backend contract: caller MUST drain until closed.
 	// XCUT-07: each event.Line may contain raw SQL payloads; NEVER log at Info/Warn.
 	//
-	// F6 (phase 15) accumulator shape: latch the TERMINAL error inside the loop
+	// Terminal-error accumulator shape: latch the TERMINAL error inside the loop
 	// and check it after. sqlmap can run for hours and be killed by a timeout or
 	// OOM; without this, a half-finished run reported "no injection".
 	var injectable int
@@ -276,13 +264,11 @@ func runSQLMap(ctx context.Context, app *appctx.AppContext,
 		line := strings.ToLower(string(ev.Line))
 		if strings.Contains(line, "injectable") || strings.Contains(line, "is vulnerable") {
 			injectable++
-			if app.Log != nil {
-				app.Log.Debug("vulns.sqli: sqlmap injectable indicator detected")
-			}
+			app.Log.Debug("vulns.sqli: sqlmap injectable indicator detected")
 		}
 	}
 
-	// F6: sqlmap ended badly. Its output DIRECTORY persists across runs, so the
+	// Terminal error: sqlmap ended badly. Its output DIRECTORY persists across runs, so the
 	// scan below would read a mixture of this run's partial results and the
 	// previous run's — return before it.
 	if termErr != nil {
@@ -328,11 +314,9 @@ func runSQLMap(ctx context.Context, app *appctx.AppContext,
 	// of it — identical records convey nothing extra and collapse in the merge
 	// anyway. The count stays in the log.
 	if len(records) == 0 && injectable > 0 {
-		if app.Log != nil {
-			app.Log.Debug("vulns.sqli: sqlmap stream reported injections with no "+
-				"per-target output dir — recording one finding against the scan target",
-				"indicators", injectable)
-		}
+		app.Log.Debug("vulns.sqli: sqlmap stream reported injections with no "+
+			"per-target output dir — recording one finding against the scan target",
+			"indicators", injectable)
 		records = append(records, newRec(app.Target.Domain))
 	}
 	return records, nil
@@ -391,7 +375,7 @@ func runGhauriPerURL(ctx context.Context, app *appctx.AppContext,
 	// dispatched counts URLs ghauri was actually launched for. Returning nil when
 	// EVERY dispatch failed would tell the caller the engine ran, and the caller
 	// would then clear a previous run's staging on behalf of a tool that is not
-	// installed (F3 did-not-run — staging.go).
+	// installed (did-not-run rule — staging.go).
 	dispatched := 0
 	for _, rawURL := range urls {
 		// Check for context cancellation between URLs.
@@ -416,10 +400,8 @@ func runGhauriPerURL(ctx context.Context, app *appctx.AppContext,
 		eventCh, streamErr := app.Tools.Stream(ctx, toolName, args)
 		if streamErr != nil {
 			// Non-fatal per best_effort — log at Debug only, continue to next URL.
-			if app.Log != nil {
-				app.Log.Debug("vulns.sqli: ghauri stream error (best_effort, continuing)",
-					"err", streamErr)
-			}
+			app.Log.Debug("vulns.sqli: ghauri stream error (best_effort, continuing)",
+				"err", streamErr)
 			continue
 		}
 		dispatched++
@@ -427,7 +409,7 @@ func runGhauriPerURL(ctx context.Context, app *appctx.AppContext,
 		// Drain stream — check for injection confirmation.
 		// XCUT-07: raw line content NEVER forwarded to Info/Warn.
 		//
-		// F6 (phase 15) accumulator shape, per URL: latch the TERMINAL error
+		// Terminal-error accumulator shape, per URL: latch the TERMINAL error
 		// inside the loop and check it after. A ghauri that died on URL 3 of 40
 		// must not let the remaining 37 be reported as clean.
 		var confirmed bool
@@ -440,9 +422,7 @@ func runGhauriPerURL(ctx context.Context, app *appctx.AppContext,
 			// ghauri prints "parameter ... appears to be ... injectable" on confirm.
 			if strings.Contains(line, "injectable") || strings.Contains(line, "identified") {
 				confirmed = true
-				if app.Log != nil {
-					app.Log.Debug("vulns.sqli: ghauri injectable indicator detected")
-				}
+				app.Log.Debug("vulns.sqli: ghauri injectable indicator detected")
 			}
 		}
 
@@ -455,10 +435,10 @@ func runGhauriPerURL(ctx context.Context, app *appctx.AppContext,
 			host := sqliExtractHost(rawURL)
 			records = append(records, VulnFindingRecord{
 				Host: host, // scope-gate locator (findings:host|url)
-				// Phase 4/5 inherited SARIF-compatible fields.
+				// Inherited SARIF-compatible fields.
 				Severity:   "critical",
 				Confidence: "high",
-				// Phase 6 vuln-class fields.
+				// Vuln-class fields.
 				VulnClass:       "sqli",
 				MatchedParam:    host,
 				PayloadRedacted: "***", // XCUT-07: raw ghauri payload never written
@@ -475,7 +455,7 @@ func runGhauriPerURL(ctx context.Context, app *appctx.AppContext,
 
 // sqliReplaceParams replaces all query-parameter values with "FUZZ" in each
 // URL line of the input byte slice. Lines without query params are dropped.
-// Implements the qsreplace FUZZ step in pure Go (T-05-17 shell-injection mitigation).
+// Implements the qsreplace FUZZ step in pure Go (shell-injection mitigation).
 func sqliReplaceParams(data []byte) []byte {
 	sc := bufio.NewScanner(bytes.NewReader(data))
 	var out bytes.Buffer

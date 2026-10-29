@@ -1,4 +1,4 @@
-// subfinder_budget_test.go — CR-07: subfinder's time budget must be expressed in
+// subfinder_budget_test.go — subfinder's time budget must be expressed in
 // the unit subfinder documents.
 //
 // subfinder v2.14.0, `subfinder -h`:

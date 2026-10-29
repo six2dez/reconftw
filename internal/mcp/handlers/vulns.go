@@ -136,6 +136,11 @@ func RunVulnsAsync(ctx context.Context, opts RunOptions) (err error) {
 		}
 	}
 
+	// CUT-08: a standalone vulns scan also finalizes a workspace — materialize the
+	// v1 bash-shape _compat/ tree (+ Recon/<domain> symlink) from the final
+	// findings.jsonl. Idempotent and best-effort: never fails the scan.
+	writeCompatTree(app, workdir, cfg.Output.Compat.ReconSymlink)
+
 	persistScanToStore(ctx, boot, opts, "vulns")
 	return nil
 }

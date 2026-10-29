@@ -1,8 +1,8 @@
-// merge_test.go — F3 (15-03) empty-union behaviour for the vulns merger.
+// merge_test.go — run-isolation empty-union behaviour for the vulns merger.
 //
 // "findings" is a CASE-A stage: artefacts/findings.jsonl has NO direct
 // app.Tree.Append writer outside the merge path, so an empty union must publish
-// a present, EMPTY artefact. Before 15-03 the merger returned nil and run B
+// a present, EMPTY artefact. Before the empty-union fix the merger returned nil and run B
 // republished run A's vulnerability — a remediated finding reappeared in every
 // later report, SARIF export, store row and notification.
 package vulns_test
@@ -27,6 +27,7 @@ func newVulnsMergeApp(t *testing.T) *appctx.AppContext {
 		t.Fatalf("output.NewTree: %v", err)
 	}
 	return &appctx.AppContext{
+		Log:    appctx.NopLogger(),
 		Tree:   tree,
 		Target: &appctx.Target{Domain: "example.com", WorkDir: workdir},
 	}

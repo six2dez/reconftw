@@ -1,6 +1,4 @@
 // sysinfo_test.go — TDD RED tests for MemProvider interface + OSMemProvider.
-//
-// Source: .planning/phases/04-subdomains-e2e-axiom-integration/04-04-PLAN.md Task 1.
 package sysinfo_test
 
 import (

@@ -6,28 +6,28 @@
 //
 // DEPENDENCY: DependsOn ["web.ffuf"] — reads artefacts/fuzz.jsonl as input.
 //
-// REPO-CLONE BINARY (RESEARCH §nomore403, Pitfall 2):
+// REPO-CLONE BINARY:
 // nomore403 is NOT a `go install` tool. It is cloned from GitHub and built
 // locally, at <tools_dir>/nomore403/nomore403.
 //
-// 18-05: IT COMES HOME. Until this plan the binary was probed with os.Stat and
-// dispatched with exec.CommandContext, because the registry resolved every tool
-// with exec.LookPath (which cannot see a clone) and backend.Runner exposed
-// neither stdin nor a working directory. All three gaps are closed:
+// IT COMES HOME. The binary used to be probed with os.Stat and dispatched
+// with exec.CommandContext, because the registry resolved every tool with
+// exec.LookPath (which cannot see a clone) and backend.Runner exposed neither
+// stdin nor a working directory. All three gaps are closed:
 //
-//   - 18-02 declared clone_dir/clone_entry for nomore403 in tools.lock, so
+//   - tools.lock declares clone_dir/clone_entry for nomore403, so
 //     ToolRegistry.Discover resolves Tool.Path from the clone.
-//   - 18-02 declared clone_workdir = true for it — the ONLY row that does —
+//   - tools.lock declares clone_workdir = true for it — the ONLY row that does —
 //     so Discover also populates Tool.WorkDir with the clone directory.
-//   - 18-01 added Runner.RunOpts + ExecOptions.Stdin.
+//   - Runner.RunOpts + ExecOptions.Stdin exist.
 //
-// CRITICAL (T-05-16 / Pitfall 2 mitigation), unchanged as a REQUIREMENT and
+// CRITICAL, unchanged as a REQUIREMENT and
 // changed only in WHO SATISFIES IT: nomore403 must run with its own directory
 // as cwd because it resolves its payload wordlists relative to it (the tool
 // prints "Payloads folder: payloads" — a relative path — in its own banner).
 // That cwd now comes from Tool.WorkDir via the manifest. This file deliberately
 // does NOT pass ExecOptions.Dir: doing so would re-introduce a module-side
-// notion of where the clone lives, which is the thing 18-02 removed.
+// notion of where the clone lives, which is the thing the manifest removed.
 //
 // DEADLINE: the local 300s context.WithTimeout is GONE. tools.lock declares
 // nomore403 timeout_seconds = 300 and applyToolContract derives the bound
@@ -42,11 +42,8 @@
 // both fail), and on that path its stdout carries error prose, not bypasses.
 // So the discarded buffer holds nothing this task ever wanted.
 //
-// INPUT FILTER (RESEARCH §nomore403): only 4xx responses excluding 404 are
+// INPUT FILTER: only 4xx responses excluding 404 are
 // meaningful bypass candidates (v1 vulns.sh:762: grep 4xx not 404, awk $3).
-//
-// Source: .planning/phases/05-web-pipeline-e2e/05-05-PLAN.md Task 1;
-// .planning/phases/18-the-runner-seam-close-the-bypass/18-05-PLAN.md Task 1.
 package web
 
 import (
@@ -55,7 +52,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -68,13 +64,13 @@ import (
 )
 
 // nomore403ToolName is the tools.lock entry this task dispatches. The same row
-// is dispatched by vulns/bypass4xx.go, and after 18-05 BOTH resolve it through
+// is dispatched by vulns/bypass4xx.go, and now BOTH resolve it through
 // the registry — pinned by TestBypass4xxAndNomore403ResolveTheSameBinary.
 const nomore403ToolName = "nomore403"
 
 // nomore403Args is the arg vector. IT IS EMPTY, and that is the captured
 // pre-move value, not an omission: nomore403 reads its target URLs from
-// standard input and the pre-18-05 call was exec.CommandContext(ctx, binaryPath)
+// standard input and the pre-move call was exec.CommandContext(ctx, binaryPath)
 // with no arguments at all. tools.lock declares default_args = [] for this row,
 // so applyToolContract prepends nothing and the command line is byte-for-byte
 // what it has always been.
@@ -110,13 +106,11 @@ func (t *Nomore403Task) Run(ctx context.Context, app *appctx.AppContext) (task.R
 
 	// Read fuzz.jsonl; collect 4xx URLs excluding 404.
 	fuzzURLs, err := read4xxURLsFromFuzzJSONL(app)
-	if err != nil && app.Log != nil {
+	if err != nil {
 		app.Log.Debug("web.nomore403: read fuzz.jsonl error", "err", err)
 	}
 	if len(fuzzURLs) == 0 {
-		if app.Log != nil {
-			app.Log.Info("web.nomore403: no 4xx bypass candidates in fuzz.jsonl — skipping")
-		}
+		app.Log.Info("web.nomore403: no 4xx bypass candidates in fuzz.jsonl — skipping")
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
@@ -136,19 +130,17 @@ func (t *Nomore403Task) Run(ctx context.Context, app *appctx.AppContext) (task.R
 		// leaves Path empty, so cmd.Start fails and LocalBackend reports
 		// NeverStarted), is the SAME graceful skip the os.Stat gate used to give
 		// — including not staging, so a run in which nomore403 never ran cannot
-		// clear a previous run's bypasses (F3 did-not-run).
+		// clear a previous run's bypasses (did-not-run).
 		if coreerrors.IsDispatchFailure(runErr) {
-			if app.Log != nil {
-				app.Log.Info("web.nomore403: nomore403 unavailable — run reconftw install")
-			}
-			return task.Result{Status: task.StatusSkipped}, nil
+			status, reason := task.ClassifyToolErr(runErr)
+			app.Log.Info("web.nomore403: nomore403 unavailable — run reconftw install",
+				"reason", reason)
+			return task.Result{Status: status, Reason: reason}, nil
 		}
 		// A non-zero exit means the target could not be reached at all (see the
 		// header's measurement). No partial output is parsed on this path.
-		if app.Log != nil {
-			app.Log.Debug("web.nomore403: nomore403 exited non-zero (no partial output on this path)",
-				"err", runErr)
-		}
+		app.Log.Debug("web.nomore403: nomore403 exited non-zero (no partial output on this path)",
+			"err", runErr)
 	}
 
 	var outBytes []byte
@@ -157,9 +149,9 @@ func (t *Nomore403Task) Run(ctx context.Context, app *appctx.AppContext) (task.R
 	}
 	findings := parseNomore403Output(outBytes)
 
-	// Stage findings for the findings merge (best_effort D-W12).
+	// Stage findings for the findings merge (best_effort).
 	//
-	// F3 (phase 15): staged UNCONDITIONALLY — StageJSONL removes the staging
+	// Staged UNCONDITIONALLY — StageJSONL removes the staging
 	// file when this run found no bypasses, so a previous run's bypasses cannot
 	// be republished.
 	var lines [][]byte
@@ -170,38 +162,34 @@ func (t *Nomore403Task) Run(ctx context.Context, app *appctx.AppContext) (task.R
 		}
 		lines = append(lines, b)
 	}
-	// F3 DID-NOT-RUN, deadline arm (18-06 code review, CR-03). Reaching here with
+	// DID-NOT-RUN, deadline arm. Reaching here with
 	// res == nil means the tool did NOT complete — a tools.lock deadline, a crash,
 	// or a cancelled context. Before the move each of these files applied its own
 	// context.WithTimeout and PARSED the partially-filled buffer, so a timeout
 	// still staged what it had seen. The move removed both, so res is nil and
 	// findings is empty — and StageJSONL implements an empty input as os.Remove.
 	// A run that never observed the corpus has no standing to delete what a
-	// previous run did observe, which is exactly what the F3 comment below claims
+	// previous run did observe, which is exactly what the staging comment below claims
 	// and, on this path, did not deliver.
 	if res == nil {
-		if app.Log != nil {
-			app.Log.Warn("web.nomore403: incomplete run — previous staging preserved",
-				"err", runErr)
-		}
+		app.Log.Warn("web.nomore403: incomplete run — previous staging preserved",
+			"err", runErr)
 	} else {
 		stagingPath := filepath.Join(app.Target.WorkDir, "inputs", "findings.nomore403.jsonl")
-		if wErr := output.StageJSONL(stagingPath, lines); wErr != nil && app.Log != nil {
+		if wErr := output.StageJSONL(stagingPath, lines); wErr != nil {
 			app.Log.Debug("web.nomore403: staging write failed",
 				"path", stagingPath, "err", wErr)
 		}
 	}
 
-	if app.Log != nil {
-		app.Log.Debug("web.nomore403: completed",
-			"input_urls", len(fuzzURLs),
-			"bypasses", len(findings))
-	}
+	app.Log.Debug("web.nomore403: completed",
+		"input_urls", len(fuzzURLs),
+		"bypasses", len(findings))
 
 	return task.Result{
 		Status: task.StatusDone,
 		Stats:  map[string]int{"bypasses": len(findings)},
-		// V-04: the tool did not finish (deadline, crash, cancellation), so this run
+		// The tool did not finish (deadline, crash, cancellation), so this run
 		// must NOT be checkpointed as done — otherwise the next run with the same
 		// input hash skips it and the deadline becomes a permanent, silent hole.
 		// Status stays non-error on purpose: this is best-effort and must not fail
@@ -239,28 +227,23 @@ func parseNomore403Output(data []byte) []FindingRecord {
 
 // read4xxURLsFromFuzzJSONL reads artefacts/fuzz.jsonl and returns URLs with
 // status codes 400-499 excluding 404 (bypass candidates per v1 vulns.sh:762).
+
 func read4xxURLsFromFuzzJSONL(app *appctx.AppContext) ([]string, error) {
 	fuzzPath := filepath.Join(app.Target.WorkDir, "artefacts", "fuzz.jsonl")
-	data, err := os.ReadFile(fuzzPath) //nolint:gosec // path within WorkDir
-	if err != nil {
-		return nil, fmt.Errorf("read fuzz.jsonl: %w", err)
-	}
 	var urls []string
-	scanner := bufio.NewScanner(bytes.NewReader(data))
-	scanner.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
-	for scanner.Scan() {
-		line := bytes.TrimSpace(scanner.Bytes())
-		if len(line) == 0 {
-			continue
-		}
+	err := output.ForEachJSONLLine(fuzzPath, 0, func(line []byte) error {
 		var rec FuzzRecord
 		if err := json.Unmarshal(line, &rec); err != nil {
-			continue
+			return nil // malformed record: skipped, as before
 		}
 		// Filter: 4xx excluding 404 (status >= 400 AND <= 499 AND != 404).
 		if rec.Status >= 400 && rec.Status <= 499 && rec.Status != 404 && rec.URL != "" {
 			urls = append(urls, rec.URL)
 		}
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("read fuzz.jsonl: %w", err)
 	}
 	return urls, nil
 }

@@ -2,10 +2,10 @@
 //
 // DomainInfoTask runs whois on the root domain and dnsx for the NS/MX/TXT/SOA
 // DNS record set (v1 modules/osint.sh:575 domain_info + mail_hygiene's TXT/DMARC
-// records). Each record becomes an informational OSINTFindingRecord (D-O4) and
+// records). Each record becomes an informational OSINTFindingRecord and
 // is written to inputs/findings.domain_info.jsonl per the multi-writer staging
-// contract (doc.go — D-O3). The raw whois text is preserved as the single-writer
-// human file osint/domain_info_general.txt (D-O5).
+// contract (doc.go). The raw whois text is preserved as the single-writer
+// human file osint/domain_info_general.txt.
 //
 // It then runs Scopify (v1 domain_info() osint.sh:606-607) over the registrable
 // company name (the `unfurl format %r` analog, companyName) → osint/scopify.txt.
@@ -14,19 +14,17 @@
 // name through app.Tools (mirroring the other python-venv osint tools) and, like
 // bash, writes its report to STDOUT which we capture to the single-writer file.
 //
-// SEEDING (D-O1): root-domain-seeded — runs from app.Target.Domain alone, no URL
+// SEEDING: root-domain-seeded — runs from app.Target.Domain alone, no URL
 // corpus, no DependsOn edges, never bootstraps subs/web.
 //
-// FAILURE POLICY (D-O8, ARCH-09): best_effort. A tool failing / finding nothing
+// FAILURE POLICY (ARCH-09): best_effort. A tool failing / finding nothing
 // logs Debug and returns StatusDone with findings:0 — the run COMPLETES.
 //
-// PD TOOLS (D-O7): dnsx args include -duc to avoid update-check hangs.
+// PD TOOLS: dnsx args include -duc to avoid update-check hangs.
 //
-// THREAT MODEL (T-07-02-01): the domain string crosses into whois/dnsx argv via
+// THREAT MODEL: the domain string crosses into whois/dnsx argv via
 // Backend.Run's []string arg-vector (never a shell string); rootDomain validates
 // a registrable-domain shape before use.
-//
-// Source: .planning/phases/07-osint-e2e/07-02-PLAN.md Task 1.
 package osint
 
 import (
@@ -62,7 +60,7 @@ func (t *DomainInfoTask) Enabled(cfg *config.Config) bool {
 	return cfg.OSINT.DomainInfo.Enabled
 }
 
-// DependsOn returns nil — OSINT is root-domain-seeded (D-O1), no DAG edges.
+// DependsOn returns nil — OSINT is root-domain-seeded, no DAG edges.
 func (t *DomainInfoTask) DependsOn() []string { return nil }
 
 // dnsRecordTypes maps the dnsx record-type flag to the OSINTFindingRecord
@@ -81,16 +79,14 @@ var dnsRecordTypes = []struct {
 //
 // Steps:
 //  1. Derive + validate the root domain from app.Target.
-//  2. Run whois; preserve osint/domain_info_general.txt (D-O5); emit a whois record.
-//  3. Run dnsx per record type with -duc (D-O7); emit one record per result.
-//  4. Run Scopify over the company name → osint/scopify.txt (D-O5 single-writer).
+//  2. Run whois; preserve osint/domain_info_general.txt; emit a whois record.
+//  3. Run dnsx per record type with -duc; emit one record per result.
+//  4. Run Scopify over the company name → osint/scopify.txt (single-writer).
 //  5. Write inputs/findings.domain_info.jsonl (multi-writer staging).
 func (t *DomainInfoTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result, error) {
 	root := rootDomain(app)
 	if root == "" {
-		if app.Log != nil {
-			app.Log.Info("osint.domain_info: no valid root domain — skipping")
-		}
+		app.Log.Info("osint.domain_info: no valid root domain — skipping")
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
@@ -101,21 +97,17 @@ func (t *DomainInfoTask) Run(ctx context.Context, app *appctx.AppContext) (task.
 	}
 	osintDir := filepath.Join(app.Target.WorkDir, "osint")
 	if err := os.MkdirAll(osintDir, 0o755); err != nil {
-		if app.Log != nil {
-			app.Log.Debug("osint.domain_info: mkdir osint/ failed (best_effort)", "err", err)
-		}
+		app.Log.Debug("osint.domain_info: mkdir osint/ failed (best_effort)", "err", err)
 	}
 
 	var records []OSINTFindingRecord
 
-	// Step 2: whois — raw text → osint/domain_info_general.txt (D-O5 single-writer).
+	// Step 2: whois — raw text → osint/domain_info_general.txt (single-writer).
 	if res, err := app.Tools.Run(ctx, "whois", []string{root}); err != nil {
-		if app.Log != nil {
-			app.Log.Debug("osint.domain_info: whois run failed (best_effort)", "err", err)
-		}
+		app.Log.Debug("osint.domain_info: whois run failed (best_effort)", "err", err)
 	} else if len(bytes.TrimSpace(res.Stdout)) > 0 {
 		whoisFile := filepath.Join(osintDir, "domain_info_general.txt")
-		if wErr := os.WriteFile(whoisFile, res.Stdout, 0o644); wErr != nil && app.Log != nil { //nolint:gosec
+		if wErr := os.WriteFile(whoisFile, res.Stdout, 0o644); wErr != nil { //nolint:gosec
 			app.Log.Debug("osint.domain_info: write domain_info_general.txt failed", "err", wErr)
 		}
 		records = append(records, OSINTFindingRecord{
@@ -126,11 +118,11 @@ func (t *DomainInfoTask) Run(ctx context.Context, app *appctx.AppContext) (task.
 		})
 	}
 
-	// Step 3: dnsx per record type with -duc (D-O7).
+	// Step 3: dnsx per record type with -duc.
 	// dnsxRan records whether AT LEAST ONE dnsx lookup was dispatched, and
 	// cancelled records an interrupted loop. Neither an absent dnsx nor a
 	// cancelled run observed the domain, so neither may clear a previous run's
-	// staging (F3 did-not-run — see writeOSINTStaging).
+	// staging (did-not-run rule — see writeOSINTStaging).
 	dnsxRan := false
 	cancelled := false
 	for _, rt := range dnsRecordTypes {
@@ -147,21 +139,17 @@ func (t *DomainInfoTask) Run(ctx context.Context, app *appctx.AppContext) (task.
 		//	hera.ns.cloudflare.com                                         (exit 0)
 		//
 		// So ALL FIVE record lookups were dead for as long as this vector
-		// existed (16-06 §6.3). A single-name lookup goes through `-l`.
+		// existed (a live-run finding). A single-name lookup goes through `-l`.
 		listFile, lErr := writeDNSXListInput(app, root)
 		if lErr != nil {
-			if app.Log != nil {
-				app.Log.Debug("osint.domain_info: dnsx list input write failed", "err", lErr)
-			}
+			app.Log.Debug("osint.domain_info: dnsx list input write failed", "err", lErr)
 			continue
 		}
 		args := []string{"-duc", "-silent", "-resp-only", rt.flag, "-l", listFile}
 		res, err := app.Tools.Run(ctx, "dnsx", args)
 		if err != nil {
-			if app.Log != nil {
-				app.Log.Debug("osint.domain_info: dnsx run failed (best_effort)",
-					"type", rt.category, "err", err)
-			}
+			app.Log.Debug("osint.domain_info: dnsx run failed (best_effort)",
+				"type", rt.category, "err", err)
 			continue
 		}
 		dnsxRan = true
@@ -171,7 +159,7 @@ func (t *DomainInfoTask) Run(ctx context.Context, app *appctx.AppContext) (task.
 				Class:       "osint",
 				Source:      "domain_info",
 				Category:    rt.category,
-				PoCRedacted: val, // DNS record value (non-secret; informational, T-07-02-03 accept)
+				PoCRedacted: val, // DNS record value (non-secret; informational)
 			})
 		}
 	}
@@ -180,17 +168,15 @@ func (t *DomainInfoTask) Run(ctx context.Context, app *appctx.AppContext) (task.
 	t.runScopify(ctx, app, root, osintDir)
 
 	// Step 5: write staging JSONL (multi-writer contract).
-	// F3: a run that resolved no DNS record REMOVES the staging file rather than
+	// Run isolation: a run that resolved no DNS record REMOVES the staging file rather than
 	// republishing records the zone no longer serves.
 	if dnsxRan && !cancelled {
 		writeOSINTStaging(app, inputsDir, "findings.domain_info.jsonl", records)
-	} else if app.Log != nil {
-		app.Log.Debug("osint.domain_info: dnsx did not resolve the record types — staging preserved (F3 did-not-run)")
+	} else {
+		app.Log.Debug("osint.domain_info: dnsx did not resolve the record types — staging preserved (did-not-run rule)")
 	}
 
-	if app.Log != nil {
-		app.Log.Info("osint.domain_info: completed", "findings", len(records))
-	}
+	app.Log.Info("osint.domain_info: completed", "findings", len(records))
 	return task.Result{
 		Status: task.StatusDone,
 		Stats:  map[string]int{"findings": len(records)},
@@ -202,9 +188,9 @@ func (t *DomainInfoTask) Run(ctx context.Context, app *appctx.AppContext) (task.
 // `scopify.py -c <company_name> > osint/scopify.txt`. company_name is derived via
 // the in-package companyName helper (the `unfurl format %r` analog). Scopify
 // writes its report to STDOUT, which we capture to the single-writer human file
-// osint/scopify.txt (D-O5, matching bash's `> osint/scopify.txt`).
+// osint/scopify.txt (matching bash's `> osint/scopify.txt`).
 //
-// Best_effort (D-O8): a missing tool / venv / empty output logs Debug and returns
+// Best_effort: a missing tool / venv / empty output logs Debug and returns
 // without disturbing the whois/dnsx path (the task never fails on Scopify).
 func (t *DomainInfoTask) runScopify(ctx context.Context, app *appctx.AppContext, root, osintDir string) {
 	company := companyName(root)
@@ -214,17 +200,15 @@ func (t *DomainInfoTask) runScopify(ctx context.Context, app *appctx.AppContext,
 	// v1 arg vector (osint.sh:607): scopify.py -c <company_name>; report → STDOUT.
 	res, err := app.Tools.Run(ctx, "Scopify", []string{"-c", company})
 	if err != nil {
-		if app.Log != nil {
-			app.Log.Debug("osint.domain_info: Scopify run failed (best_effort)", "err", err)
-		}
+		app.Log.Debug("osint.domain_info: Scopify run failed (best_effort)", "err", err)
 		return
 	}
 	if len(bytes.TrimSpace(res.Stdout)) == 0 {
 		return
 	}
-	// D-O5 single-writer human file: osint/scopify.txt (bash `> osint/scopify.txt`).
+	// single-writer human file: osint/scopify.txt (bash `> osint/scopify.txt`).
 	scopifyFile := filepath.Join(osintDir, "scopify.txt")
-	if wErr := os.WriteFile(scopifyFile, res.Stdout, 0o644); wErr != nil && app.Log != nil { //nolint:gosec
+	if wErr := os.WriteFile(scopifyFile, res.Stdout, 0o644); wErr != nil { //nolint:gosec
 		app.Log.Debug("osint.domain_info: write scopify.txt failed", "err", wErr)
 	}
 }
@@ -239,7 +223,7 @@ func init() { task.Register(&DomainInfoTask{}) }
 // rootDomain derives the registrable root domain from app.Target. It rejects
 // IP/CIDR targets (OSINT domain functions are domain-only — v1 guards with the
 // IPv4 regex in osint.sh) and validates a registrable-domain shape before the
-// value crosses into tool argv (T-07-02-01). Returns "" when unusable.
+// value crosses into tool argv. Returns "" when unusable.
 func rootDomain(app *appctx.AppContext) string {
 	if app == nil || app.Target == nil {
 		return ""
@@ -280,10 +264,10 @@ func splitNonEmptyLines(data []byte) []string {
 // output.StageJSONL (the per-task staging file — doc.go contract). Errors are
 // logged at Debug (best_effort).
 //
-// This is the SINGLE staging writer for all 20 osint producer files, so the F3
+// This is the SINGLE staging writer for all 20 osint producer files, so the run-isolation
 // run-isolation contract lives here for the whole package.
 //
-// F3 (phase 15): the write is UNCONDITIONAL. It used to return early when
+// Run isolation: the write is UNCONDITIONAL. It used to return early when
 // records was empty, so an osint task that RAN and found nothing left the
 // previous run's staging file on disk and MergeOSINTFindings republished it — a
 // leaked credential that has since been rotated, or a cloud bucket that has
@@ -306,7 +290,7 @@ func writeOSINTStaging(app *appctx.AppContext, inputsDir, fileName string, recor
 		lines = append(lines, b)
 	}
 	stagingPath := filepath.Join(inputsDir, fileName)
-	if wErr := output.StageJSONL(stagingPath, lines); wErr != nil && app.Log != nil {
+	if wErr := output.StageJSONL(stagingPath, lines); wErr != nil {
 		app.Log.Debug("osint: staging write failed", "path", stagingPath, "err", wErr)
 	}
 }

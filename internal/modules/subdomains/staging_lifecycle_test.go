@@ -1,4 +1,4 @@
-// staging_lifecycle_test.go — F3 (phase 15, plan 15-13 Task 1) write-then-clear
+// staging_lifecycle_test.go — write-then-clear
 // behaviour for the subdomains producers, plus the end-to-end gate-3 experiment
 // through MergeAllSubdomains.
 //
@@ -52,6 +52,7 @@ func stagingLifecycleApp(t *testing.T, workDir string, stdout []byte) *appctx.Ap
 	cfg := &config.Config{}
 	cfg.Subdomains.Passive.Enabled = true
 	return &appctx.AppContext{
+		Log:    appctx.NopLogger(),
 		Tools:  runner,
 		Tree:   tree,
 		Target: &appctx.Target{Domain: "example.com", WorkDir: workDir, Scope: scope},
@@ -118,7 +119,7 @@ func TestPassiveCrtStagingWriteThenClear(t *testing.T) {
 	if _, err := os.Stat(staging); !os.IsNotExist(err) {
 		body, _ := os.ReadFile(staging) //nolint:gosec // test-controlled temp path
 		t.Errorf("run B found nothing but %s survived — MergeAllSubdomains would republish "+
-			"run A's hostnames (F3); stat err = %v, contents = %q", staging, err, string(body))
+			"run A's hostnames (write-or-remove); stat err = %v, contents = %q", staging, err, string(body))
 	}
 }
 
@@ -193,6 +194,6 @@ func TestGate3SubdomainsProducerToMergedArtefact(t *testing.T) {
 	if got := nonBlankFileLines(t, artefact); got != 0 {
 		body, _ := os.ReadFile(artefact) //nolint:gosec // test-controlled temp path
 		t.Errorf("run B found nothing but the artefact holds %d records — a previous run's "+
-			"subdomains were republished (F3, gate 3): %q", got, string(body))
+			"subdomains were republished (write-or-remove, gate 3): %q", got, string(body))
 	}
 }

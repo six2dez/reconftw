@@ -10,8 +10,6 @@
 // filterByModuleAndEnabled calls Enabled(). Enabled() returning false is
 // used only for config-based disablement (Brute.Enabled = false). Runtime
 // conditions like resolver health MUST live in Run().
-//
-// Source: .planning/phases/04-subdomains-e2e-axiom-integration/04-02-PLAN.md Task 2.
 package subdomains
 
 import (
@@ -88,24 +86,20 @@ func (SubResolversHealthTask) Run(_ context.Context, app *appctx.AppContext) (ta
 
 	count, err := countResolverLines(resolverPath)
 	if err != nil || count == 0 {
-		if app.Log != nil {
-			app.Log.Error("resolver_health_check_failed",
-				"resolver_file", resolverPath,
-				"count", count,
-				"error", errText(err),
-			)
-		}
+		app.Log.Error("resolver_health_check_failed",
+			"resolver_file", resolverPath,
+			"count", count,
+			"error", errText(err),
+		)
 		return task.Result{Status: task.StatusErrored}, errNoResolvers(resolverPath, err)
 	}
 
 	if count < minResolvers {
-		if app.Log != nil {
-			app.Log.Warn("resolver_health_check_failed",
-				"resolver_file", resolverPath,
-				"count", count,
-				"min", minResolvers,
-			)
-		}
+		app.Log.Warn("resolver_health_check_failed",
+			"resolver_file", resolverPath,
+			"count", count,
+			"min", minResolvers,
+		)
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
@@ -203,14 +197,12 @@ func (SubBruteTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resul
 
 	count, readErr := countResolverLines(resolverPath)
 	if readErr != nil || count < minResolvers {
-		if app.Log != nil {
-			app.Log.Warn("brute_skipped_resolver_gate",
-				"event", "brute_skipped_resolver_gate",
-				"resolver_file", resolverPath,
-				"count", count,
-				"min", minResolvers,
-			)
-		}
+		app.Log.Warn("brute_skipped_resolver_gate",
+			"event", "brute_skipped_resolver_gate",
+			"resolver_file", resolverPath,
+			"count", count,
+			"min", minResolvers,
+		)
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
@@ -226,10 +218,8 @@ func (SubBruteTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resul
 	// showed up as a healthy "[OK] subdomains.brute 0s" while contributing nothing.
 	// Skip loudly instead, mirroring web.ffuf's "no fuzz wordlist configured".
 	if !wordlistReadable(wordlistPath) {
-		if app.Log != nil {
-			app.Log.Info("subdomains.brute: subs wordlist missing or unreadable — skipping",
-				"wordlist", wordlistPath, "deep", cfg.Advanced.Deep)
-		}
+		app.Log.Info("subdomains.brute: subs wordlist missing or unreadable — skipping",
+			"wordlist", wordlistPath, "deep", cfg.Advanced.Deep)
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
@@ -245,8 +235,8 @@ func (SubBruteTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resul
 	//	$ puredns bruteforce wl.txt example.com -r res.txt --quiet
 	//	www.example.com                                              (exit 0)
 	//
-	// So this Task produced NOTHING for as long as the vector existed (CR-01,
-	// 16-06 §6.3). v1 passes it positionally too — modules/utils.sh:1550.
+	// So this Task produced NOTHING for as long as the vector existed. v1 passes
+	// it positionally too — modules/utils.sh:1550.
 	args := []string{
 		"bruteforce", wordlistPath,
 		app.Target.Domain,
@@ -265,7 +255,7 @@ func (SubBruteTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resul
 			fmt.Errorf("puredns bruteforce: Stream failed: %w", err)
 	}
 
-	// F6 (phase 15): ACCUMULATOR shape — latch the terminal Event.Err inside the
+	// ACCUMULATOR shape — latch the terminal Event.Err inside the
 	// loop and check it after. A puredns bruteforce killed part way through a
 	// multi-million-word list yields a fraction of the resolvable hosts;
 	// staging that as this run's brute result would silently shrink the

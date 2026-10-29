@@ -1,17 +1,17 @@
-// llm.go — LLMTask: julius LLM endpoint probe (D-V3).
+// llm.go — LLMTask: julius LLM endpoint probe.
 //
-// LLMTask is a D-V3 fold-in from web.sh llm_probe(), routed to the
-// vulns pipeline per plan 06-08 (VULN-14 parity completeness gate).
+// LLMTask is a fold-in from web.sh llm_probe(), routed to the
+// vulns pipeline for parity completeness (VULN-14).
 //
-// XCUT-07 BINDING CONSTRAINT (T-06-08-05):
+// XCUT-07 BINDING CONSTRAINT:
 // LLM response content (model output, API response body, generated text, token
 // counts, prompt echoes) is NEVER logged at any level and NEVER written to any
 // artefact field. Only the detected boolean + endpoint URL is recorded.
 // This is a hard constraint — any violation triggers XCUT-07 audit failure.
 //
-// INPUT: artefacts/urls.jsonl — URL corpus from Phase 5.
+// INPUT: artefacts/urls.jsonl — URL corpus from the web stage.
 //
-//	Empty → StatusSkipped (best_effort per D-V7).
+//	Empty → StatusSkipped (best_effort).
 //
 // ARG VECTOR (v1 web.sh llm_probe verbatim):
 //
@@ -24,8 +24,6 @@
 // (doc.go: single-writer artefacts do NOT go through the staging+merge pipeline).
 // Record fields: {url, target, detected:bool, type:"llm-endpoint"}.
 // NEVER includes response_body, generated_text, token_count, or any LLM content.
-//
-// Source: .planning/phases/06-vulnerability-scanning-e2e/06-08-PLAN.md Task 1.
 package vulns
 
 import (
@@ -44,7 +42,7 @@ import (
 )
 
 // LLMTask runs the julius LLM endpoint probe against the URL corpus
-// (D-V3, VULN-14 parity completeness).
+// (VULN-14 parity completeness).
 type LLMTask struct{}
 
 // Name returns the globally unique dot-namespaced task identifier.
@@ -78,15 +76,13 @@ func (t *LLMTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result,
 	const toolName = "julius"
 	cfg := app.Cfg
 
-	// Step 1: Resolve URL corpus via D-V5 precedence (--urls ctx > artefacts/urls.jsonl).
+	// Step 1: Resolve URL corpus via precedence (--urls ctx > artefacts/urls.jsonl).
 	urls, err := readURLsWithCtx(ctx, app)
-	if err != nil && app.Log != nil {
+	if err != nil {
 		app.Log.Debug("vulns.llm: read URL corpus error (best_effort)", "err", err)
 	}
 	if len(urls) == 0 {
-		if app.Log != nil {
-			app.Log.Info("vulns.llm: no URLs in URL corpus — skipping")
-		}
+		app.Log.Info("vulns.llm: no URLs in URL corpus — skipping")
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
@@ -121,18 +117,21 @@ func (t *LLMTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result,
 	}
 
 	res, runErr := app.Tools.Run(ctx, toolName, args)
-	if runErr != nil && app.Log != nil {
+	if runErr != nil {
 		app.Log.Debug("vulns.llm: julius error (best_effort)", "err", runErr)
 	}
 	// A hard failure (unregistered binary, spawn/rate-limit error) returns a nil
 	// res; guard it so a missing julius degrades to skipped, never a nil-pointer
-	// panic (same class as the testssl live all-mode regression, 2026-08).
+	// panic (same class as the testssl live all-mode regression, 2026-08). The
+	// Reason says whether julius was absent or failed (task.ClassifyToolErr).
 	if res == nil {
-		return task.Result{Status: task.StatusSkipped}, nil
+		status, reason := task.ClassifyToolErr(runErr)
+		app.Log.Info("vulns.llm: julius not run — skipping", "reason", reason)
+		return task.Result{Status: status, Reason: reason}, nil
 	}
 
 	// Step 4: Parse stdout JSONL for LLM endpoint indicators.
-	// XCUT-07 (T-06-08-05 BINDING): only detected bool + endpoint URL extracted.
+	// XCUT-07: only detected bool + endpoint URL extracted.
 	// Response body, generated text, token counts NEVER stored or logged at any level.
 	records := parseLLMProbeOutput(res.Stdout)
 
@@ -147,7 +146,7 @@ func (t *LLMTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result,
 			lines = append(lines, b)
 		}
 		if len(lines) > 0 {
-			if wErr := app.Tree.Append("llm", lines); wErr != nil && app.Log != nil {
+			if wErr := app.Tree.Append("llm", lines); wErr != nil {
 				app.Log.Debug("vulns.llm: Tree.Append failed",
 					"records", len(lines), "err", wErr)
 			}
@@ -155,9 +154,7 @@ func (t *LLMTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result,
 	}
 
 	// XCUT-07: log only count — never raw julius output.
-	if app.Log != nil {
-		app.Log.Info("vulns.llm: completed", "endpoints", len(records))
-	}
+	app.Log.Info("vulns.llm: completed", "endpoints", len(records))
 
 	return task.Result{
 		Status: task.StatusDone,
@@ -199,7 +196,7 @@ type juliusOutputLine struct {
 }
 
 // parseLLMProbeOutput parses julius JSONL stdout into llmRecord slice.
-// XCUT-07 (T-06-08-05 BINDING): only endpoint URL + provider label extracted.
+// XCUT-07: only endpoint URL + provider label extracted.
 // Raw output bytes are NEVER logged; response content is NEVER stored.
 func parseLLMProbeOutput(data []byte) []llmRecord {
 	if len(bytes.TrimSpace(data)) == 0 {

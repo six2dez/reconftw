@@ -1,7 +1,7 @@
 // github_leaks_test.go — XCUT-07 three-layer redaction assertions for the
 // highest-secret-leak-risk Task (OSINT-05 github_leaks: ghleaks + trufflehog).
 //
-// CRITICAL (T-07-03-01): trufflehog/ghleaks emit LIVE credentials. These tests
+// CRITICAL: trufflehog/ghleaks emit LIVE credentials. These tests
 // prove the raw secret VALUE is NEVER propagated to a record (L3) and IS
 // registered with the slog Redactor (L2) so it is scrubbed from logs.
 //

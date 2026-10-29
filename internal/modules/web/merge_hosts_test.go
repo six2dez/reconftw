@@ -1,8 +1,8 @@
-// merge_hosts_test.go — regression guard for the 13-08 hosts-merge union fix.
+// merge_hosts_test.go — regression guard for the hosts-merge union fix.
 //
 // web.httpx writes artefacts/hosts.jsonl DIRECTLY via app.Tree.Append (REPLACE
 // semantics). The portscan/nerva/wellknown producers stage host records to
-// inputs/hosts.*.jsonl, which plan 13-08 consolidates via MergeStage(_, _,
+// inputs/hosts.*.jsonl, which the merge consolidates via MergeStage(_, _,
 // "hosts"). Without union-preservation, that merge would OVERWRITE httpx's probed
 // hosts. These tests assert the merge UNIONS the existing artefact with the
 // staging files instead of replacing it.
@@ -35,6 +35,7 @@ func newHostsMergeApp(t *testing.T) *appctx.AppContext {
 		t.Fatalf("output.NewTree: %v", err)
 	}
 	return &appctx.AppContext{
+		Log:    appctx.NopLogger(),
 		Tree:   tree,
 		Target: &appctx.Target{Domain: "example.com", WorkDir: workdir},
 	}
@@ -128,7 +129,7 @@ func TestMergeStageHostsNoStagingIsNoOp(t *testing.T) {
 	}
 }
 
-// TestMergeStageHostsDedupsSameHostDifferentShape guards IN-13-03: the hosts merge
+// TestMergeStageHostsDedupsSameHostDifferentShape guards the one-line-per-host rule: the hosts merge
 // keys by decoded host identity, so an httpx artefact record and a portscan staging
 // record for the SAME host but a DIFFERENT JSON shape collapse to a single artefact
 // line — a line-counting consumer must see one host, not two. Under the old raw-byte
@@ -225,7 +226,7 @@ func TestMergeStageHostsKeepsCanonicalEndpoint(t *testing.T) {
 	}
 }
 
-// TestMergeStageHostsProbeResultBeatsBareHost keeps the IN-13-03 guarantee explicit
+// TestMergeStageHostsProbeResultBeatsBareHost keeps the one-line-per-host guarantee explicit
 // in the ranking's own terms: a rich httpx record outranks a bare portscan shape for
 // the same host EVEN THOUGH the portscan record carries a standard port and the
 // httpx one carries none. If the port preference ever outgrows the probe-result

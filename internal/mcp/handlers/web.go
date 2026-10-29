@@ -177,6 +177,11 @@ func RunWebAsync(ctx context.Context, opts RunOptions) (err error) {
 		}
 	}
 
+	// CUT-08: a standalone web scan also finalizes a workspace — materialize the
+	// v1 bash-shape _compat/ tree (+ Recon/<domain> symlink) from the final
+	// hosts/urls/findings artefacts. Idempotent and best-effort: never fails the scan.
+	writeCompatTree(app, workdir, cfg.Output.Compat.ReconSymlink)
+
 	persistScanToStore(ctx, boot, opts, "web")
 	return nil
 }

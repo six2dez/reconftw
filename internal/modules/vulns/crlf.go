@@ -1,13 +1,13 @@
 // crlf.go — CRLFTask: crlfuzz scanner (VULN-06).
 //
-// CRLFTask reads the probed host URL list from artefacts/urls.jsonl (Phase 5
+// CRLFTask reads the probed host URL list from artefacts/urls.jsonl (the web stage
 // web output), writes a temp host file, runs crlfuzz, and stores findings in
 // inputs/findings.crlf.jsonl per the multi-writer staging contract.
 //
 // DEPENDENCY: DependsOn ["vulns.gf"] — v1 crlf_checks() runs after url_gf()
 // in the vulns pipeline; the gf DAG root ensures the URL corpus is ready.
 //
-// INPUT: artefacts/urls.jsonl — host URL list from Phase 5 web probe (D-V5).
+// INPUT: artefacts/urls.jsonl — host URL list from the web probe.
 // crlfuzz does NOT need gf-pattern-filtered input; it tests all web hosts
 // (v1 crlf_checks reads webs/webs_all.txt, the unfiltered host list).
 //
@@ -15,7 +15,7 @@
 //
 //	crlfuzz -l <hostsFile> -o <stagingTxt>
 //
-// PAYLOAD REDACTION (XCUT-07, T-06-02-02):
+// PAYLOAD REDACTION (XCUT-07):
 // crlfuzz output lines contain raw CRLF injection sequences (\r\n).
 // These MUST NOT appear in logs. Only finding count is logged at Info.
 // MatchedAt and PoCRedacted fields are always "***".
@@ -24,8 +24,6 @@
 // crlfuzz on a large host set can run >5 min. Backend.Stream is used for the
 // heartbeat — the event channel is drained in a goroutine so the UI never
 // appears stuck.
-//
-// Source: .planning/phases/06-vulnerability-scanning-e2e/06-02-PLAN.md Task 2.
 package vulns
 
 import (
@@ -77,15 +75,13 @@ func (t *CRLFTask) DependsOn() []string { return []string{"vulns.gf"} }
 func (t *CRLFTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result, error) {
 	const toolName = "crlfuzz"
 
-	// Step 1: Resolve URL corpus via D-V5 precedence (--urls ctx > artefacts/urls.jsonl).
+	// Step 1: Resolve URL corpus via precedence (--urls ctx > artefacts/urls.jsonl).
 	hostURLs, err := readURLsWithCtx(ctx, app)
-	if err != nil && app.Log != nil {
+	if err != nil {
 		app.Log.Debug("vulns.crlf: read URL corpus error (best_effort)", "err", err)
 	}
 	if len(hostURLs) == 0 {
-		if app.Log != nil {
-			app.Log.Info("vulns.crlf: no host URLs in URL corpus — skipping")
-		}
+		app.Log.Info("vulns.crlf: no host URLs in URL corpus — skipping")
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
@@ -113,20 +109,18 @@ func (t *CRLFTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 	eventCh, streamErr := app.Tools.Stream(ctx, toolName, args)
 	// crlfuzzRan records whether crlfuzz was actually DISPATCHED. A dispatch
 	// failure means the binary is absent: the task observed nothing and must not
-	// clear a previous run's staging (F3 did-not-run — staging.go).
+	// clear a previous run's staging (did-not-run rule — staging.go).
 	crlfuzzRan := streamErr == nil
 	if streamErr != nil {
-		if app.Log != nil {
-			app.Log.Debug("vulns.crlf: crlfuzz stream error (best_effort)", "err", streamErr)
-		}
+		app.Log.Debug("vulns.crlf: crlfuzz stream error (best_effort)", "err", streamErr)
 		// Non-fatal per best_effort policy — proceed; stagingTxt may still have output
 		// if crlfuzz wrote it before exiting, or be absent (handled below).
 	} else {
-		// F6 (phase 15): consume the TERMINAL error before reading stagingTxt.
+		// Terminal error: consume the TERMINAL error before reading stagingTxt.
 		// crlfuzz exiting non-zero leaves either a truncated -o file or none at
 		// all, and the read below treats "no file" as "clean target" — so an
 		// unchecked crash reported a vulnerable target as clean.
-		// XCUT-07 / T-06-02-02: events contain raw CRLF sequences; NEVER log at Info.
+		// XCUT-07: events contain raw CRLF sequences; NEVER log at Info.
 		if drainErr := backend.Drain(eventCh); drainErr != nil {
 			return task.Result{Status: task.StatusErrored},
 				terminalStreamError(toolName, drainErr)
@@ -135,7 +129,7 @@ func (t *CRLFTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 
 	// Step 4: Read and parse crlfuzz staging output.
 	//
-	// F3 (phase 15): both read-failure paths used to `return StatusDone` HERE,
+	// Run isolation: both read-failure paths used to `return StatusDone` HERE,
 	// one statement before the staging write. That is the same run-isolation bug
 	// as an unconditional write, and no AST guard can see it — the detector
 	// reports raw WRITES, not a return placed in front of a correct one. A clean
@@ -143,7 +137,7 @@ func (t *CRLFTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 	// CRLF injections forever. Both paths now fall through to the staging call
 	// with zero records, which CLEARS the file.
 	stagingData, readErr := os.ReadFile(stagingTxt) //nolint:gosec // path within WorkDir
-	if readErr != nil && app.Log != nil {
+	if readErr != nil {
 		if os.IsNotExist(readErr) {
 			// No output file — normal for a clean target.
 			app.Log.Debug("vulns.crlf: no crlfuzz output file — zero findings this run")
@@ -164,9 +158,7 @@ func (t *CRLFTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 	stageVulnFindings(app, "vulns.crlf", stagingPath, crlfuzzRan, records)
 
 	// XCUT-07: log only the count, never the raw CRLF payload lines.
-	if app.Log != nil {
-		app.Log.Info("vulns.crlf: completed", "findings", len(records))
-	}
+	app.Log.Info("vulns.crlf: completed", "findings", len(records))
 
 	return task.Result{
 		Status: task.StatusDone,
@@ -177,7 +169,7 @@ func (t *CRLFTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 // parseCRLFuzzOutput parses crlfuzz plain-text output into VulnFindingRecord slice.
 // Each non-empty line is a vulnerable URL (containing injected \r\n sequences).
 //
-// XCUT-07 / T-06-02-02: raw CRLF payload lines (which contain injected CR/LF
+// XCUT-07: raw CRLF payload lines (which contain injected CR/LF
 // chars) MUST NOT appear in logs or records. MatchedAt and PoCRedacted are "***".
 // Only the host (extracted from the URL) is written to the record.
 func parseCRLFuzzOutput(data []byte) []VulnFindingRecord {
@@ -196,10 +188,10 @@ func parseCRLFuzzOutput(data []byte) []VulnFindingRecord {
 		host := extractCRLFHost(line)
 		records = append(records, VulnFindingRecord{
 			Host: host, // scope-gate locator (findings:host|url)
-			// Phase 4/5 inherited SARIF-compatible fields.
+			// Inherited SARIF-compatible fields.
 			Severity:   "medium",
 			Confidence: "high",
-			// Phase 6 vuln-class fields.
+			// Vuln-class fields.
 			VulnClass:       "crlf",
 			PayloadRedacted: "***", // XCUT-07: raw CRLF payload never written
 			PoCRedacted:     "***", // XCUT-07: raw vulnerable URL never written

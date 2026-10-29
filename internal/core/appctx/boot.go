@@ -105,6 +105,10 @@ type BootOptions struct {
 // sched must implement appctx.SchedulerRunner (a minimal interface — see
 // appctx.go). *scheduler.Scheduler satisfies it.
 func Boot(ctx context.Context, logger *slog.Logger, cfg *config.Config, target *Target, sched SchedulerRunner, opt BootOptions) (*AppContext, error) {
+	// app.Log is a GUARANTEE, not a convention: every module may call
+	// app.Log.<Level> without a nil guard. A nil logger falls back to the
+	// process default handler so a caller that forgot to build one still gets
+	// output; TestBootNilLoggerIsReplaced pins the field non-nil.
 	if logger == nil {
 		logger = slog.Default()
 	}
@@ -197,7 +201,16 @@ func Boot(ctx context.Context, logger *slog.Logger, cfg *config.Config, target *
 	// 5. OutputTree.
 	tree := opt.Tree
 	if tree == nil {
-		scope := &output.DefaultScopeFilter{Patterns: target.Scope}
+		// target.Scope plus the operator's include/exclude lists
+		// (subdomains.scope.include_file / exclude_file ← --include-file /
+		// --exclude-file ← v1 -i / -x). The Tree's Append gate and every
+		// aggregator's FilterInScope read THIS filter, so an excluded host is
+		// dropped at the write boundary rather than per module.
+		scope, err := output.NewScopeFilter(target.Scope,
+			cfg.Subdomains.Scope.IncludeFile, cfg.Subdomains.Scope.ExcludeFile)
+		if err != nil {
+			return nil, fmt.Errorf("appctx.Boot: scope lists: %w", err)
+		}
 		ot, err := output.NewTree(target.WorkDir, scope)
 		if err != nil {
 			return nil, fmt.Errorf("appctx.Boot: output tree: %w", err)

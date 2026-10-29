@@ -48,7 +48,7 @@ func newResolverGateApp(t *testing.T, workDir, resolvers, trusted string) *appct
 // TestSubActiveNoResolversErrors is the regression guard for the blocker itself.
 // The failure it prevents is not "puredns errored" — it is a run that resolves
 // nothing and still reports a result, which is what would have happened before
-// phase 15 made Event.Err propagate.
+// Event.Err was made to propagate.
 func TestSubActiveNoResolversErrors(t *testing.T) {
 	cases := []struct {
 		name      string
@@ -264,8 +264,8 @@ func (b *argCapturingBackend) Stream(_ context.Context, _ *backend.Tool, args []
 	return ch, nil
 }
 
-// ExecOpts satisfies the backend.Backend options seam added in 18-01. It
-// PRESERVES this fake's pre-18-01 dispatch exactly: Runner.Run used to call
+// ExecOpts satisfies the backend.Backend options seam. It PRESERVES this
+// fake's original dispatch exactly: Runner.Run used to call
 // Backend.Exec and Runner.RunEnv used to call Backend.ExecEnv, and both now
 // arrive here, so the env-set case forwards to ExecEnv and the zero case to Exec.
 //

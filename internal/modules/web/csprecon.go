@@ -12,16 +12,14 @@
 // (artefacts/hosts.jsonl URLs). The subdomains-stage csprecon call remains in
 // the subdomains module. No deduplication issue (OutputTree.Append is idempotent).
 //
-// ARG VECTOR (RESEARCH §csprecon — verbatim v1 form):
+// ARG VECTOR (verbatim v1 form):
 //
 //	csprecon -s  (stdin: URL list)
 //
-// T-05-08: extract/csp.Extract applies anchored domain suffix filter.
-// T-05-10: tool stdout routed to run.log only (never INFO terminal, GAP-3).
+// Extract/csp.Extract applies anchored domain suffix filter.
+// Tool stdout routed to run.log only (never INFO terminal).
 //
-// csprecon is a LocalBackend tool only (D-W13).
-//
-// Source: .planning/phases/05-web-pipeline-e2e/05-03-PLAN.md Task 2.
+// csprecon is a LocalBackend tool only.
 package web
 
 import (
@@ -61,9 +59,7 @@ func (t *CspreconTask) Run(ctx context.Context, app *appctx.AppContext) (task.Re
 
 	urls, err := readHostURLsFromJSONL(app)
 	if err != nil || len(urls) == 0 {
-		if app.Log != nil {
-			app.Log.Info("web.csprecon: no hosts in hosts.jsonl — skipping")
-		}
+		app.Log.Info("web.csprecon: no hosts in hosts.jsonl — skipping")
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
@@ -85,11 +81,13 @@ func (t *CspreconTask) Run(ctx context.Context, app *appctx.AppContext) (task.Re
 
 	res, execErr := app.Tools.Run(ctx, toolName, args)
 	if execErr != nil {
-		if app.Log != nil {
-			app.Log.Info("web.csprecon: binary absent or failed — skipping",
-				"err", execErr)
-		}
-		return task.Result{Status: task.StatusSkipped}, nil
+		// Absent-vs-failed policy (task.ClassifyToolErr): a csprecon that never
+		// started is "tool absent"; one that could not be run for any other
+		// reason is degraded with its own account of why. Neither fails the
+		// scan (best_effort).
+		status, reason := task.ClassifyToolErr(execErr)
+		app.Log.Info("web.csprecon: csprecon not run — skipping", "reason", reason)
+		return task.Result{Status: status, Reason: reason}, nil
 	}
 
 	var rawOutput []byte
@@ -97,7 +95,7 @@ func (t *CspreconTask) Run(ctx context.Context, app *appctx.AppContext) (task.Re
 		rawOutput = res.Stdout
 	}
 
-	// T-05-08: extract/csp.Extract applies in-scope filter.
+	// Extract/csp.Extract applies in-scope filter.
 	hostResults, _ := csp.Extract(rawOutput, app.Target.Domain)
 
 	if len(hostResults) == 0 {
@@ -128,15 +126,11 @@ func (t *CspreconTask) Run(ctx context.Context, app *appctx.AppContext) (task.Re
 	if len(lines) > 0 {
 		// Write to csprecon_hosts artefact (avoids collision with Phase-4 subdomains.jsonl).
 		if appendErr := app.Tree.Append("csprecon_hosts", lines); appendErr != nil {
-			if app.Log != nil {
-				app.Log.Debug("web.csprecon: Tree.Append failed", "err", appendErr)
-			}
+			app.Log.Debug("web.csprecon: Tree.Append failed", "err", appendErr)
 		}
 	}
 
-	if app.Log != nil {
-		app.Log.Debug("web.csprecon: completed", "csp_hostnames", len(hostResults))
-	}
+	app.Log.Debug("web.csprecon: completed", "csp_hostnames", len(hostResults))
 	return task.Result{
 		Status: task.StatusDone,
 		Stats:  map[string]int{"csp_hostnames": len(hostResults)},

@@ -2,9 +2,6 @@
 //
 // Verifies DefaultScopeFilter matches v1 lib/validation.sh:is_in_scope_host
 // semantics exactly: anchored matching, apex wildcard, userinfo rejection.
-//
-// Source: .planning/phases/04-subdomains-e2e-axiom-integration/04-01-PLAN.md
-// Task 2 behavior tests 1-6 (scope + Task registration + Task semantics).
 package subdomains_test
 
 import (
@@ -125,7 +122,7 @@ func TestScopeCrossCheckURL(t *testing.T) {
 // package results in task.Default containing all 5 passive tasks and
 // NO barrier task.
 //
-// FIVE, not six: subdomains.passive.hackertarget was deleted in 17-07 (CR-05).
+// FIVE, not six: subdomains.passive.hackertarget was deleted.
 // It dispatched `httpx -silent -u <api url>` and parsed the output as the API
 // response body, but httpx prints the PROBED URL — so the URL itself was
 // lowercased, staged as a hostname and reported as one subdomain found, on every
@@ -220,6 +217,7 @@ func TestSubfinderRunWritesStagingFile(t *testing.T) {
 	mockTree := &mockTree{}
 
 	app := &appctx.AppContext{
+		Log:   appctx.NopLogger(),
 		Tools: runner,
 		Tree:  mockTree,
 		Target: &appctx.Target{

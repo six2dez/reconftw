@@ -375,3 +375,171 @@ func TestCompatV1ToV2MappingSubset(t *testing.T) {
 		t.Errorf("V1ToV2Mapping has %d entries; want >= 7", len(output.V1ToV2Mapping))
 	}
 }
+
+// ---- CUT-08: top-level Recon/<domain> contract symlink (MIGRATION §2.2) ----
+
+// initWorkspace mirrors a real boot: WorkspaceInit under <engagement>/workspaces
+// so the identity marker exists and Recon/ lands as a sibling of workspaces/.
+func initWorkspace(t *testing.T, engagement, target string) string {
+	t.Helper()
+	workdir, err := output.WorkspaceInit(filepath.Join(engagement, "workspaces"), target)
+	if err != nil {
+		t.Fatalf("WorkspaceInit(%q): %v", target, err)
+	}
+	return workdir
+}
+
+// Test 11: a domain target links Recon/<canonical domain> — the exact v1 name
+// every `Recon/$domain/...` script relies on — as a sibling of workspaces/.
+func TestReconLinkPathDomainUsesCanonicalName(t *testing.T) {
+	t.Parallel()
+	engagement := t.TempDir()
+	workdir := initWorkspace(t, engagement, "https://Example.COM./")
+
+	got, err := output.ReconLinkPath(workdir)
+	if err != nil {
+		t.Fatalf("ReconLinkPath: %v", err)
+	}
+	want := filepath.Join(engagement, "Recon", "example.com")
+	if got != want {
+		t.Fatalf("ReconLinkPath = %q; want %q", got, want)
+	}
+}
+
+// Test 12: IP/CIDR targets use the workspace slug — the same target-id the
+// workspace directory is named with — since "10.0.0.0/24" is not a path component.
+func TestReconLinkPathNonDomainUsesWorkspaceSlug(t *testing.T) {
+	t.Parallel()
+	for _, target := range []string{"10.0.0.0/24", "10.0.0.1", "2001:db8::1"} {
+		engagement := t.TempDir()
+		workdir := initWorkspace(t, engagement, target)
+		got, err := output.ReconLinkPath(workdir)
+		if err != nil {
+			t.Fatalf("ReconLinkPath(%q): %v", target, err)
+		}
+		want := filepath.Join(engagement, "Recon", filepath.Base(workdir))
+		if got != want {
+			t.Errorf("target %q: ReconLinkPath = %q; want %q", target, got, want)
+		}
+		if strings.ContainsAny(filepath.Base(got), "/\\") {
+			t.Errorf("target %q: link name %q is not a single path component", target, filepath.Base(got))
+		}
+	}
+}
+
+// Test 13: a directory that was never WorkspaceInit'd has no identity marker;
+// the caller must get an error (and skip) rather than a guessed name.
+func TestReconLinkPathMissingMarkerErrors(t *testing.T) {
+	t.Parallel()
+	if _, err := output.ReconLinkPath(t.TempDir()); err == nil {
+		t.Fatal("ReconLinkPath on a marker-less dir: want error, got nil")
+	}
+}
+
+// Test 14: WriteCompat with ReconDir set creates a RELATIVE symlink
+// Recon/example.com → ../workspaces/<slug>/_compat that resolves to the tree.
+func TestCompatReconSymlinkIsRelativeAndResolves(t *testing.T) {
+	t.Parallel()
+	engagement := t.TempDir()
+	workdir := initWorkspace(t, engagement, "example.com")
+	writeArtefact(t, filepath.Join(workdir, "artefacts", "subdomains.jsonl"),
+		`{"subdomain":"a.example.com"}`)
+
+	link := filepath.Join(engagement, "Recon", "example.com")
+	cw := &output.CompatWriter{WorkspaceRoot: workdir, ReconDir: link}
+	if err := cw.WriteCompat(nil); err != nil {
+		t.Fatalf("WriteCompat: %v", err)
+	}
+
+	got, err := os.Readlink(link)
+	if err != nil {
+		t.Fatalf("Readlink(%s): %v", link, err)
+	}
+	want := filepath.Join("..", "workspaces", filepath.Base(workdir), "_compat")
+	if got != want {
+		t.Fatalf("symlink target = %q; want relative %q", got, want)
+	}
+	// It resolves: the v1 path reads the compat-written list.
+	data, err := os.ReadFile(filepath.Join(link, "subdomains", "subdomains.txt"))
+	if err != nil {
+		t.Fatalf("read through Recon/ symlink: %v", err)
+	}
+	if string(data) != "a.example.com\n" {
+		t.Fatalf("Recon/example.com/subdomains/subdomains.txt = %q", string(data))
+	}
+}
+
+// Test 15: a stale symlink (previous slug / layout) is replaced atomically.
+func TestCompatReconSymlinkReplacesStaleSymlink(t *testing.T) {
+	t.Parallel()
+	engagement := t.TempDir()
+	workdir := initWorkspace(t, engagement, "example.com")
+	link := filepath.Join(engagement, "Recon", "example.com")
+	if err := os.MkdirAll(filepath.Dir(link), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join("..", "workspaces", "example.com-old", "_compat"), link); err != nil {
+		t.Fatalf("seed stale symlink: %v", err)
+	}
+
+	cw := &output.CompatWriter{WorkspaceRoot: workdir, ReconDir: link}
+	if err := cw.WriteCompat(nil); err != nil {
+		t.Fatalf("WriteCompat: %v", err)
+	}
+	got, err := os.Readlink(link)
+	if err != nil {
+		t.Fatalf("Readlink: %v", err)
+	}
+	want := filepath.Join("..", "workspaces", filepath.Base(workdir), "_compat")
+	if got != want {
+		t.Fatalf("stale symlink not replaced: target = %q; want %q", got, want)
+	}
+	// No stranded temp slots next to the link.
+	entries, _ := os.ReadDir(filepath.Dir(link))
+	for _, e := range entries {
+		if strings.HasPrefix(e.Name(), ".symlink-tmp.") {
+			t.Errorf("stranded temp slot %q", e.Name())
+		}
+	}
+}
+
+// Test 16: a REAL Recon/<domain> directory (a genuine v1 tree the operator keeps)
+// is never clobbered: it stays a directory, its files survive, and the writer
+// still produces _compat/ and returns nil.
+func TestCompatReconSymlinkNeverClobbersRealDir(t *testing.T) {
+	t.Parallel()
+	engagement := t.TempDir()
+	workdir := initWorkspace(t, engagement, "example.com")
+	link := filepath.Join(engagement, "Recon", "example.com")
+	keep := filepath.Join(link, "subdomains", "subdomains.txt")
+	if err := os.MkdirAll(filepath.Dir(keep), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(keep, []byte("v1.example.com\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeArtefact(t, filepath.Join(workdir, "artefacts", "subdomains.jsonl"),
+		`{"subdomain":"v2.example.com"}`)
+
+	cw := &output.CompatWriter{WorkspaceRoot: workdir, ReconDir: link}
+	if err := cw.WriteCompat(nil); err != nil {
+		t.Fatalf("WriteCompat: %v", err)
+	}
+
+	fi, err := os.Lstat(link)
+	if err != nil {
+		t.Fatalf("Lstat: %v", err)
+	}
+	if fi.Mode()&os.ModeSymlink != 0 || !fi.IsDir() {
+		t.Fatalf("real Recon/example.com was replaced (mode %v); must be left untouched", fi.Mode())
+	}
+	data, err := os.ReadFile(keep)
+	if err != nil || string(data) != "v1.example.com\n" {
+		t.Fatalf("v1 file clobbered: data=%q err=%v", string(data), err)
+	}
+	// The compat tree itself is still written under the workspace.
+	data, err = os.ReadFile(filepath.Join(workdir, "_compat", "subdomains", "subdomains.txt"))
+	if err != nil || string(data) != "v2.example.com\n" {
+		t.Fatalf("_compat tree not written: data=%q err=%v", string(data), err)
+	}
+}

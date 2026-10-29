@@ -5,19 +5,17 @@
 // KatanaTask crawls all probed hosts using katana, collects discovered URLs,
 // and writes URLRecord entries to artefacts/urls.jsonl.
 //
-// ARG VECTOR (RESEARCH §katana — verbatim v1 form, web.sh:1940-1943):
+// ARG VECTOR (verbatim v1 form, web.sh:1940-1943):
 //
 //	katana -silent -list <targets_file> [-headless]
 //	       -jc -kf all -c <threads> -d 2 (or 3 in DEEP mode) -fs rdn
 //
-// XCUT-09 (Pitfall 5): katana runs 3-4h; Backend.Stream is MANDATORY
+// katana runs 3-4h; Backend.Stream is MANDATORY
 // to deliver heartbeat events and avoid CI kill.
 //
-// T-05-15: out-of-scope URLs filtered by extract/urls.ExtractURLs domain check.
+// Out-of-scope URLs filtered by extract/urls.ExtractURLs domain check.
 //
 // [ASSUMED: -headless flag form unchanged; -fs rdn is current flag name.]
-//
-// Source: .planning/phases/05-web-pipeline-e2e/05-04-PLAN.md Task 2.
 package web
 
 import (
@@ -56,9 +54,7 @@ func (t *KatanaTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resu
 	// Read probed hosts from artefacts/hosts.jsonl.
 	allURLs, err := readHostURLsFromJSONL(app)
 	if err != nil || len(allURLs) == 0 {
-		if app.Log != nil {
-			app.Log.Info("web.katana: no hosts in hosts.jsonl — skipping")
-		}
+		app.Log.Info("web.katana: no hosts in hosts.jsonl — skipping")
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
@@ -82,13 +78,13 @@ func (t *KatanaTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resu
 		threads = runtime.NumCPU() * 5
 	}
 
-	// Crawl depth: 2 normally, 3 in deep mode (RESEARCH §katana).
+	// Crawl depth: 2 normally, 3 in deep mode.
 	depth := 2
 	if cfg.Advanced.Deep {
 		depth = 3
 	}
 
-	// Build arg vector (RESEARCH §katana verbatim v1 form web.sh:1940-1943).
+	// Build arg vector (verbatim v1 form, web.sh:1940-1943).
 	args := []string{
 		"-silent",
 		"-list", targetsFile,
@@ -104,18 +100,21 @@ func (t *KatanaTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resu
 		args = append(args, "-headless")
 	}
 
-	// XCUT-09: Backend.Stream is mandatory for katana (3-4h runtime; Pitfall 5).
+	// Backend.Stream is mandatory for katana (3-4h runtime).
 	eventCh, err := app.Tools.Stream(ctx, toolName, args)
 	if err != nil {
-		if app.Log != nil {
-			app.Log.Info("web.katana: binary absent or failed — skipping", "err", err)
-		}
-		return task.Result{Status: task.StatusSkipped}, nil
+		// Absent-vs-failed policy (task.ClassifyToolErr): a katana that never
+		// started is "tool absent"; one that could not be run for any other
+		// reason is degraded with its own account of why. Neither fails the
+		// scan (best_effort).
+		status, reason := task.ClassifyToolErr(err)
+		app.Log.Info("web.katana: katana not run — skipping", "reason", reason)
+		return task.Result{Status: status, Reason: reason}, nil
 	}
 
 	// Collect URL lines from streamed output.
 	//
-	// F6 (phase 15): ACCUMULATOR shape — latch the terminal Event.Err inside the
+	// ACCUMULATOR shape — latch the terminal Event.Err inside the
 	// loop and check it after. A katana that crawls for three hours and then
 	// exits non-zero has produced a PARTIAL corpus; publishing it as a complete
 	// crawl is the failure this closes.
@@ -145,7 +144,7 @@ func (t *KatanaTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resu
 
 	// Extract and scope-filter URLs via extract/urls.
 	//
-	// F3 (phase 15): staged UNCONDITIONALLY — StageJSONL removes the staging
+	// Staged UNCONDITIONALLY — StageJSONL removes the staging
 	// file when this crawl found nothing, so a previous run's katana URLs
 	// cannot be republished by the urls merge. Reaching here means katana RAN
 	// (the StatusSkipped return above covers the absent-binary case).
@@ -165,17 +164,15 @@ func (t *KatanaTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resu
 		}
 	}
 	stagingPath := filepath.Join(app.Target.WorkDir, "inputs", "urls.katana.jsonl")
-	if wErr := output.StageJSONL(stagingPath, lines); wErr != nil && app.Log != nil {
+	if wErr := output.StageJSONL(stagingPath, lines); wErr != nil {
 		app.Log.Debug("web.katana: staging write failed",
 			"path", stagingPath, "err", wErr)
 	}
 
-	if app.Log != nil {
-		app.Log.Debug("web.katana: completed",
-			"hosts", len(allURLs),
-			"url_lines", len(urlLines),
-			"in_scope_records", totalRecords)
-	}
+	app.Log.Debug("web.katana: completed",
+		"hosts", len(allURLs),
+		"url_lines", len(urlLines),
+		"in_scope_records", totalRecords)
 
 	return task.Result{
 		Status: task.StatusDone,

@@ -1,12 +1,12 @@
 // ssrf_lifecycle_test.go — THE ADJUDICATION OF vulns/ssrf.go, decided by running
-// something rather than by reading something (18-05 Task 3).
+// something rather than by reading something.
 //
 // THE QUESTION. ssrf.go's declared bypass reason is `process_lifecycle`, not
 // stdin: it assigns no standard input anywhere. It runs interactsh-client as a
 // LONG-LIVED out-of-band callback server — SysProcAttr{Setpgid:true}, a
 // persistent stdout pipe read line by line for the whole task, and a
-// process-group SIGTERM on cleanup. 18-03 established that this is the one
-// manifest reason 18-01 did NOT make obsolete, because ExecOptions has no
+// process-group SIGTERM on cleanup. The Runner move established that this is the one
+// manifest reason the ExecOptions seam did NOT make obsolete, because ExecOptions has no
 // caller-managed background-process mode.
 //
 // But "no background-process MODE" is not the same as "cannot serve that
@@ -222,6 +222,7 @@ func TestStartInteractshClientThroughTheSeam(t *testing.T) {
 	runner.Recorder = backend.NewToolRecorder(logPath, nil)
 
 	app := &appctx.AppContext{
+		Log:    appctx.NopLogger(),
 		Tools:  runner,
 		Cfg:    config.Defaults(),
 		Target: &appctx.Target{Domain: "example.com", WorkDir: workDir},
@@ -263,7 +264,7 @@ func TestStartInteractshClientThroughTheSeam(t *testing.T) {
 		if !died {
 			_ = syscall.Kill(grandchild, syscall.SIGKILL)
 			t.Fatalf("cleanup() left the grandchild (pid %d) alive — a leaked OOB callback "+
-				"server outlives its task and holds a session open (T-18-05-03)", grandchild)
+				"server outlives its task and holds a session open", grandchild)
 		}
 	}
 
@@ -295,6 +296,7 @@ func TestStartInteractshClientFallsBackWhenUnresolvable(t *testing.T) {
 	reg := backend.NewToolRegistry()
 	reg.Register(&backend.Tool{Name: ssrfInteractshTool}) // registered, Path empty
 	app := &appctx.AppContext{
+		Log:    appctx.NopLogger(),
 		Tools:  backend.NewRunner(&backend.LocalBackend{KillGrace: 500 * time.Millisecond}, reg, nil),
 		Cfg:    config.Defaults(),
 		Target: &appctx.Target{Domain: "example.com", WorkDir: t.TempDir()},

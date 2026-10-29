@@ -2,21 +2,21 @@
 //
 // HTTPXTask is the dependency root — DependsOn returns nil. All other web
 // Tasks DependsOn "web.httpx" (directly or transitively). The entire web
-// pipeline is best_effort (D-W12); httpx is NOT fail_fast.
+// pipeline is best_effort; httpx is NOT fail_fast.
 //
-// INPUT BOUNDARY (D-W10):
+// INPUT BOUNDARY :
 //  1. ctx value keyed by hostsFileKey — set by runWebCmd via CtxWithHostsFile
 //  2. artefacts/hosts.jsonl (prior web run output)
 //  3. artefacts/subdomains.jsonl (prior subs run; host field extracted)
 //  4. fail-fast with "no host list: run `subs` first or pass --hosts <file>"
 //
-// OUTPUT SCHEMA (D-W11 hosts.jsonl):
+// OUTPUT SCHEMA (hosts.jsonl):
 //
 //	{host, url, scheme, port, status, title, tech[], content_length, ip, cdn}
 //
-// The cdn field is populated empty here; cdncheck Task (Phase 5 plan-03) fills it.
+// The cdn field is populated empty here; cdncheck Task fills it.
 //
-// ARG VECTOR (RESEARCH §httpx — verbatim v1 form; [ASSUMED] flags noted):
+// ARG VECTOR (verbatim v1 form; [ASSUMED] flags noted):
 //
 //	httpx -follow-host-redirects -random-agent -status-code
 //	      -p <ports> -threads <n> -rl <n> -timeout <n>
@@ -25,8 +25,6 @@
 //	      -l <input-file>
 //
 // [ASSUMED: -follow-host-redirects is the correct v1 flag form; verify at install.]
-//
-// Source: .planning/phases/05-web-pipeline-e2e/05-01-PLAN.md Task 2.
 package web
 
 import (
@@ -36,6 +34,7 @@ import (
 	"crypto/md5" //nolint:gosec // used for input-file hash only, not crypto
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -67,7 +66,7 @@ func hostsFileFromCtx(ctx context.Context) string {
 	return ""
 }
 
-// HostRecord is the D-W11 JSONL schema for artefacts/hosts.jsonl.
+// HostRecord is the JSONL schema for artefacts/hosts.jsonl.
 // Written by HTTPXTask.Run after parsing httpx's JSONL output.
 type HostRecord struct {
 	Host          string   `json:"host"`
@@ -83,7 +82,7 @@ type HostRecord struct {
 }
 
 // httpxRaw is the subset of httpx JSONL fields we parse.
-// httpx outputs more fields; we only map the ones in D-W11.
+// httpx outputs more fields; we only map the ones in HostRecord.
 //
 // FIELD NAMES AND TYPES ARE LOAD-BEARING — verified against real httpx v1.6
 // `-json` output, not inferred. Three of them were wrong, and the combination
@@ -131,12 +130,12 @@ func (t *HTTPXTask) Enabled(cfg *config.Config) bool {
 	return cfg.Web.Probe.Enabled
 }
 
-// DependsOn returns nil — HTTPXTask IS the DAG root (D-W12).
+// DependsOn returns nil — HTTPXTask IS the DAG root.
 func (t *HTTPXTask) DependsOn() []string { return nil }
 
 // Run executes httpx and writes parsed records to artefacts/hosts.jsonl.
 //
-// Input resolution follows D-W10 precedence:
+// Input resolution follows input precedence:
 //  1. ctx-carried --hosts FILE (set via CtxWithHostsFile by runWebCmd)
 //  2. artefacts/hosts.jsonl — prior web run
 //  3. artefacts/subdomains.jsonl — prior subs run (extracts host fields)
@@ -145,13 +144,13 @@ func (t *HTTPXTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resul
 	const toolName = "httpx"
 	cfg := app.Cfg
 
-	// Step 1: Resolve input file (D-W10 precedence).
+	// Step 1: Resolve input file (input precedence).
 	inputFile, err := resolveHostInput(ctx, app)
 	if err != nil {
 		return task.Result{Status: task.StatusErrored}, err
 	}
 
-	// Validate --hosts path (T-05-01 / WR-08: operator-trust model).
+	// Validate --hosts path (operator-trust model).
 	if err := checkHostsFileReadable(inputFile); err != nil {
 		return task.Result{Status: task.StatusErrored}, err
 	}
@@ -173,7 +172,7 @@ func (t *HTTPXTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resul
 
 	// httpx's RAW output goes to a staging path, never onto the artefact.
 	//
-	// CR-02 (phase 16 review, proven in 17-06): this used to be artefactFile
+	// this used to be artefactFile
 	// itself, and that is destructive in two separate ways, both observed:
 	//
 	//  1. httpx CREATES AND TRUNCATES its -o file. Verified on httpx v1.9.0:
@@ -184,7 +183,7 @@ func (t *HTTPXTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resul
 	//  2. Step 5 below reads outputFile back and parses it as httpx output. When
 	//     -o WAS the artefact and httpx wrote nothing, this parsed subdomains.geo's
 	//     enrichment records as if they were httpx's own output and republished
-	//     them stripped — ip/asn/country silently blanked. Observed in the CR-02
+	//     them stripped — ip/asn/country silently blanked. Observed in the failing
 	//     RED run: {"host":"api.example.com",…,"ip":""} where the input carried
 	//     "ip":"93.184.216.34","asn":"AS15133".
 	//
@@ -197,13 +196,13 @@ func (t *HTTPXTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resul
 	}
 	outputFile := filepath.Join(inputsDir, "hosts.httpx.raw.jsonl")
 
-	// Step 3: Build arg vector (RESEARCH §httpx verbatim v1 form).
+	// Step 3: Build arg vector (verbatim v1 form).
 	// Ports: cfg.Web.Probe.Ports; "" → omit -p flag (httpx uses its default).
 	// Threads: cfg.Web.Probe.Threads; 0 → omit.
 	// RateLimit: cfg.Web.Probe.RateLimit; 0 → omit.
 	// Timeout: cfg.Web.Probe.TimeoutSeconds; 0 → omit.
 	args := []string{
-		"-follow-host-redirects", // [ASSUMED: verify exact flag at install — DoD-1]
+		"-follow-host-redirects", // [ASSUMED: verify exact flag at install]
 		"-random-agent",
 		"-status-code",
 	}
@@ -246,9 +245,13 @@ func (t *HTTPXTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resul
 		"-location",
 		"-no-color",
 		"-json",
-		"-o", outputFile,
-		"-l", inputFile,
 	)
+	// Operator extras (advanced.tools.httpx.flags) go BEFORE the -o/-l pair so a
+	// stray value-taking flag cannot swallow the output or input path.
+	if extra := strings.Fields(cfg.Advanced.Tools.HTTPX.Flags); len(extra) > 0 {
+		args = append(args, extra...)
+	}
+	args = append(args, "-o", outputFile, "-l", inputFile)
 
 	// Step 4: Execute httpx.
 	//
@@ -264,7 +267,7 @@ func (t *HTTPXTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resul
 			fmt.Errorf("web.httpx: refusing to dispatch: the input list and the output file are the same path (%s); httpx truncates its -o file, so this would destroy the list while reading it", inputFile)
 	}
 
-	// T-05-02: stdout routed to run.log only (GAP-3 pattern via app.Tools).
+	// Stdout routed to run.log only (via app.Tools).
 	res, err := app.Tools.Run(ctx, toolName, args)
 	if err != nil {
 		return task.Result{Status: task.StatusErrored},
@@ -293,17 +296,15 @@ func (t *HTTPXTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resul
 	// in a long run is a different fact and treating it as fatal would make the
 	// rule useless.
 	if parseErr != nil {
-		if app.Log != nil {
-			app.Log.Warn("web.httpx: output did not parse",
-				"event", "httpx_total_parse_failure",
-				"err", parseErr.Error(),
-				"input_hosts", inputCount,
-			)
-		}
-		// Publish the empty artefact first: the F3 contract (an empty run must
+		app.Log.Warn("web.httpx: output did not parse",
+			"event", "httpx_total_parse_failure",
+			"err", parseErr.Error(),
+			"input_hosts", inputCount,
+		)
+		// Publish the empty artefact first: the empty-run contract (an empty run must
 		// publish an EMPTY artefact, not leave a stale one) holds regardless of
 		// why the run was empty.
-		if pubErr := output.PublishArtefact(app.Target.WorkDir, "hosts", nil); pubErr != nil && app.Log != nil {
+		if pubErr := output.PublishArtefact(app.Target.WorkDir, "hosts", nil); pubErr != nil {
 			app.Log.Debug("web.httpx: empty hosts publish failed", "err", pubErr)
 		}
 		return task.Result{
@@ -330,7 +331,7 @@ func (t *HTTPXTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resul
 		inScope = append(inScope, line)
 	}
 
-	// F3 (phase 15): publish artefacts/hosts.jsonl UNCONDITIONALLY.
+	// Publish artefacts/hosts.jsonl UNCONDITIONALLY.
 	//
 	// "hosts" has TWO direct writers — this one and subdomains/geo.go — and the
 	// empty publish is assigned to httpx ALONE. The ordering evidence, verified
@@ -342,7 +343,7 @@ func (t *HTTPXTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resul
 	//     (internal/mcp/handlers/composite.go). geo therefore runs strictly
 	//     BEFORE httpx whenever both run.
 	//  2. Tree.Append REPLACES rather than appends, so geo's records do not
-	//     survive an httpx run that probes. (Until CR-02 was fixed httpx also
+	//     survive an httpx run that probes. (Until the -o fix httpx also
 	//     pointed its -o at the artefact, which destroyed geo's records even when
 	//     httpx produced nothing at all; -o now goes to inputs/ — see step 2.)
 	//     Adding the empty publish here removes no data that currently survives.
@@ -362,23 +363,19 @@ func (t *HTTPXTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resul
 	if len(inScope) > 0 {
 		// Tree.Append stays the scope-enforcement boundary for non-empty batches.
 		if appendErr := app.Tree.Append("hosts", inScope); appendErr != nil {
-			if app.Log != nil {
-				app.Log.Debug("web.httpx: Tree.Append failed",
-					"records", len(inScope), "err", appendErr)
-			}
-			// Non-fatal per best_effort (D-W12).
+			app.Log.Debug("web.httpx: Tree.Append failed",
+				"records", len(inScope), "err", appendErr)
+			// Non-fatal per best_effort.
 		}
 	} else if pubErr := output.PublishArtefact(app.Target.WorkDir, "hosts", nil); pubErr != nil {
 		// Append short-circuits on an empty batch and cannot express "this probe
 		// found nothing", so the empty case goes through PublishArtefact. This
 		// also truncates httpx's own raw -o output, which is desirable: that
 		// write is unfiltered and must not survive as the artefact.
-		if app.Log != nil {
-			app.Log.Debug("web.httpx: empty hosts publish failed", "err", pubErr)
-		}
+		app.Log.Debug("web.httpx: empty hosts publish failed", "err", pubErr)
 	}
 
-	if app.Log != nil && inputHash != "" {
+	if inputHash != "" {
 		app.Log.Debug("web.httpx: completed",
 			"input", inputFile,
 			"input_hash", inputHash,
@@ -392,12 +389,10 @@ func (t *HTTPXTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resul
 		// broken.
 		if inputCount > 0 {
 			reason := fmt.Sprintf("probed %d host(s), no live host survived probing or scope filtering", inputCount)
-			if app.Log != nil {
-				app.Log.Warn("web.httpx: produced no hosts from a non-empty input",
-					"event", "httpx_no_hosts_from_input",
-					"input_hosts", inputCount,
-				)
-			}
+			app.Log.Warn("web.httpx: produced no hosts from a non-empty input",
+				"event", "httpx_no_hosts_from_input",
+				"input_hosts", inputCount,
+			)
 			return task.Result{
 				Status:  task.StatusSkipped,
 				Outputs: []string{artefactFile},
@@ -470,13 +465,13 @@ func probePorts(cfg *config.Config) string {
 	return strings.Join(out, ",")
 }
 
-// resolveHostInput implements the D-W10 input precedence.
+// resolveHostInput implements the input precedence.
 func resolveHostInput(ctx context.Context, app *appctx.AppContext) (string, error) {
 	// Priority 1: ctx-carried --hosts flag (set by runWebCmd).
 	//
 	// An operator who points --hosts at a JSONL artefact (their own
 	// artefacts/hosts.jsonl is the obvious candidate — it is the file the run
-	// just produced) gets the SAME silent nothing CR-02 describes, because httpx
+	// just produced) gets the SAME silent nothing described above, because httpx
 	// cannot use a JSON object as a target. Detect that shape and extract, rather
 	// than probing nothing and calling the target dead.
 	if hostsFile := hostsFileFromCtx(ctx); hostsFile != "" {
@@ -492,7 +487,7 @@ func resolveHostInput(ctx context.Context, app *appctx.AppContext) (string, erro
 
 	// Priority 2: prior artefacts/hosts.jsonl — EXTRACTED, never passed through.
 	//
-	// CR-02. This branch used to return the artefact path itself. artefacts/hosts.jsonl
+	// This branch used to return the artefact path itself. artefacts/hosts.jsonl
 	// holds JSON objects, and httpx cannot use one as a target. Same binary, same
 	// live host, httpx v1.9.0 on 127.0.0.1 (no third-party host contacted):
 	//
@@ -527,27 +522,16 @@ func resolveHostInput(ctx context.Context, app *appctx.AppContext) (string, erro
 // extractHostsFromSubdomainsJSONL reads artefacts/subdomains.jsonl and
 // writes a plain-text hostname file to inputs/httpx.hosts.txt, returning
 // its path. Returns error if subdomains.jsonl is empty or unreadable.
-func extractHostsFromSubdomainsJSONL(subdomainsPath string, app *appctx.AppContext) (string, error) {
-	f, err := os.Open(subdomainsPath) //nolint:gosec // path from trusted WorkDir
-	if err != nil {
-		return "", fmt.Errorf("open subdomains.jsonl: %w", err)
-	}
-	defer f.Close() //nolint:errcheck
 
+func extractHostsFromSubdomainsJSONL(subdomainsPath string, app *appctx.AppContext) (string, error) {
 	var hostnames []string
-	scanner := bufio.NewScanner(f)
-	scanner.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
-	for scanner.Scan() {
-		line := bytes.TrimSpace(scanner.Bytes())
-		if len(line) == 0 {
-			continue
-		}
+	err := output.ForEachJSONLLine(subdomainsPath, 0, func(line []byte) error {
 		var rec struct {
 			Subdomain string `json:"subdomain"`
 			Host      string `json:"host"`
 		}
 		if err := json.Unmarshal(line, &rec); err != nil {
-			continue
+			return nil // malformed record: skipped, as before
 		}
 		h := rec.Subdomain
 		if h == "" {
@@ -556,6 +540,10 @@ func extractHostsFromSubdomainsJSONL(subdomainsPath string, app *appctx.AppConte
 		if h != "" {
 			hostnames = append(hostnames, h)
 		}
+		return nil
+	})
+	if err != nil {
+		return "", fmt.Errorf("read subdomains.jsonl: %w", err)
 	}
 	if len(hostnames) == 0 {
 		return "", fmt.Errorf("subdomains.jsonl: no hostnames found")
@@ -579,41 +567,34 @@ func extractHostsFromSubdomainsJSONL(subdomainsPath string, app *appctx.AppConte
 // The `host` field is preferred; `url` is the fallback and is reduced to its
 // host[:port] because httpx accepts either but the artefact's url carries a
 // scheme and path that a bare-host list must not.
-func extractHostsFromHostsJSONL(hostsPath string, app *appctx.AppContext) (string, error) {
-	f, err := os.Open(hostsPath) //nolint:gosec // path from trusted WorkDir
-	if err != nil {
-		return "", fmt.Errorf("open hosts.jsonl: %w", err)
-	}
-	defer f.Close() //nolint:errcheck
 
+func extractHostsFromHostsJSONL(hostsPath string, app *appctx.AppContext) (string, error) {
 	seen := make(map[string]struct{})
 	var hostnames []string
-	scanner := bufio.NewScanner(f)
-	scanner.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
-	for scanner.Scan() {
-		line := bytes.TrimSpace(scanner.Bytes())
-		if len(line) == 0 {
-			continue
-		}
+	err := output.ForEachJSONLLine(hostsPath, 0, func(line []byte) error {
 		var rec struct {
 			Host string `json:"host"`
 			URL  string `json:"url"`
 		}
 		if err := json.Unmarshal(line, &rec); err != nil {
-			continue
+			return nil // malformed record: skipped, as before
 		}
 		h := strings.TrimSpace(rec.Host)
 		if h == "" {
 			h = hostFromURL(rec.URL)
 		}
 		if h == "" {
-			continue
+			return nil
 		}
 		if _, dup := seen[h]; dup {
-			continue
+			return nil
 		}
 		seen[h] = struct{}{}
 		hostnames = append(hostnames, h)
+		return nil
+	})
+	if err != nil {
+		return "", fmt.Errorf("read hosts.jsonl: %w", err)
 	}
 	if len(hostnames) == 0 {
 		return "", fmt.Errorf("hosts.jsonl: no hostnames found")
@@ -635,23 +616,20 @@ func extractHostsFromHostsJSONL(hostsPath string, app *appctx.AppContext) (strin
 // object. It reads at most the first 1 MiB: the question is about the file's
 // SHAPE, and a host list whose first line is a JSON object is a JSONL artefact
 // however long the rest of it is.
+
 func looksLikeJSONLines(path string) bool {
-	f, err := os.Open(path) //nolint:gosec // operator-supplied path, operator-trust model (WR-08)
-	if err != nil {
+	// The first non-blank line decides; errStopSniff ends the walk after it.
+	errStopSniff := errors.New("sniffed")
+	isJSON := false
+	err := output.ForEachJSONLLine(path, 1024*1024, func(line []byte) error {
+		line = bytes.TrimSpace(line)
+		isJSON = len(line) > 0 && line[0] == '{' && json.Valid(line)
+		return errStopSniff
+	})
+	if err != nil && !errors.Is(err, errStopSniff) {
 		return false
 	}
-	defer f.Close() //nolint:errcheck
-
-	scanner := bufio.NewScanner(f)
-	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
-	for scanner.Scan() {
-		line := bytes.TrimSpace(scanner.Bytes())
-		if len(line) == 0 {
-			continue
-		}
-		return len(line) > 0 && line[0] == '{' && json.Valid(line)
-	}
-	return false
+	return isJSON
 }
 
 // hostFromURL reduces a URL to host[:port]. It is deliberately string-based:
@@ -704,7 +682,7 @@ func sameFilePath(a, b string) bool {
 // checkHostsFileReadable checks that path is accessible and is a regular file.
 // The --hosts flag is operator-supplied on the operator's local machine;
 // arbitrary absolute paths are allowed by design — the operator controls the
-// machine running reconftw. The ".." substring check was removed (WR-08): it
+// machine running reconftw. The ".." substring check was removed: it
 // was over-inclusive (blocked legitimate filenames containing "..") and under-
 // inclusive (did not prevent absolute path reads, which are the actual exposure).
 func checkHostsFileReadable(path string) error {
@@ -753,7 +731,7 @@ func parseHTTPXOutput(jsonlData []byte) ([]HostRecord, error) {
 			continue
 		}
 
-		// Map httpx raw fields to D-W11 HostRecord schema.
+		// Map httpx raw fields to HostRecord schema.
 		host := raw.Host
 		if host == "" {
 			host = raw.Input
@@ -766,7 +744,7 @@ func parseHTTPXOutput(jsonlData []byte) ([]HostRecord, error) {
 		}
 
 		// Port is already a string in httpx output and HostRecord.Port is a
-		// string too (D-W11), so it passes through verbatim.
+		// string too, so it passes through verbatim.
 		portStr := strings.TrimSpace(raw.Port)
 
 		rec := HostRecord{
@@ -779,7 +757,7 @@ func parseHTTPXOutput(jsonlData []byte) ([]HostRecord, error) {
 			Tech:          raw.Technologies,
 			ContentLength: raw.ContentLength,
 			IP:            ip,
-			CDN:           "", // populated by cdncheck Task (Phase 5 plan-03)
+			CDN:           "", // populated by cdncheck Task
 		}
 		if rec.Tech == nil {
 			rec.Tech = []string{}

@@ -1,7 +1,7 @@
-// artefact_publish_test.go — F3 (phase 15, plan 15-13 Task 3) for the FOUR
+// artefact_publish_test.go — the empty-run contract for the FOUR
 // artefacts that have a DIRECT writer: hosts, fuzz, origins and urls.
 //
-// WHY THESE FOUR NEED THEIR OWN TESTS. Plan 15-03 closed F3 at the MERGE layer,
+// WHY THESE FOUR NEED THEIR OWN TESTS. The merge layer already closes the empty-run contract,
 // but it also had to bar the merge from truncating these four, because each is
 // written directly by a producer outside the merge path
 // (directArtefactWriterStages in merge.go). "fuzz" and "origins" have no staging
@@ -352,11 +352,11 @@ func TestHostsArtefactEmptiedByHTTPXOverGeoRecords(t *testing.T) {
 	app := newWebApp(t, workDir, be, "httpx")
 
 	res, err := lookupWebTask(t, "web.httpx").Run(context.Background(), app)
-	// PRECONDITION, not the subject: this test is about the F3 empty publish, and
+	// PRECONDITION, not the subject: this test is about the empty publish, and
 	// the status check only exists to confirm the probe actually HAPPENED (as
 	// opposed to the did-not-run error path covered by the next test).
 	//
-	// Updated deliberately in phase 16: "the probe ran and produced nothing" is
+	// Updated deliberately: "the probe ran and produced nothing" is
 	// now StatusSkipped with a Reason rather than StatusDone, because reporting OK
 	// for a task that consumed 1 host and produced 0 is the exact silent success
 	// that emptied the web layer on 2026-08-21. Errored still means did-not-run,

@@ -2,9 +2,9 @@
 //
 // GFTask is the dependency root — DependsOn returns nil. All scanner Tasks
 // DependsOn "vulns.gf" (directly or transitively). The entire vulns pipeline
-// is best_effort (D-V7, ADR §7 line 49).
+// is best_effort (ADR §7 line 49).
 //
-// INPUT BOUNDARY (D-V5):
+// INPUT BOUNDARY:
 //  1. ctx value keyed by urlsFileKey — set by runVulnsCmd via CtxWithURLsFile
 //  2. artefacts/urls.jsonl  (prior web run output)
 //  3. fail-fast: "no URL corpus — run `web` first or pass `--urls`"
@@ -20,13 +20,11 @@
 // GFTask writes the URL list to inputs/gf_input.txt.tmp then passes it as
 // a positional arg to gf. The tmp file is cleaned up after classification.
 //
-// VulnFindingRecord extends the Phase 4/5 SARIF-compatible shape defined
+// VulnFindingRecord extends the base SARIF-compatible shape defined
 // in doc.go. This struct is the canonical schema for findings.jsonl.
 //
 // PAYLOAD REDACTION (XCUT-07): GFTask writes only URLs (no payloads);
 // no redaction needed here. Scanner Tasks (plan-07+) MUST redact.
-//
-// Source: .planning/phases/06-vulnerability-scanning-e2e/06-01-PLAN.md Task 1.
 package vulns
 
 import (
@@ -79,8 +77,8 @@ var gfClasses = [8]string{
 	"lfi",
 }
 
-// VulnFindingRecord is the Phase 6 extended findings.jsonl SARIF-compatible
-// schema. Adds vuln-specific fields on top of the Phase 4/5 base shape.
+// VulnFindingRecord is the vulns extended findings.jsonl SARIF-compatible
+// schema. Adds vuln-specific fields on top of the base shape.
 // Fields tagged omitempty are absent when not applicable (scanner-specific).
 //
 // XCUT-07 contract: PayloadRedacted and PoCRedacted MUST have any secret
@@ -98,7 +96,7 @@ type VulnFindingRecord struct {
 	URL  string `json:"url,omitempty"`
 
 	// Hostnames carries EVERY hostname known to resolve to an IP-addressed
-	// finding, in first-seen order (F20, audit bullet 3). It is populated by
+	// finding, in first-seen order (shared-IP attribution). It is populated by
 	// vulns.spray, whose hits identify a service by IP because brutespray and
 	// brutus both read the nmap .gnmap.
 	//
@@ -115,12 +113,12 @@ type VulnFindingRecord struct {
 	// reader ignores the field rather than failing.
 	Hostnames []string `json:"hostnames,omitempty"`
 
-	// Phase 4/5 inherited SARIF-compatible fields.
+	// Inherited SARIF-compatible fields.
 	Severity   string   `json:"severity,omitempty"`
 	Confidence string   `json:"confidence,omitempty"`
 	References []string `json:"references,omitempty"`
 
-	// Phase 6 additions — vuln-class specific metadata (omitempty = absent when N/A).
+	// Vuln-class additions — vuln-class specific metadata (omitempty = absent when N/A).
 	VulnClass       string `json:"vuln_class,omitempty"`
 	MatchedParam    string `json:"matched_param,omitempty"`
 	PayloadRedacted string `json:"payload_redacted,omitempty"`
@@ -188,15 +186,15 @@ func (t *GFTask) Description() string {
 
 // Enabled always returns true when invoked via the vulns subcommand — the
 // gf-classify DAG root always runs; it is the prerequisite for every
-// targeted scanner. No per-cfg gate at the root level (D-V4).
+// targeted scanner. No per-cfg gate at the root level.
 func (t *GFTask) Enabled(_ *config.Config) bool { return true }
 
-// DependsOn returns nil — GFTask IS the DAG root (D-V4).
+// DependsOn returns nil — GFTask IS the DAG root.
 func (t *GFTask) DependsOn() []string { return nil }
 
 // Run executes gf classification:
-//  1. Resolves URL input per D-V5 precedence.
-//  2. Validates the input file path (T-06-01-01 — path traversal mitigation).
+//  1. Resolves URL input precedence.
+//  2. Validates the input file path (path traversal mitigation).
 //  3. Creates inputs/gf/ directory.
 //  4. For each class in gfClasses: runs `gf <class> <input_file>`,
 //     writes stdout to inputs/gf/<class>.txt.
@@ -204,13 +202,13 @@ func (t *GFTask) DependsOn() []string { return nil }
 func (t *GFTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result, error) {
 	const toolName = "gf"
 
-	// Step 1: Resolve URL input (D-V5 precedence).
+	// Step 1: Resolve URL input (precedence).
 	inputFile, err := resolveURLInput(ctx, app)
 	if err != nil {
 		return task.Result{Status: task.StatusErrored}, err
 	}
 
-	// Step 2: Validate input path (T-06-01-01 — reject path traversal).
+	// Step 2: Validate input path (reject path traversal).
 	if err := checkURLsFileReadable(inputFile, app.Target.WorkDir); err != nil {
 		return task.Result{Status: task.StatusErrored}, err
 	}
@@ -242,10 +240,8 @@ func (t *GFTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result, 
 		res, runErr := app.Tools.Run(ctx, toolName, args)
 		if runErr != nil {
 			// Non-fatal per best_effort — log and continue to next class.
-			if app.Log != nil {
-				app.Log.Debug("vulns.gf: gf invocation failed (best_effort — continuing)",
-					"class", class, "err", runErr)
-			}
+			app.Log.Debug("vulns.gf: gf invocation failed (best_effort — continuing)",
+				"class", class, "err", runErr)
 			// Write an empty bucket file so downstream Tasks can stat it without error.
 			_ = os.WriteFile(bucketFile, nil, 0o644) //nolint:gosec
 			continue
@@ -256,10 +252,8 @@ func (t *GFTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result, 
 
 		if len(matched) == 0 {
 			// Empty bucket is non-fatal — warn and continue.
-			if app.Log != nil {
-				app.Log.Debug("vulns.gf: empty bucket (no URLs matched class)",
-					"class", class, "bucket", bucketFile)
-			}
+			app.Log.Debug("vulns.gf: empty bucket (no URLs matched class)",
+				"class", class, "bucket", bucketFile)
 			// Write an empty file so downstream Tasks can stat it without error.
 			_ = os.WriteFile(bucketFile, nil, 0o644) //nolint:gosec
 			continue
@@ -267,7 +261,7 @@ func (t *GFTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result, 
 
 		// Write matched URLs to the bucket file.
 		//
-		// F3 (phase 15, hand-verified — inputs/gf/<class>.txt is a SUBDIRECTORY
+		// Run isolation (hand-verified — inputs/gf/<class>.txt is a SUBDIRECTORY
 		// path no merger glob can reach, so the staging-contract detector is
 		// structurally blind to it): every class must be rewritten on every run,
 		// or a stale bucket silently redirects sqli, xss, lfi and ssrf at last
@@ -277,10 +271,8 @@ func (t *GFTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result, 
 		// leaves either a stale file (open failed) or a half-written one (write
 		// failed), and both are worse than an empty bucket. Truncate it.
 		if writeErr := writeURLList(bucketFile, matched); writeErr != nil {
-			if app.Log != nil {
-				app.Log.Debug("vulns.gf: failed to write bucket file (best_effort)",
-					"class", class, "bucket", bucketFile, "err", writeErr)
-			}
+			app.Log.Debug("vulns.gf: failed to write bucket file (best_effort)",
+				"class", class, "bucket", bucketFile, "err", writeErr)
 			_ = os.WriteFile(bucketFile, nil, 0o644) //nolint:gosec
 			continue
 		}
@@ -288,10 +280,8 @@ func (t *GFTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result, 
 		outputs = append(outputs, bucketFile)
 		totalURLs += len(matched)
 
-		if app.Log != nil {
-			app.Log.Debug("vulns.gf: classified URLs",
-				"class", class, "count", len(matched), "bucket", bucketFile)
-		}
+		app.Log.Debug("vulns.gf: classified URLs",
+			"class", class, "count", len(matched), "bucket", bucketFile)
 	}
 
 	return task.Result{
@@ -301,7 +291,7 @@ func (t *GFTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result, 
 	}, nil
 }
 
-// resolveURLInput implements the D-V5 input precedence for the vulns pipeline.
+// resolveURLInput implements the input precedence for the vulns pipeline.
 func resolveURLInput(ctx context.Context, app *appctx.AppContext) (string, error) {
 	// Priority 1: ctx-carried --urls flag (set by runVulnsCmd via CtxWithURLsFile).
 	if urlsFile := urlsFileFromCtx(ctx); urlsFile != "" {
@@ -316,11 +306,11 @@ func resolveURLInput(ctx context.Context, app *appctx.AppContext) (string, error
 		return urlsJSONL, nil
 	}
 
-	// Priority 3: fail-fast with actionable message (D-V5).
+	// Priority 3: fail-fast with actionable message.
 	return "", fmt.Errorf("vulns.gf: no URL corpus — run `web` first or pass `--urls`")
 }
 
-// checkURLsFileReadable validates the --urls file path (T-06-01-01 mitigation).
+// checkURLsFileReadable validates the --urls file path.
 // For operator-provided paths (--urls flag) we allow any readable regular file.
 // For auto-discovered paths (artefacts/urls.jsonl) the path is within workdir.
 func checkURLsFileReadable(path, workDir string) error {
@@ -380,7 +370,7 @@ func writeURLList(path string, urls []string) error {
 	return w.Flush()
 }
 
-// readURLsWithCtx resolves the URL corpus via the D-V5 input precedence
+// readURLsWithCtx resolves the URL corpus via the input precedence
 // (ctx --urls flag > artefacts/urls.jsonl) and returns all URL strings.
 //
 // This is the canonical helper for URL-corpus scanners that previously read
@@ -389,7 +379,7 @@ func writeURLList(path string, urls []string) error {
 // os.ReadFile("artefacts/urls.jsonl") directly.
 //
 // Returns nil (not an error) when the resolved file is absent or empty —
-// callers should StatusSkipped in that case per D-V7 best_effort.
+// callers should return StatusSkipped in that case (best_effort).
 func readURLsWithCtx(ctx context.Context, app *appctx.AppContext) ([]string, error) {
 	resolvedPath, err := resolveURLInput(ctx, app)
 	if err != nil {

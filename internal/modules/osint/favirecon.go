@@ -2,7 +2,7 @@
 //
 // NOTE: this is osint.favirecon — DISTINCT from web.favirecon
 // (internal/modules/web/favirecon.go). The osint variant folds favicon-based CMS
-// fingerprinting into the OSINT findings stream (D-O3) as an OSINT-12 engine
+// fingerprinting into the OSINT findings stream as an OSINT-12 engine
 // alongside CMSeeK; the web variant writes the favicons.jsonl artefact in the web
 // pipeline. They share the LITERAL v1 favirecon arg vector but emit different
 // records to different streams.
@@ -10,20 +10,18 @@
 // FaviReconTask runs favirecon over the discovered web hosts (v1
 // modules/web.sh:557 favirecon_tech: favirecon -l webs/webs_all.txt -c 50 -t 10
 // -s -j -o <out>) to identify the CMS/technology behind each host by favicon hash.
-// Each hit becomes an informational OSINTFindingRecord (D-O4, Category cms-favicon).
+// Each hit becomes an informational OSINTFindingRecord (Category cms-favicon).
 //
-// OPPORTUNISTIC ENRICHMENT (D-O2): favirecon is a v1 web.sh function (host-corpus
+// OPPORTUNISTIC ENRICHMENT: favirecon is a v1 web.sh function (host-corpus
 // seeded). It reads the discovered hosts from the workspace artefacts
 // (artefacts/hosts.jsonl or artefacts/urls.jsonl) IF present. When NO workspace
 // hosts exist it logs an Info note and returns StatusSkipped — it NEVER fails or
-// bootstraps subs/web (best_effort, D-O1/D-O2). Hosts are already scope-filtered
-// by Phase 5 (T-07-05-05).
+// bootstraps subs/web (best_effort). Hosts are already scope-filtered
+// by the web stage.
 //
-// SEEDING (D-O1): no DependsOn edges — the workspace-host enrichment is
+// SEEDING: no DependsOn edges — the workspace-host enrichment is
 // opportunistic, not a DAG edge.
-// FAILURE POLICY (D-O8, ARCH-09): best_effort.
-//
-// Source: .planning/phases/07-osint-e2e/07-05-PLAN.md Task 1.
+// FAILURE POLICY (ARCH-09): best_effort.
 package osint
 
 import (
@@ -68,26 +66,24 @@ func (t *FaviReconTask) Enabled(cfg *config.Config) bool {
 	return cfg.OSINT.CMS.Enabled && cfg.OSINT.CMS.FavireconEnabled
 }
 
-// DependsOn returns nil — the workspace-host enrichment (D-O2) is OPPORTUNISTIC,
+// DependsOn returns nil — the workspace-host enrichment is OPPORTUNISTIC,
 // not a DAG edge.
 func (t *FaviReconTask) DependsOn() []string { return nil }
 
-// Run executes favirecon over the workspace hosts (D-O2 opportunistic enrichment).
+// Run executes favirecon over the workspace hosts (opportunistic enrichment).
 //
 // Steps:
-//  1. D-O2: read workspace hosts (artefacts/hosts.jsonl|urls.jsonl) IF present;
+//  1. read workspace hosts (artefacts/hosts.jsonl|urls.jsonl) IF present;
 //     absent → log Info + StatusSkipped (best_effort, NO fail/bootstrap).
 //  2. Write the host list, run favirecon (LITERAL web.sh:557 arg vector).
 //  3. Parse favicon-hash CMS hits into informational records.
 //  4. Write inputs/findings.favirecon.jsonl (multi-writer staging).
 func (t *FaviReconTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result, error) {
-	// Step 1: D-O2 opportunistic host read.
+	// Step 1: opportunistic host read.
 	hosts := readWorkspaceHosts(app.Target.WorkDir)
 	if len(hosts) == 0 {
-		// D-O2: log-skip when absent — best_effort, NOT an error/bootstrap.
-		if app.Log != nil {
-			app.Log.Info("osint.favirecon: no workspace hosts (artefacts/hosts.jsonl|urls.jsonl) — skipping (D-O2)")
-		}
+		// log-skip when absent — best_effort, NOT an error/bootstrap.
+		app.Log.Info("osint.favirecon: no workspace hosts (artefacts/hosts.jsonl|urls.jsonl) — skipping")
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
@@ -120,10 +116,11 @@ func (t *FaviReconTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 
 	res, err := app.Tools.Run(ctx, "favirecon", args)
 	if err != nil {
-		if app.Log != nil {
-			app.Log.Debug("osint.favirecon: favirecon run failed (best_effort)", "err", err)
-		}
-		return task.Result{Status: task.StatusDone, Stats: map[string]int{"findings": 0}}, nil
+		// Absent-vs-failed (task.ClassifyToolErr): a tool that did not run is a
+		// Skipped result with a Reason, never a silent findings:0 success.
+		status, reason := task.ClassifyToolErr(err)
+		app.Log.Info("osint.favirecon: favirecon not run — skipping", "reason", reason)
+		return task.Result{Status: status, Reason: reason}, nil
 	}
 
 	// Step 3: parse favirecon JSON output (prefer the -o file, fall back to stdout).
@@ -138,9 +135,7 @@ func (t *FaviReconTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 	// Step 4: write staging JSONL (multi-writer contract).
 	writeOSINTStaging(app, inputsDir, "findings.favirecon.jsonl", records)
 
-	if app.Log != nil {
-		app.Log.Info("osint.favirecon: completed", "findings", len(records), "hosts_scanned", len(hosts))
-	}
+	app.Log.Info("osint.favirecon: completed", "findings", len(records), "hosts_scanned", len(hosts))
 	return task.Result{
 		Status: task.StatusDone,
 		Stats:  map[string]int{"findings": len(records), "hosts_scanned": len(hosts)},

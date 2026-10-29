@@ -1,27 +1,23 @@
 // screenshot.go — ScreenshotTask: nuclei-headless screenshots → content-addressed PNGs.
 //
 // ScreenshotTask runs nuclei with -headless -id screenshot against probed hosts,
-// then renames each produced PNG to raw/screenshots/<SHA-256-of-bytes>.png (D-W5).
+// then renames each produced PNG to raw/screenshots/<SHA-256-of-bytes>.png.
 //
-// FAIL-SOFT (D-W6): if the nuclei binary or the nuclei-templates path is absent,
+// FAIL-SOFT: if the nuclei binary or the nuclei-templates path is absent,
 // the task logs an explicit SKIP message and returns StatusSkipped — it NEVER
-// blocks the pipeline (best_effort policy, D-W12).
+// blocks the pipeline (best_effort policy).
 //
-// ARG VECTOR (RESEARCH §nuclei screenshot — corrected WR-02):
+// ARG VECTOR (corrected):
 //
 //	nuclei -headless -id screenshot -V dir=<abs-temp-dir>
 //	       -l <hosts_file>  (hosts file via -l flag, not stdin)
 //
-// D-W5 content-addressed rename: after nuclei writes PNGs to a temp dir,
+// content-addressed rename: after nuclei writes PNGs to a temp dir,
 // Walk the dir, compute sha256.Sum256 of each PNG's bytes, rename to
 // raw/screenshots/<hex>.png.
-//
-// Source: .planning/phases/05-web-pipeline-e2e/05-02-PLAN.md Task 1.
 package web
 
 import (
-	"bufio"
-	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/json"
@@ -30,6 +26,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/six2dez/reconftw/internal/core/output"
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
 	"github.com/six2dez/reconftw/internal/core/backend"
@@ -40,7 +38,7 @@ import (
 // ScreenshotTask runs nuclei in headless mode to capture screenshots and
 // stores them as content-addressed PNGs under raw/screenshots/.
 //
-// ARG VECTOR (corrected — WR-02): nuclei is invoked as:
+// ARG VECTOR (corrected): nuclei is invoked as:
 //
 //	nuclei -headless -id screenshot -V dir=<dir> -l <hosts_file>
 //
@@ -60,52 +58,44 @@ func (t *ScreenshotTask) Description() string {
 }
 
 // Enabled reports whether this task should run.
-// Maps to cfg.Web.Screenshots.Enabled (WEBSCREENSHOT legacy alias per ADR §2).
+// Maps to cfg.Web.Screenshots.Enabled (WEBSCREENSHOT legacy alias).
 func (t *ScreenshotTask) Enabled(cfg *config.Config) bool { return cfg.Web.Screenshots.Enabled }
 
 // DependsOn returns the DAG edges for ScreenshotTask.
 func (t *ScreenshotTask) DependsOn() []string { return []string{"web.httpx"} }
 
 // Run captures screenshots using nuclei-headless and renames PNGs to
-// raw/screenshots/<sha256hex>.png (D-W5 content-addressed storage).
+// raw/screenshots/<sha256hex>.png (content-addressed storage).
 func (t *ScreenshotTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result, error) {
 	const toolName = "nuclei"
 	cfg := app.Cfg
 
-	// D-W6: check nuclei binary availability.
+	// Check nuclei binary availability.
 	if _, err := exec.LookPath(toolName); err != nil {
-		if app.Log != nil {
-			app.Log.Info("web.screenshot: nuclei binary not found — skipping (D-W6)",
-				"err", err)
-		}
+		app.Log.Info("web.screenshot: nuclei binary not found — skipping",
+			"err", err)
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
-	// D-W6: check nuclei templates path.
+	// Check nuclei templates path.
 	templatesPath := cfg.Web.Nuclei.TemplatesPath
 	if templatesPath == "" {
 		templatesPath = cfg.Paths.NucleiTemplates
 	}
 	if templatesPath == "" {
-		if app.Log != nil {
-			app.Log.Info("web.screenshot: nuclei templates path not configured — skipping (D-W6)")
-		}
+		app.Log.Info("web.screenshot: nuclei templates path not configured — skipping")
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 	if _, err := os.Stat(templatesPath); err != nil {
-		if app.Log != nil {
-			app.Log.Info("web.screenshot: nuclei templates path not accessible — skipping (D-W6)",
-				"path", templatesPath, "err", err)
-		}
+		app.Log.Info("web.screenshot: nuclei templates path not accessible — skipping",
+			"path", templatesPath, "err", err)
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
 	// Read probed hosts for screenshot input.
 	allHosts, err := readScreenshotHosts(app)
 	if err != nil || len(allHosts) == 0 {
-		if app.Log != nil {
-			app.Log.Info("web.screenshot: no hosts in hosts.jsonl — skipping")
-		}
+		app.Log.Info("web.screenshot: no hosts in hosts.jsonl — skipping")
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
@@ -137,7 +127,7 @@ func (t *ScreenshotTask) Run(ctx context.Context, app *appctx.AppContext) (task.
 			fmt.Errorf("web.screenshot: write hosts file: %w", err)
 	}
 
-	// Build arg vector (RESEARCH §nuclei screenshot — v1 web.sh:327).
+	// Build arg vector (v1 web.sh:327).
 	// -V dir=<abs-path> sets the nuclei variable for screenshot output directory.
 	args := []string{
 		"-headless",
@@ -147,55 +137,52 @@ func (t *ScreenshotTask) Run(ctx context.Context, app *appctx.AppContext) (task.
 		"-silent",
 	}
 
-	// Execute via Backend.Stream for XCUT-09 heartbeat (Pitfall 4 mitigation:
+	// Execute via Backend.Stream for the heartbeat (
 	// nuclei headless can be slow; stream gives progress visibility).
 	eventCh, err := app.Tools.Stream(ctx, toolName, args)
 	if err != nil {
-		// Nuclei headless unavailable or returns error — treat as best_effort SKIP (D-W6).
-		if app.Log != nil {
-			app.Log.Info("web.screenshot: nuclei headless failed — skipping (D-W6)",
-				"err", err)
-		}
-		return task.Result{Status: task.StatusSkipped}, nil
+		// Nuclei headless could not be started: a best-effort skip, never a
+		// failure. Absent-vs-failed policy (task.ClassifyToolErr): a nuclei that
+		// never started is "tool absent"; one that could not be opened for any
+		// other reason is degraded with its own account of why.
+		status, reason := task.ClassifyToolErr(err)
+		app.Log.Info("web.screenshot: nuclei headless not run — skipping", "reason", reason)
+		return task.Result{Status: status, Reason: reason}, nil
 	}
-	// F6 (phase 15): consume the TERMINAL error. A nuclei headless run that dies
+	// Consume the TERMINAL error. A nuclei headless run that dies
 	// part way leaves a partial set of PNGs in tmpDir; content-addressing them
 	// into raw/screenshots/ would publish an incomplete capture as a complete
 	// one, and the count would silently understate what was not screenshotted.
 	//
-	// The D-W6 StatusSkipped above is deliberately untouched: it means nuclei
+	// The StatusSkipped above is deliberately untouched: it means nuclei
 	// headless is UNAVAILABLE (dispatch), which must never become a failure.
 	if drainErr := backend.Drain(eventCh); drainErr != nil {
 		return task.Result{Status: task.StatusErrored},
 			terminalStreamError(toolName, drainErr)
 	}
 
-	// Walk temp dir and content-address rename each PNG (D-W5).
+	// Walk temp dir and content-address rename each PNG.
 	count, renameErr := contentAddressPNGs(tmpDir, rawScreenshotsDir)
-	if renameErr != nil && app.Log != nil {
+	if renameErr != nil {
 		app.Log.Debug("web.screenshot: some PNG renames failed", "err", renameErr)
 	}
 
-	// D-W6: if 0 PNGs produced (headless unavailable), return StatusSkipped — not fail.
-	// WR-02: emit explicit Warn when hosts were non-empty to distinguish
+	// If 0 PNGs produced (headless unavailable), return StatusSkipped — not fail.
+	// Emit an explicit Warn when hosts were non-empty to distinguish
 	// "headless unavailable" from "wrong nuclei invocation".
 	if count == 0 {
-		if app.Log != nil {
-			if len(allHosts) > 0 {
-				app.Log.Warn("web.screenshot: no screenshots produced but hosts were non-empty — verify nuclei headless + templates",
-					"hosts", len(allHosts))
-			} else {
-				app.Log.Info("web.screenshot: 0 PNGs produced (headless likely unavailable) — skipping (D-W6)")
-			}
+		if len(allHosts) > 0 {
+			app.Log.Warn("web.screenshot: no screenshots produced but hosts were non-empty — verify nuclei headless + templates",
+				"hosts", len(allHosts))
+		} else {
+			app.Log.Info("web.screenshot: 0 PNGs produced (headless likely unavailable) — skipping")
 		}
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
-	if app.Log != nil {
-		app.Log.Debug("web.screenshot: completed",
-			"screenshots", count,
-			"dir", rawScreenshotsDir)
-	}
+	app.Log.Debug("web.screenshot: completed",
+		"screenshots", count,
+		"dir", rawScreenshotsDir)
 
 	return task.Result{
 		Status:  task.StatusDone,
@@ -206,7 +193,7 @@ func (t *ScreenshotTask) Run(ctx context.Context, app *appctx.AppContext) (task.
 
 // contentAddressPNGs walks srcDir for *.png files, computes SHA-256 of each,
 // and renames them to dstDir/<hex>.png. Returns count of successful renames
-// and the first rename error (if any). Non-fatal per D-W6.
+// and the first rename error (if any). Non-fatal.
 func contentAddressPNGs(srcDir, dstDir string) (int, error) {
 	var firstErr error
 	count := 0
@@ -264,27 +251,18 @@ func copyFile(src, dst string) error {
 }
 
 // readScreenshotHosts reads artefacts/hosts.jsonl and returns the URL list
-// for screenshot input (url field from D-W11 HostRecord schema).
+// for screenshot input (url field from HostRecord schema).
+
 func readScreenshotHosts(app *appctx.AppContext) ([]string, error) {
 	hostsPath := filepath.Join(app.Target.WorkDir, "artefacts", "hosts.jsonl")
-	data, err := os.ReadFile(hostsPath) //nolint:gosec // path within WorkDir
-	if err != nil {
-		return nil, fmt.Errorf("read hosts.jsonl for screenshot: %w", err)
-	}
 	var hosts []string
-	scanner := bufio.NewScanner(bytes.NewReader(data))
-	scanner.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
-	for scanner.Scan() {
-		line := bytes.TrimSpace(scanner.Bytes())
-		if len(line) == 0 {
-			continue
-		}
+	err := output.ForEachJSONLLine(hostsPath, 0, func(line []byte) error {
 		var rec struct {
 			URL  string `json:"url"`
 			Host string `json:"host"`
 		}
 		if err := json.Unmarshal(line, &rec); err != nil {
-			continue
+			return nil // malformed record: skipped, as before
 		}
 		h := rec.URL
 		if h == "" {
@@ -293,6 +271,10 @@ func readScreenshotHosts(app *appctx.AppContext) ([]string, error) {
 		if h != "" {
 			hosts = append(hosts, h)
 		}
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("read hosts.jsonl for screenshot: %w", err)
 	}
 	return hosts, nil
 }

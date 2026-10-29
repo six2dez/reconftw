@@ -1,12 +1,12 @@
 // ffuf.go — FfufTask: web directory/file fuzzer → artefacts/fuzz.jsonl.
 //
 // FfufTask runs ffuf per-host against probed hosts, writing structured
-// results to artefacts/fuzz.jsonl (D-W11 schema: {url, status, length,
+// results to artefacts/fuzz.jsonl (schema: {url, status, length,
 // words, lines, redirect}).
 //
 // DEPENDENCY: DependsOn ["web.httpx"] — reads artefacts/hosts.jsonl as input.
 //
-// ARG VECTOR (RESEARCH §ffuf — v1 form, web.sh:1497-1499, plus -ac per #1049):
+// ARG VECTOR (v1 form, web.sh:1497-1499, plus -ac per #1049):
 //
 //	ffuf -mc all -fc 404 -ac -sf -noninteractive -of json
 //	     -t <threads> -rate <rate> -H "<header>"
@@ -15,17 +15,15 @@
 //
 // DEEP mode (web.sh:1503) adds: -recursion -recursion-depth <depth>
 //
-// THREAD CAP (T-05-06 / WEB-03): threads = min(cfg.Web.Fuzz.Threads,
+// THREAD CAP: threads = min(cfg.Web.Fuzz.Threads,
 // cfg.Advanced.Tools.FFUF.Threads) when both are set and positive; otherwise
 // uses the non-zero value; final default = AVAILABLE_CORES * 10 (v1 default).
 //
-// XCUT-09 (Pitfall 5): ffuf runs up to FFUF_MAXTIME (default 900s) per host;
+// ffuf runs up to FFUF_MAXTIME (default 900s) per host;
 // Backend.Stream is mandatory to deliver heartbeat events for long runs.
 //
-// T-05-05 mitigation: each host URL from hosts.jsonl is validated for
+// each host URL from hosts.jsonl is validated for
 // http/https scheme before being interpolated into the -u flag.
-//
-// Source: .planning/phases/05-web-pipeline-e2e/05-02-PLAN.md Task 2.
 package web
 
 import (
@@ -49,7 +47,7 @@ import (
 )
 
 // ffufJSON is the top-level structure of ffuf's -of json output.
-// Source: RESEARCH §Code Examples: ffufJSON struct (web.sh:1520-1521).
+// Source: v1 ffufJSON struct (web.sh:1520-1521).
 type ffufJSON struct {
 	Results []ffufResult `json:"results"`
 }
@@ -64,7 +62,7 @@ type ffufResult struct {
 	Redirectlocation string `json:"redirectlocation"`
 }
 
-// FuzzRecord is the D-W11 artefacts/fuzz.jsonl schema.
+// FuzzRecord is the artefacts/fuzz.jsonl schema.
 // Fields: {url, status, length, words, lines, redirect}.
 type FuzzRecord struct {
 	URL      string `json:"url"`
@@ -93,7 +91,7 @@ func (t *FfufTask) Enabled(cfg *config.Config) bool { return cfg.Web.Fuzz.Enable
 // DependsOn returns the DAG edges: depends on web.httpx for hosts.jsonl input.
 func (t *FfufTask) DependsOn() []string { return []string{"web.httpx"} }
 
-// Run executes ffuf per host and writes D-W11 records to artefacts/fuzz.jsonl.
+// Run executes ffuf per host and writes records to artefacts/fuzz.jsonl.
 func (t *FfufTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result, error) {
 	const toolName = "ffuf"
 	cfg := app.Cfg
@@ -101,25 +99,19 @@ func (t *FfufTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 	// Resolve wordlist path (Paths.FuzzWordlist is the canonical source).
 	wordlist := cfg.Paths.FuzzWordlist
 	if wordlist == "" {
-		if app.Log != nil {
-			app.Log.Info("web.ffuf: no fuzz wordlist configured — skipping")
-		}
+		app.Log.Info("web.ffuf: no fuzz wordlist configured — skipping")
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 	if _, err := os.Stat(wordlist); err != nil {
-		if app.Log != nil {
-			app.Log.Info("web.ffuf: fuzz wordlist not accessible — skipping",
-				"path", wordlist, "err", err)
-		}
+		app.Log.Info("web.ffuf: fuzz wordlist not accessible — skipping",
+			"path", wordlist, "err", err)
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
 	// Read probed hosts from artefacts/hosts.jsonl.
 	allHosts, err := readHostURLsFromJSONL(app)
 	if err != nil || len(allHosts) == 0 {
-		if app.Log != nil {
-			app.Log.Info("web.ffuf: no hosts in hosts.jsonl — skipping")
-		}
+		app.Log.Info("web.ffuf: no hosts in hosts.jsonl — skipping")
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
@@ -135,7 +127,7 @@ func (t *FfufTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 			fmt.Errorf("web.ffuf: mkdir artefacts/: %w", err)
 	}
 
-	// Resolve thread count: cap at FFUF_THREADS_MAX (T-05-06 / WEB-03).
+	// Resolve thread count: cap at FFUF_THREADS_MAX.
 	threads := resolveFFUFThreads(cfg)
 
 	// Rate limit (0 = unlimited, matching v1 default).
@@ -171,7 +163,7 @@ func (t *FfufTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 
 	var totalResults int
 
-	// F3 + cross-host accumulation (phase 15).
+	// Cross-host accumulation.
 	//
 	// allLines accumulates EVERY host's records so the artefact is published
 	// exactly ONCE, after the loop. It used to be published inside the loop, and
@@ -185,11 +177,9 @@ func (t *FfufTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 	var allLines [][]byte
 
 	for i, hostURL := range allHosts {
-		// T-05-05: validate URL scheme before interpolating into -u flag.
+		// Validate URL scheme before interpolating into -u flag.
 		if err := validateFFUFURL(hostURL); err != nil {
-			if app.Log != nil {
-				app.Log.Debug("web.ffuf: skipping host with invalid URL", "url", hostURL, "err", err)
-			}
+			app.Log.Debug("web.ffuf: skipping host with invalid URL", "url", hostURL, "err", err)
 			continue
 		}
 
@@ -199,17 +189,15 @@ func (t *FfufTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 			threads, rateLimit, maxTime, header, extraArgs,
 			deepMode, recursionDepth, stagingFile)
 		if err != nil {
-			// F6: a TERMINAL error means ffuf RAN on this host and ended badly.
+			// A TERMINAL error means ffuf RAN on this host and ended badly.
 			// Fail the task rather than silently publishing the hosts fuzzed so
 			// far as a complete fuzz of every host.
 			if isTerminalStreamError(err) {
 				os.Remove(stagingFile) //nolint:errcheck // best effort cleanup
 				return task.Result{Status: task.StatusErrored}, err
 			}
-			if app.Log != nil {
-				app.Log.Debug("web.ffuf: host run error",
-					"host", hostURL, "err", err)
-			}
+			app.Log.Debug("web.ffuf: host run error",
+				"host", hostURL, "err", err)
 		}
 		totalResults += len(results)
 
@@ -229,7 +217,7 @@ func (t *FfufTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 	// Publish artefacts/fuzz.jsonl ONCE, covering every host.
 	//
 	// ffuf is the sole direct writer of "fuzz" and there is no staging producer
-	// for that stage, so web.MergeStage is barred from touching it (15-03's
+	// for that stage, so web.MergeStage is barred from touching it (
 	// directArtefactWriterStages). This is therefore the ONLY place the artefact
 	// can be emptied — and it must be, or a run that fuzzes every host and finds
 	// nothing republishes the previous run's results.
@@ -242,26 +230,20 @@ func (t *FfufTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 	if len(allLines) > 0 {
 		// Tree.Append stays the scope-enforcement boundary for non-empty batches.
 		if appendErr := app.Tree.Append("fuzz", allLines); appendErr != nil {
-			if app.Log != nil {
-				app.Log.Debug("web.ffuf: Tree.Append failed",
-					"records", len(allLines), "err", appendErr)
-			}
-			// Non-fatal per best_effort (D-W12).
+			app.Log.Debug("web.ffuf: Tree.Append failed",
+				"records", len(allLines), "err", appendErr)
+			// Non-fatal per best_effort.
 		}
 	} else if pubErr := output.PublishArtefact(app.Target.WorkDir, "fuzz", nil); pubErr != nil {
 		// Append cannot express "empty" — it short-circuits on a zero-length
 		// batch — so the empty case goes through PublishArtefact. No scope check
 		// is needed or possible: there are no records.
-		if app.Log != nil {
-			app.Log.Debug("web.ffuf: empty fuzz publish failed", "err", pubErr)
-		}
+		app.Log.Debug("web.ffuf: empty fuzz publish failed", "err", pubErr)
 	}
 
-	if app.Log != nil {
-		app.Log.Debug("web.ffuf: completed",
-			"hosts", len(allHosts),
-			"total_results", totalResults)
-	}
+	app.Log.Debug("web.ffuf: completed",
+		"hosts", len(allHosts),
+		"total_results", totalResults)
 
 	return task.Result{
 		Status: task.StatusDone,
@@ -270,13 +252,13 @@ func (t *FfufTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 }
 
 // runFFUFHost runs ffuf for a single host URL, returns parsed FuzzRecord slice.
-// Uses Backend.Stream (XCUT-09 — ffuf runs up to maxTime per host; Pitfall 5).
+// Uses Backend.Stream (ffuf runs up to maxTime per host).
 func runFFUFHost(ctx context.Context, app *appctx.AppContext, toolName, hostURL string,
 	wordlist string, threads, rateLimit, maxTime int, header string,
 	extraArgs []string, deepMode bool, recursionDepth int,
 	stagingFile string,
 ) ([]FuzzRecord, error) {
-	// Build arg vector (RESEARCH §ffuf verbatim v1 form web.sh:1497-1499).
+	// Build arg vector (verbatim v1 form, web.sh:1497-1499).
 	// -mc all -fc 404 -ac -sf -noninteractive -of json
 	//
 	// -ac is a deliberate DIVERGENCE from the v1 form this vector was ported
@@ -319,15 +301,14 @@ func runFFUFHost(ctx context.Context, app *appctx.AppContext, toolName, hostURL 
 	fuzzURL := strings.TrimRight(hostURL, "/") + "/FUZZ"
 	args = append(args, "-u", fuzzURL, "-o", stagingFile)
 
-	// Use Backend.Stream for XCUT-09 heartbeat (ffuf runs up to maxTime seconds;
-	// Pitfall 5 mitigation).
+	// Use Backend.Stream for the heartbeat (ffuf runs up to maxTime seconds).
 	eventCh, err := app.Tools.Stream(ctx, toolName, args)
 	if err != nil {
 		// DISPATCH failure — ffuf is not on PATH; nothing ran for this host.
 		return nil, fmt.Errorf("ffuf stream for %s: %w", hostURL, err)
 	}
 
-	// F6 (phase 15): consume the TERMINAL error before reading stagingFile. A
+	// Consume the TERMINAL error before reading stagingFile. A
 	// ffuf that hits -maxtime and is killed, or dies on a malformed wordlist,
 	// leaves a truncated -o JSON document; parsing it would report a partial
 	// fuzz as this host's complete result set.
@@ -407,7 +388,7 @@ func parseFFUFJSONL(data []byte) []FuzzRecord {
 }
 
 // resolveFFUFThreads computes the effective thread count, capping at
-// cfg.Advanced.Tools.FFUF.Threads (FFUF_THREADS_MAX) per T-05-06 / WEB-03.
+// cfg.Advanced.Tools.FFUF.Threads (FFUF_THREADS_MAX).
 // Falls back to AVAILABLE_CORES * 10 (v1 default) when no config is set.
 func resolveFFUFThreads(cfg *config.Config) int {
 	computed := cfg.Web.Fuzz.Threads
@@ -421,7 +402,7 @@ func resolveFFUFThreads(cfg *config.Config) int {
 	return computed
 }
 
-// validateFFUFURL checks that u is an http or https URL (T-05-05 mitigation).
+// validateFFUFURL checks that u is an http or https URL.
 // Rejects empty, non-parseable, or non-http/https URLs to prevent ffuf arg injection.
 func validateFFUFURL(u string) error {
 	if u == "" {

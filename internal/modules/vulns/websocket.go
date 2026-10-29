@@ -1,11 +1,11 @@
-// websocket.go — WebsocketTask: WebSocket endpoint detection via HTTP Upgrade probe (D-V3).
+// websocket.go — WebsocketTask: WebSocket endpoint detection via HTTP Upgrade probe.
 //
-// WebsocketTask is a D-V3 fold-in from web.sh websocket_checks(), routed to
-// the vulns pipeline per plan 06-08 (VULN-14 parity completeness gate).
+// WebsocketTask is a fold-in from web.sh websocket_checks(), routed to
+// the vulns pipeline for parity completeness (VULN-14).
 //
-// INPUT: artefacts/urls.jsonl — URL corpus from Phase 5.
+// INPUT: artefacts/urls.jsonl — URL corpus from the web stage.
 //
-//	Empty → StatusSkipped (best_effort per D-V7).
+//	Empty → StatusSkipped (best_effort).
 //
 // ARG VECTOR:
 //
@@ -14,7 +14,7 @@
 // httpx -websocket flag identifies hosts that respond to HTTP Upgrade with
 // 101 Switching Protocols. The -json output includes a "websocket" boolean.
 //
-// Non-zero exit → log.Debug (best_effort per D-V7, ADR §7).
+// Non-zero exit → log.Debug (best_effort, ADR §7).
 //
 // V1 EQUIVALENT (web.sh websocket_checks:2603):
 // v1 uses curl with Connection:Upgrade/Upgrade:websocket headers per wss:// URL,
@@ -27,8 +27,6 @@
 //
 // OUTPUT: artefacts/websocket.jsonl — single-writer; direct app.Tree.Append OK
 // (doc.go: single-writer artefacts do NOT go through the staging+merge pipeline).
-//
-// Source: .planning/phases/06-vulnerability-scanning-e2e/06-08-PLAN.md Task 1.
 package vulns
 
 import (
@@ -46,7 +44,7 @@ import (
 	"github.com/six2dez/reconftw/internal/core/task"
 )
 
-// WebsocketTask detects WebSocket endpoints via HTTP Upgrade probe (D-V3).
+// WebsocketTask detects WebSocket endpoints via HTTP Upgrade probe.
 type WebsocketTask struct{}
 
 // Name returns the globally unique dot-namespaced task identifier.
@@ -78,15 +76,13 @@ func (t *WebsocketTask) DependsOn() []string { return []string{"vulns.gf"} }
 func (t *WebsocketTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result, error) {
 	const toolName = "httpx"
 
-	// Step 1: Resolve URL corpus via D-V5 precedence (--urls ctx > artefacts/urls.jsonl).
+	// Step 1: Resolve URL corpus via precedence (--urls ctx > artefacts/urls.jsonl).
 	urls, err := readURLsWithCtx(ctx, app)
-	if err != nil && app.Log != nil {
+	if err != nil {
 		app.Log.Debug("vulns.websocket: read URL corpus error (best_effort)", "err", err)
 	}
 	if len(urls) == 0 {
-		if app.Log != nil {
-			app.Log.Info("vulns.websocket: no URLs in URL corpus — skipping")
-		}
+		app.Log.Info("vulns.websocket: no URLs in URL corpus — skipping")
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
@@ -124,14 +120,17 @@ func (t *WebsocketTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 	}
 
 	res, runErr := app.Tools.Run(ctx, toolName, args)
-	if runErr != nil && app.Log != nil {
+	if runErr != nil {
 		app.Log.Debug("vulns.websocket: httpx error (best_effort)", "err", runErr)
 	}
 	// A hard failure (unregistered binary, spawn/rate-limit error) returns a nil
 	// res; guard it so a missing httpx degrades to skipped, never a nil-pointer
-	// panic (same class as the testssl live all-mode regression, 2026-08).
+	// panic (same class as the testssl live all-mode regression, 2026-08). The
+	// Reason says whether httpx was absent or failed (task.ClassifyToolErr).
 	if res == nil {
-		return task.Result{Status: task.StatusSkipped}, nil
+		status, reason := task.ClassifyToolErr(runErr)
+		app.Log.Info("vulns.websocket: httpx not run — skipping", "reason", reason)
+		return task.Result{Status: status, Reason: reason}, nil
 	}
 
 	// Step 4: Parse JSONL output for websocket:true hosts.
@@ -148,16 +147,14 @@ func (t *WebsocketTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 			lines = append(lines, b)
 		}
 		if len(lines) > 0 {
-			if wErr := app.Tree.Append("websocket", lines); wErr != nil && app.Log != nil {
+			if wErr := app.Tree.Append("websocket", lines); wErr != nil {
 				app.Log.Debug("vulns.websocket: Tree.Append failed",
 					"records", len(lines), "err", wErr)
 			}
 		}
 	}
 
-	if app.Log != nil {
-		app.Log.Info("vulns.websocket: completed", "endpoints", len(records))
-	}
+	app.Log.Info("vulns.websocket: completed", "endpoints", len(records))
 
 	return task.Result{
 		Status: task.StatusDone,

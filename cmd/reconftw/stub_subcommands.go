@@ -255,9 +255,12 @@ func runSubsCmd(cmd *cobra.Command) error {
 			_ = axiomBE.Shutdown(context.Background()) //nolint:staticcheck
 		}
 	}()
+	scopeIncludeFile, scopeExcludeFile := scopeFileFlags(cmd)
 	if err := handlers.RunSubsAsync(ctx, handlers.RunOptions{
 		Secrets:      runSecrets,
 		Target:       targetFlag,
+		IncludeFile:  scopeIncludeFile,
+		ExcludeFile:  scopeExcludeFile,
 		DryRun:       dryRun,
 		ConfigPath:   efs.configPath,
 		SecretsPath:  efs.secretsPath,
@@ -537,9 +540,12 @@ func runWebCmd(cmd *cobra.Command) error {
 			_ = axiomBE.Shutdown(context.Background()) //nolint:staticcheck
 		}
 	}()
+	scopeIncludeFile, scopeExcludeFile := scopeFileFlags(cmd)
 	if err := handlers.RunWebAsync(ctx, handlers.RunOptions{
 		Secrets:      runSecrets,
 		Target:       targetFlag,
+		IncludeFile:  scopeIncludeFile,
+		ExcludeFile:  scopeExcludeFile,
 		DryRun:       dryRun,
 		ExtraFile:    hostsFlag,
 		ConfigPath:   efs.configPath,
@@ -864,9 +870,12 @@ func runVulnsCmd(cmd *cobra.Command) error {
 			_ = axiomBE.Shutdown(context.Background()) //nolint:staticcheck
 		}
 	}()
+	scopeIncludeFile, scopeExcludeFile := scopeFileFlags(cmd)
 	if err := handlers.RunVulnsAsync(ctx, handlers.RunOptions{
 		Secrets:      runSecrets,
 		Target:       targetFlag,
+		IncludeFile:  scopeIncludeFile,
+		ExcludeFile:  scopeExcludeFile,
 		DryRun:       dryRun,
 		ExtraFile:    urlsFlag,
 		ConfigPath:   efs.configPath,
@@ -1114,9 +1123,12 @@ func runOSINTCmd(cmd *cobra.Command) error {
 			_ = axiomBE.Shutdown(context.Background()) //nolint:staticcheck
 		}
 	}()
+	scopeIncludeFile, scopeExcludeFile := scopeFileFlags(cmd)
 	if err := handlers.RunOSINTAsync(ctx, handlers.RunOptions{
 		Secrets:      runSecrets,
 		Target:       targetFlag,
+		IncludeFile:  scopeIncludeFile,
+		ExcludeFile:  scopeExcludeFile,
 		DryRun:       dryRun,
 		ConfigPath:   efs.configPath,
 		SecretsPath:  efs.secretsPath,
@@ -1335,9 +1347,12 @@ func runMonitorCmd(cmd *cobra.Command) error {
 	// FlushNow is wired inside RunMonitorAsync via the notifier.Flusher interface
 	// assertion on boot.App.Notify (*notifier.Multi implements Flusher via Plan 02).
 	// The CLI layer does NOT need to wire or inject a coalescer reference.
+	scopeIncludeFile, scopeExcludeFile := scopeFileFlags(cmd)
 	return handlers.RunMonitorAsync(ctx, handlers.RunOptions{
 		Secrets:     runSecrets,
 		Target:      targetFlag,
+		IncludeFile: scopeIncludeFile,
+		ExcludeFile: scopeExcludeFile,
 		DryRun:      dryRun,
 		ConfigPath:  efs.configPath,
 		SecretsPath: efs.secretsPath,

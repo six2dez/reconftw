@@ -1,7 +1,7 @@
-// merge_test.go — F3 (15-03) empty-union behaviour for the web merger.
+// merge_test.go — empty-union behaviour for the web merger.
 //
 // Run A finds a result, run B on the SAME workspace finds nothing. Workspaces
-// are stable across runs by design, so before 15-03 run B republished run A's
+// are stable across runs by design, so before the fix run B republished run A's
 // artefact. These tests drive the STAGE-LEVEL entry point (web.MergeStage)
 // because that is what production calls — MergeAllWebArtefacts is reached only
 // from tests and doc comments (internal/mcp/handlers/web.go,
@@ -28,6 +28,7 @@ func newMergeApp(t *testing.T) *appctx.AppContext {
 		t.Fatalf("output.NewTree: %v", err)
 	}
 	return &appctx.AppContext{
+		Log:    appctx.NopLogger(),
 		Tree:   tree,
 		Target: &appctx.Target{Domain: "example.com", WorkDir: workdir},
 	}
@@ -213,7 +214,7 @@ func TestMergeStageDoesNotTruncateHosts(t *testing.T) {
 }
 
 // TestMergeStageDoesNotTruncateUrls — artefacts/urls.jsonl is written directly
-// by web/urldedup.go:230, the sole semantic-dedup writer (WEB-14).
+// by web/urldedup.go:230, the sole semantic-dedup writer.
 // Emptying urls when urldedup RUNS and finds nothing is 15-13 Task 3.
 func TestMergeStageDoesNotTruncateUrls(t *testing.T) {
 	assertMergeDoesNotTruncate(t, "urls", `{"url":"https://a.example.com/one"}`)
@@ -223,7 +224,7 @@ func TestMergeStageDoesNotTruncateUrls(t *testing.T) {
 // the never-truncate guard must NOT have turned into a seed-and-union for
 // "urls". Only "hosts" seeds the existing artefact (artefactSeedStages); seeding
 // urls would re-import the pre-dedup staging URLs on top of urldedup's
-// deduplicated artefact and undo WEB-14. The intermediate merge at
+// deduplicated artefact and undo the single-writer rule. The intermediate merge at
 // internal/mcp/handlers/web.go:143 must keep publishing the raw union.
 func TestMergeStageUrlsStillUnionsRawStaging(t *testing.T) {
 	app := newMergeApp(t)

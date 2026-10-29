@@ -298,9 +298,12 @@ func runRefreshCacheCmd(cmd *cobra.Command) error {
 		commonAfterBoot(ctx, boot, sched, dryRun, "refresh-cache", &capture, runSecrets)
 	}
 
+	scopeIncludeFile, scopeExcludeFile := scopeFileFlags(cmd)
 	if err := handlers.RunCompositeAsync(ctx, handlers.RunOptions{
 		Secrets:         runSecrets,
 		Target:          targetFlag,
+		IncludeFile:     scopeIncludeFile,
+		ExcludeFile:     scopeExcludeFile,
 		DryRun:          dryRun,
 		ConfigPath:      efs.configPath,
 		SecretsPath:     efs.secretsPath,
@@ -568,9 +571,12 @@ func runQuickRescanCmd(cmd *cobra.Command) error {
 		commonAfterBoot(ctx, boot, sched, dryRun, "quick-rescan", &capture, runSecrets)
 	}
 
+	scopeIncludeFile, scopeExcludeFile := scopeFileFlags(cmd)
 	if err := handlers.RunCompositeAsync(ctx, handlers.RunOptions{
 		Secrets:         runSecrets,
 		Target:          targetFlag,
+		IncludeFile:     scopeIncludeFile,
+		ExcludeFile:     scopeExcludeFile,
 		DryRun:          dryRun,
 		ConfigPath:      efs.configPath,
 		SecretsPath:     efs.secretsPath,

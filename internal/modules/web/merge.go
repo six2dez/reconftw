@@ -6,17 +6,13 @@
 // The web pipeline uses this for artefacts that accumulate across parallel
 // tasks (e.g. URL records from katana + urlfinder + waymore) before the
 // final deduplicated write to artefacts/urls.jsonl.
-//
-// Source: .planning/phases/05-web-pipeline-e2e/05-01-PLAN.md Task 2.
 package web
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -34,14 +30,14 @@ import (
 //   - write to app.Tree.Append(stage, ...)
 //
 // The web MergeStage deduplicates by raw JSON line bytes for every stage EXCEPT
-// "hosts", which dedups by DECODED host identity (one artefact line per host —
-// IN-13-03) because httpx/wellknown/portscan emit different JSON shapes for the
+// "hosts", which dedups by DECODED host identity (one artefact line per host)
+// because httpx/wellknown/portscan emit different JSON shapes for the
 // SAME host ({"host":"x","tech":[…]} vs {"host":"x","ip":…,"port":…}); raw-byte
 // dedup would let all of them survive and a line-counting consumer would over-count.
 // Raw-byte dedup remains correct for the other structured artefacts where the full
 // record is the unit of uniqueness.
 //
-// EMPTY UNION (F3, 15-03). An empty glob, an empty post-dedup set or an empty
+// EMPTY UNION. An empty glob, an empty post-dedup set or an empty
 // post-scope-filter set is NOT a no-op. Workspaces are stable across runs, so
 // returning nil left the PREVIOUS run's artefact in place and every downstream
 // consumer — report, SARIF, store, notifications — reported a stale finding as
@@ -54,7 +50,7 @@ import (
 //     the merge does not own.
 //
 // app.Tree.Append errors are returned — callers should log and continue
-// (best_effort policy, D-W12).
+// (best_effort policy).
 func MergeStage(ctx context.Context, app *appctx.AppContext, stage string) error {
 	pattern := filepath.Join(app.Target.WorkDir, "inputs", stage+".*.jsonl")
 	matches, err := filepath.Glob(pattern)
@@ -62,10 +58,8 @@ func MergeStage(ctx context.Context, app *appctx.AppContext, stage string) error
 		return fmt.Errorf("web.MergeStage %s: glob %q: %w", stage, pattern, err)
 	}
 	if len(matches) == 0 {
-		if app.Log != nil {
-			app.Log.Debug("web.MergeStage: no staging files found",
-				"stage", stage, "pattern", pattern)
-		}
+		app.Log.Debug("web.MergeStage: no staging files found",
+			"stage", stage, "pattern", pattern)
 		return publishEmptyStage(app, stage, "no staging files")
 	}
 
@@ -73,7 +67,7 @@ func MergeStage(ctx context.Context, app *appctx.AppContext, stage string) error
 	sort.Strings(matches)
 
 	// dedup key: the "hosts" stage keys by DECODED host identity so same-host
-	// records of different JSON shape collapse to one artefact line (IN-13-03);
+	// records of different JSON shape collapse to one artefact line;
 	// every other stage keys by raw JSON bytes (full-record uniqueness).
 	keyFor := func(line []byte) string { return string(line) }
 	if stage == "hosts" {
@@ -108,7 +102,7 @@ func MergeStage(ctx context.Context, app *appctx.AppContext, stage string) error
 		}
 	}
 
-	// REPLACE-preservation for the "hosts" artefact (13-08): web.httpx is a DIRECT
+	// REPLACE-preservation for the "hosts" artefact: web.httpx is a DIRECT
 	// writer of artefacts/hosts.jsonl via app.Tree.Append, which has REPLACE
 	// semantics. A hosts merge sourced from the portscan/nerva/wellknown staging
 	// files (inputs/hosts.*.jsonl) must therefore UNION the existing artefact FIRST,
@@ -138,10 +132,8 @@ func MergeStage(ctx context.Context, app *appctx.AppContext, stage string) error
 	for _, fpath := range matches {
 		lines, rerr := readJSONLFile(fpath)
 		if rerr != nil {
-			if app.Log != nil {
-				app.Log.Debug("web.MergeStage: error reading staging file",
-					"file", fpath, "err", rerr)
-			}
+			app.Log.Debug("web.MergeStage: error reading staging file",
+				"file", fpath, "err", rerr)
 			continue // non-fatal per best_effort policy
 		}
 		for _, line := range lines {
@@ -159,7 +151,7 @@ func MergeStage(ctx context.Context, app *appctx.AppContext, stage string) error
 	// keep every syntactically valid line — FilterInScope dispatches on the
 	// artefact exactly as Append does.
 	kept, dropped := output.FilterInScope(app.Tree, stage, ordered)
-	if dropped > 0 && app.Log != nil {
+	if dropped > 0 {
 		app.Log.Warn("web.MergeStage: dropped records the scope gate would reject",
 			"stage", stage, "dropped", dropped, "kept", len(kept))
 	}
@@ -169,10 +161,8 @@ func MergeStage(ctx context.Context, app *appctx.AppContext, stage string) error
 	ordered = kept
 
 	if err := app.Tree.Append(stage, ordered); err != nil {
-		if app.Log != nil {
-			app.Log.Debug("web.MergeStage: Tree.Append failed",
-				"stage", stage, "records", len(ordered), "err", err)
-		}
+		app.Log.Debug("web.MergeStage: Tree.Append failed",
+			"stage", stage, "records", len(ordered), "err", err)
 		return fmt.Errorf("web.MergeStage %s: Tree.Append: %w", stage, err)
 	}
 
@@ -181,13 +171,13 @@ func MergeStage(ctx context.Context, app *appctx.AppContext, stage string) error
 }
 
 // artefactSeedStages lists the stages whose merge must SEED the union with the
-// EXISTING artefact before folding in the staging files. This is the 13-08
+// EXISTING artefact before folding in the staging files. This is the
 // union-preservation behaviour and it is scoped to "hosts" ALONE: the
 // portscan/nerva/wellknown host records must be ADDED to httpx's probed hosts,
 // not substituted for them.
 //
 // Do NOT widen this set. Applying it to "urls" would re-import the pre-dedup
-// staging URLs on top of urldedup's deduplicated artefact, undoing WEB-14.
+// staging URLs on top of urldedup's deduplicated artefact, undoing the single-writer rule.
 //
 // This is a DIFFERENT concern from directArtefactWriterStages below (which is
 // about never TRUNCATING an artefact the merge does not own); they are two
@@ -213,8 +203,8 @@ var artefactSeedStages = map[string]bool{"hosts": true}
 // vulns/bypass4xx.go and web/portscan.go would then consume the empty files.
 //
 // IT DOES NOT SAY THESE FOUR ARTEFACTS ARE NEVER EMPTIED. They MUST be emptied
-// when their own direct writer RUNS and finds nothing — that is F3 for them,
-// and it is delivered by plan 15-13 Task 3 at web/ffuf.go,
+// when their own direct writer RUNS and finds nothing — that is the empty-run rule for them,
+// and it is delivered by the producers themselves at web/ffuf.go,
 // web/hakoriginfinder.go, web/urldedup.go and web/httpx.go. The empty-publish
 // belongs to the producer because only the producer can tell "did not run"
 // (preserve) from "ran and found nothing" (empty); the merge cannot, which is
@@ -226,7 +216,7 @@ var directArtefactWriterStages = map[string]bool{
 	"urls":    true,
 }
 
-// publishEmptyStage handles a merge whose union came out EMPTY (F3, 15-03).
+// publishEmptyStage handles a merge whose union came out EMPTY.
 //
 // Case A (stage NOT in directArtefactWriterStages — waf, findings): publish a
 // present, zero-length artefact so "this run found nothing" is representable
@@ -239,10 +229,8 @@ func publishEmptyStage(app *appctx.AppContext, stage, reason string) error {
 	if directArtefactWriterStages[stage] {
 		existing := filepath.Join(app.Target.WorkDir, "artefacts", stage+".jsonl")
 		if n := countArtefactLines(existing); n > 0 {
-			if app.Log != nil {
-				app.Log.Debug("web.MergeStage: empty union — artefact retained, the merge does not own it",
-					"stage", stage, "reason", reason, "retained", n)
-			}
+			app.Log.Debug("web.MergeStage: empty union — artefact retained, the merge does not own it",
+				"stage", stage, "reason", reason, "retained", n)
 			return nil
 		}
 	}
@@ -254,10 +242,8 @@ func publishEmptyStage(app *appctx.AppContext, stage, reason string) error {
 	if err := output.PublishArtefact(app.Target.WorkDir, stage, nil); err != nil {
 		return fmt.Errorf("web.MergeStage %s: publish empty artefact: %w", stage, err)
 	}
-	if app.Log != nil {
-		app.Log.Debug("web.MergeStage: empty union — published empty artefact",
-			"stage", stage, "reason", reason)
-	}
+	app.Log.Debug("web.MergeStage: empty union — published empty artefact",
+		"stage", stage, "reason", reason)
 	return nil
 }
 
@@ -271,7 +257,7 @@ func countArtefactLines(path string) int {
 	return len(lines)
 }
 
-// hostsDedupKey returns the dedup identity for a "hosts"-stage JSON line (IN-13-03).
+// hostsDedupKey returns the dedup identity for a "hosts"-stage JSON line.
 // httpx, wellknown and portscan all emit a "host" field but with different record
 // shapes; keying by the decoded, trimmed, lower-cased host collapses those to ONE
 // artefact line per host (DNS hostnames are case-insensitive). A line that is not
@@ -292,7 +278,7 @@ func hostsDedupKey(line []byte) string {
 
 // hostRecordRank scores a "hosts" record for the collapse below. Higher wins.
 //
-// One artefact line per host (IN-13-03) is the right cardinality — it is what
+// One artefact line per host is the right cardinality — it is what
 // made the live-host core set match v1 exactly, 12 of 12. But WHICH of a host's
 // records survives is not cosmetic, because artefacts/hosts.jsonl is the target
 // list web.nuclei scans. Once the uncommon-port sweep landed, httpx returned
@@ -324,7 +310,7 @@ func hostRecordRank(line []byte) int {
 	// DOMINANT TERM: an actual HTTP probe result beats a bare host mention,
 	// whatever ports are involved. A portscan/wellknown record carries a host and
 	// maybe a port; an httpx record carries the URL, title, tech and status that
-	// make the artefact useful. IN-13-03's existing guarantee — httpx's rich
+	// make the artefact useful. The one-line-per-host guarantee — httpx's rich
 	// record survives a same-host portscan shape — depends on this outranking
 	// every port preference below, so it stays worth more than all of them
 	// combined.
@@ -356,27 +342,17 @@ func hostRecordRank(line []byte) int {
 
 // readJSONLFile reads a JSONL file and returns each non-empty, non-whitespace
 // trimmed line as a []byte copy. Missing files return (nil, error).
-func readJSONLFile(path string) ([][]byte, error) {
-	f, err := os.Open(path) //nolint:gosec // path is from trusted Glob within WorkDir
-	if err != nil {
-		return nil, fmt.Errorf("open %q: %w", path, err)
-	}
-	defer f.Close() //nolint:errcheck
 
+func readJSONLFile(path string) ([][]byte, error) {
 	var lines [][]byte
-	scanner := bufio.NewScanner(f)
-	scanner.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
-	for scanner.Scan() {
-		b := bytes.TrimSpace(scanner.Bytes())
-		if len(b) == 0 {
-			continue
-		}
-		// Copy — scanner reuses its internal buffer.
-		line := make([]byte, len(b))
-		copy(line, b)
-		lines = append(lines, line)
+	err := output.ForEachJSONLLine(path, 0, func(line []byte) error {
+		lines = append(lines, bytes.TrimSpace(line))
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
-	return lines, scanner.Err()
+	return lines, nil
 }
 
 // webStagingPrefixes lists the web pipeline staging artefact names, in
@@ -388,7 +364,7 @@ var webStagingPrefixes = []string{"hosts", "fuzz", "waf", "origins", "urls", "fi
 // Non-fatal: errors are logged at Debug level and the function continues.
 //
 // The pre-glob "no staging files → skip" shortcut this function used to carry
-// was removed in 15-03: MergeStage now OWNS the empty case (publish empty for
+// was removed: MergeStage now OWNS the empty case (publish empty for
 // Case A, never truncate for Case B), and skipping the call here would have
 // left the previous run's artefact in place. NOTE this function is called only
 // from tests and doc comments — production calls MergeStage directly
@@ -398,10 +374,8 @@ func MergeAllWebArtefacts(ctx context.Context, app *appctx.AppContext) error {
 	var firstErr error
 	for _, prefix := range webStagingPrefixes {
 		if mergeErr := MergeStage(ctx, app, prefix); mergeErr != nil {
-			if app.Log != nil {
-				app.Log.Debug("web.MergeAllWebArtefacts: MergeStage failed",
-					"stage", prefix, "err", mergeErr)
-			}
+			app.Log.Debug("web.MergeAllWebArtefacts: MergeStage failed",
+				"stage", prefix, "err", mergeErr)
 			if firstErr == nil {
 				firstErr = mergeErr
 			}

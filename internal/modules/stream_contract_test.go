@@ -106,9 +106,8 @@ var streamContractAllowlist = map[string][]string{
 }
 
 // streamContractAllowlistSize is the number of flattened allowlist entries.
-// TestStreamContractAllowlistShrinks pins it against the map so the two cannot
-// drift; TestStreamContractRatchetIsClosed pins it at exactly 0 so neither can
-// be raised.
+// TestStreamContractRatchetIsClosed pins it at exactly 0 and asserts the map is
+// empty, so neither can be raised.
 //
 // 15-02 seed: 23 (web 6, subdomains 4, vulns 11, osint 2).
 // 15-13 lowered it to 13 by migrating all 10 web + subdomains sites.
@@ -136,35 +135,23 @@ func TestStreamContract(t *testing.T) {
 	}
 }
 
-// TestStreamContractAllowlistShrinks pins the allowlist size so the ratchet
-// cannot be loosened silently.
-func TestStreamContractAllowlistShrinks(t *testing.T) {
-	got := 0
-	for _, fns := range streamContractAllowlist {
-		got += len(fns)
-	}
-	switch {
-	case got > streamContractAllowlistSize:
-		t.Errorf("the stream-contract allowlist grew to %d entries (constant says %d) — that is never correct.\n"+
-			"  A new app.Tools.Stream call site must consume the terminal error on the day it is written;\n"+
-			"  the allowlist only shrinks (phase 15 plan 02).", got, streamContractAllowlistSize)
-	case got < streamContractAllowlistSize:
-		t.Errorf("streamContractAllowlist is down to %d entries but streamContractAllowlistSize still says %d.\n"+
-			"  If you migrated a site, lower the constant in the same commit so the ratchet stays tight.",
-			got, streamContractAllowlistSize)
-	}
-}
-
 // TestStreamContractRatchetIsClosed is phase 15 plan 17's permanent closure of
 // the F6 migration ratchet.
 //
-// TestStreamContractAllowlistShrinks only pins the map AGAINST the constant, so
-// raising BOTH together would satisfy it — which is precisely how a migration
+// A map-against-constant pin alone would be satisfied by raising BOTH together — which is precisely how a migration
 // ratchet gets quietly re-opened once nobody remembers it was supposed to
 // finish. This test pins the CONSTANT itself, so the only way to add an
 // allowlist entry is to edit an assertion that says, in the failure message,
 // that editing it is the regression.
 func TestStreamContractRatchetIsClosed(t *testing.T) {
+	// The MAP, not only the constant. TestStreamContractAllowlistShrinks used to
+	// compare the two; with both at 0 that was 0==0 and it was deleted in 21-04
+	// (internal/modules/DELETED_TESTS.md). The one thing it still guarded — an
+	// entry quietly added to the map — lives here instead.
+	if n := len(streamContractAllowlist); n != 0 {
+		t.Errorf("streamContractAllowlist holds %d file(s): %v — the ratchet is CLOSED and no entry "+
+			"may ever be added back; consume the terminal error at the call site instead", n, streamContractAllowlist)
+	}
 	if streamContractAllowlistSize != 0 {
 		t.Errorf("streamContractAllowlistSize is %d, want 0.\n"+
 			"  The F6 stream-contract ratchet was CLOSED by phase 15 plan 17. Every\n"+

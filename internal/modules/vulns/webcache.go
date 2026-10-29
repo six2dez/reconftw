@@ -8,7 +8,7 @@
 // DEPENDENCY: DependsOn ["vulns.gf"] — webcache() v1 runs after the URL corpus
 // is ready; the gf DAG root ensures that corpus is finalized before this task.
 //
-// INPUT: artefacts/urls.jsonl — host URL list from Phase 5 web probe (D-V5).
+// INPUT: artefacts/urls.jsonl — host URL list from the web probe.
 // WCVS does NOT need gf-pattern-filtered input; it tests all web hosts
 // (v1 webcache() reads webs/webs_all.txt, the unfiltered host list).
 //
@@ -17,12 +17,12 @@
 //	Web-Cache-Vulnerability-Scanner -u "file:<hostsFile>" -v 0
 //	toxicache -i <hostsFile> -o <outFile> -t <threads> -ua <userAgent>
 //
-// PAYLOAD REDACTION (XCUT-07, T-06-06-02):
+// PAYLOAD REDACTION (XCUT-07):
 // WCVS stdout contains raw cache poisoning PoC headers (X-Forwarded-Host etc.)
 // and injected cache directives. These MUST NOT appear in logs. Only finding
 // count is logged at Info. PayloadRedacted and PoCRedacted are always "***".
 //
-// SUBPROCESS SAFETY (FOUND-09, T-06-06-01):
+// SUBPROCESS SAFETY (FOUND-09):
 // Backend.Stream uses LocalBackend which sets SysProcAttr.Setpgid=true and
 // WaitDelay for all subprocess invocations — orphan processes are kill-tree safe.
 // No raw exec.Command calls in WebCacheTask code.
@@ -30,8 +30,6 @@
 // HEARTBEAT (XCUT-09):
 // Backend.Stream used for WCVS — can be slow on large host sets; the UI must
 // never appear stuck. toxicache uses Backend.Run (finite output).
-//
-// Source: .planning/phases/06-vulnerability-scanning-e2e/06-06-PLAN.md Task 1.
 package vulns
 
 import (
@@ -90,15 +88,13 @@ func (t *WebCacheTask) Run(ctx context.Context, app *appctx.AppContext) (task.Re
 	)
 	cfg := app.Cfg
 
-	// Step 1: Resolve URL corpus via D-V5 precedence (--urls ctx > artefacts/urls.jsonl).
+	// Step 1: Resolve URL corpus via precedence (--urls ctx > artefacts/urls.jsonl).
 	hostURLs, err := readURLsWithCtx(ctx, app)
-	if err != nil && app.Log != nil {
+	if err != nil {
 		app.Log.Debug("vulns.webcache: read URL corpus error (best_effort)", "err", err)
 	}
 	if len(hostURLs) == 0 {
-		if app.Log != nil {
-			app.Log.Info("vulns.webcache: no host URLs in URL corpus — skipping")
-		}
+		app.Log.Info("vulns.webcache: no host URLs in URL corpus — skipping")
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
@@ -122,10 +118,8 @@ func (t *WebCacheTask) Run(ctx context.Context, app *appctx.AppContext) (task.Re
 		deepLimit = 500 // v1 default DEEP_LIMIT
 	}
 	if !cfg.Advanced.Deep && len(hostURLs) > deepLimit {
-		if app.Log != nil {
-			app.Log.Info("vulns.webcache: too many URLs — skipped (use --deep to override)",
-				"url_count", len(hostURLs), "deep_limit", deepLimit)
-		}
+		app.Log.Info("vulns.webcache: too many URLs — skipped (use --deep to override)",
+			"url_count", len(hostURLs), "deep_limit", deepLimit)
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
@@ -140,18 +134,16 @@ func (t *WebCacheTask) Run(ctx context.Context, app *appctx.AppContext) (task.Re
 	eventCh, streamErr := app.Tools.Stream(ctx, wcvsToolName, wcvsArgs)
 	// engineRan records whether EITHER engine was actually dispatched. If neither
 	// WCVS nor toxicache is installed the task observed nothing and must not
-	// clear a previous run's staging (F3 did-not-run — staging.go).
+	// clear a previous run's staging (did-not-run rule — staging.go).
 	engineRan := streamErr == nil
 	if streamErr != nil {
 		// Non-fatal per best_effort policy — WCVS may not be installed.
-		if app.Log != nil {
-			app.Log.Debug("vulns.webcache: WCVS stream error (best_effort)", "err", streamErr)
-		}
+		app.Log.Debug("vulns.webcache: WCVS stream error (best_effort)", "err", streamErr)
 	} else {
 		// Drain event channel for XCUT-09 heartbeat; collect WCVS confirmed findings.
-		// XCUT-07 / T-06-06-02: raw WCVS output lines contain cache poisoning PoC
+		// XCUT-07: raw WCVS output lines contain cache poisoning PoC
 		// headers (X-Forwarded-Host etc.). NEVER log raw lines at Info/Warn.
-		// F6 (phase 15) accumulator shape: latch the TERMINAL error inside the
+		// Terminal-error accumulator shape: latch the TERMINAL error inside the
 		// loop and act on it after. `streamErr` is the DISPATCH error and keeps
 		// its untouched best-effort branch above.
 		for ev := range eventCh {
@@ -178,7 +170,7 @@ func (t *WebCacheTask) Run(ctx context.Context, app *appctx.AppContext) (task.Re
 				})
 			}
 		}
-		// F6: WCVS exited non-zero, so the poisoning verdicts collected above are
+		// Terminal error: WCVS exited non-zero, so the poisoning verdicts collected above are
 		// a partial scan. Return before toxicache and before the staging write —
 		// publishing a crashed scanner's partial result as this run's
 		// cache-poisoning verdict is exactly what gate 5 exists to stop.
@@ -215,9 +207,7 @@ func (t *WebCacheTask) Run(ctx context.Context, app *appctx.AppContext) (task.Re
 		_, toxErr := app.Tools.Run(ctx, toxicacheToolName, toxArgs)
 		if toxErr != nil {
 			// Non-fatal per best_effort policy — toxicache may not be installed.
-			if app.Log != nil {
-				app.Log.Debug("vulns.webcache: toxicache run error (best_effort)", "err", toxErr)
-			}
+			app.Log.Debug("vulns.webcache: toxicache run error (best_effort)", "err", toxErr)
 		} else {
 			engineRan = true
 			// Parse toxicache plain-text output for additional findings.
@@ -230,7 +220,7 @@ func (t *WebCacheTask) Run(ctx context.Context, app *appctx.AppContext) (task.Re
 
 	// Step 6: Write inputs/findings.webcache.jsonl (merged WCVS + toxicache).
 	//
-	// F3 (phase 15): staged through stageVulnFindings so a run in which neither
+	// Run isolation: staged through stageVulnFindings so a run in which neither
 	// engine confirmed poisoning REMOVES the previous run's staging instead of
 	// republishing a cache-poisoning vector that has since been fixed.
 	//
@@ -241,9 +231,7 @@ func (t *WebCacheTask) Run(ctx context.Context, app *appctx.AppContext) (task.Re
 	stageVulnFindings(app, "vulns.webcache", stagingPath, engineRan, allFindings)
 
 	// XCUT-07: log only count, never raw cache poisoning PoC headers.
-	if app.Log != nil {
-		app.Log.Info("vulns.webcache: completed", "webcache_findings", len(allFindings))
-	}
+	app.Log.Info("vulns.webcache: completed", "webcache_findings", len(allFindings))
 
 	return task.Result{
 		Status: task.StatusDone,

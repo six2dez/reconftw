@@ -4,7 +4,7 @@
 // files written by Tasks, deduplicates, converts to SubdomainRecord JSON,
 // and calls app.Tree.Append("subdomains", records) EXACTLY ONCE.
 //
-// MERGED-TXT CONTRACT (04-02):
+// MERGED-TXT CONTRACT:
 // After calling Append, MergeStage writes inputs/<stage>.merged.txt — a plain
 // newline-delimited hostname file used by subsequent-stage Tasks as their input
 // list (e.g. SubActiveTask reads inputs/passive.merged.txt, permutation Tasks
@@ -13,9 +13,6 @@
 //
 // This function is NOT a Task. It is called by the command layer (newSubsCmd in
 // cmd/reconftw/stub_subcommands.go) after each sequential RunStage call returns.
-//
-// Source: .planning/phases/04-subdomains-e2e-axiom-integration/04-01-PLAN.md
-// Task 1 Step C (MergeStage). Extended by 04-02 to write merged.txt.
 package subdomains
 
 import (
@@ -44,7 +41,7 @@ import (
 // and returns the error — out-of-scope rejections are expected and logged at
 // Debug, not Error.
 //
-// EMPTY UNION (F3, 15-03) — this function is CASE C, and it behaves differently
+// EMPTY UNION — this function is CASE C, and it behaves differently
 // from the web/vulns/osint mergers on purpose.
 //
 //  1. It must NOT publish an empty artefacts/subdomains.jsonl. MergeStage is not
@@ -67,7 +64,7 @@ func MergeStage(ctx context.Context, app *appctx.AppContext, stage string) error
 	if err != nil {
 		return fmt.Errorf("MergeStage %s: glob %q: %w", stage, pattern, err)
 	}
-	if len(matches) == 0 && app.Log != nil {
+	if len(matches) == 0 {
 		app.Log.Debug("MergeStage: no staging files found", "stage", stage, "pattern", pattern)
 	}
 
@@ -86,16 +83,14 @@ func MergeStage(ctx context.Context, app *appctx.AppContext, stage string) error
 		// re-merge the PREVIOUS run's hostnames, and rewrite merged.txt with
 		// them, so the empty-union refresh below could never be reached and
 		// permut/recursive/geo/buckets/takeover kept consuming run A's hosts
-		// forever. That is F3 at the derived layer (15-03 Case D).
+		// forever. That is the stale-staging leak at the derived layer (CASE D).
 		if strings.HasSuffix(fpath, ".merged.txt") {
 			continue
 		}
 		toolName := extractToolName(fpath, stage)
 		if err := readStagingFile(fpath, toolName, dedupe); err != nil {
-			if app.Log != nil {
-				app.Log.Debug("MergeStage: error reading staging file",
-					"file", fpath, "err", err)
-			}
+			app.Log.Debug("MergeStage: error reading staging file",
+				"file", fpath, "err", err)
 			// Non-fatal: skip this file, continue with others.
 			continue
 		}
@@ -125,7 +120,7 @@ func MergeStage(ctx context.Context, app *appctx.AppContext, stage string) error
 				dropped++
 			}
 		}
-		if dropped > 0 && app.Log != nil {
+		if dropped > 0 {
 			app.Log.Debug("MergeStage: dropped out-of-scope hosts",
 				"stage", stage, "dropped", dropped, "kept", len(filtered))
 		}
@@ -147,7 +142,7 @@ func MergeStage(ctx context.Context, app *appctx.AppContext, stage string) error
 	//
 	// Non-fatal: a failure here is logged at Debug and the merge continues.
 	mergedPath := filepath.Join(app.Target.WorkDir, "inputs", stage+".merged.txt")
-	if writeErr := writeMergedTxt(mergedPath, hosts); writeErr != nil && app.Log != nil {
+	if writeErr := writeMergedTxt(mergedPath, hosts); writeErr != nil {
 		app.Log.Debug("MergeStage: write merged.txt failed",
 			"path", mergedPath, "err", writeErr)
 	}
@@ -155,10 +150,8 @@ func MergeStage(ctx context.Context, app *appctx.AppContext, stage string) error
 	if len(hosts) == 0 {
 		// CASE C: do NOT publish an empty artefact here — MergeAllSubdomains is the
 		// authoritative writer and an empty publish would truncate it mid-run.
-		if app.Log != nil {
-			app.Log.Debug("MergeStage: empty union — artefact left to MergeAllSubdomains",
-				"stage", stage)
-		}
+		app.Log.Debug("MergeStage: empty union — artefact left to MergeAllSubdomains",
+			"stage", stage)
 		return nil
 	}
 
@@ -173,10 +166,8 @@ func MergeStage(ctx context.Context, app *appctx.AppContext, stage string) error
 		line, err := json.Marshal(rec)
 		if err != nil {
 			// Hostname serialization should never fail; skip defensively.
-			if app.Log != nil {
-				app.Log.Debug("MergeStage: marshal SubdomainRecord failed",
-					"host", host, "err", err)
-			}
+			app.Log.Debug("MergeStage: marshal SubdomainRecord failed",
+				"host", host, "err", err)
 			continue
 		}
 		records = append(records, line)
@@ -185,24 +176,20 @@ func MergeStage(ctx context.Context, app *appctx.AppContext, stage string) error
 	if len(records) == 0 {
 		// Every host failed to marshal (should never happen). Same CASE C rule:
 		// leave the artefact to MergeAllSubdomains. merged.txt is already refreshed.
-		if app.Log != nil {
-			app.Log.Debug("MergeStage: no marshalable records — artefact left to MergeAllSubdomains",
-				"stage", stage)
-		}
+		app.Log.Debug("MergeStage: no marshalable records — artefact left to MergeAllSubdomains",
+			"stage", stage)
 		return nil
 	}
 
 	// Single app.Tree.Append call — REPLACE semantics are safe because this is
 	// the ONLY writer for the "subdomains" artefact in this stage.
 	if err := app.Tree.Append("subdomains", records); err != nil {
-		if app.Log != nil {
-			// Out-of-scope rejections are expected (e.g. wildcard scope
-			// filtering); log at Debug, not Error.
-			app.Log.Debug("MergeStage: Tree.Append failed",
-				"stage", stage,
-				"records", len(records),
-				"err", err)
-		}
+		// Out-of-scope rejections are expected (e.g. wildcard scope
+		// filtering); log at Debug, not Error.
+		app.Log.Debug("MergeStage: Tree.Append failed",
+			"stage", stage,
+			"records", len(records),
+			"err", err)
 		return fmt.Errorf("MergeStage %s: Tree.Append: %w", stage, err)
 	}
 
@@ -229,7 +216,7 @@ var subdomainStagingPrefixes = []string{"passive", "resolved", "permut", "recurs
 // Out-of-scope hosts are dropped (non-fatal); *.merged.txt derived files are
 // skipped to avoid double counting.
 //
-// EMPTY UNION (F3, 15-03). This is the ONE empty-publish site for the
+// EMPTY UNION. This is the ONE empty-publish site for the
 // subdomains artefact — MergeStage is barred from it (CASE C above). An empty
 // union here means every producer that ran this invocation found nothing, so
 // the artefact is REPLACED with a present, empty file. Returning nil left the
@@ -252,7 +239,7 @@ func MergeAllSubdomains(ctx context.Context, app *appctx.AppContext) error {
 				continue // derived output, not a source
 			}
 			toolName := extractToolName(fpath, prefix)
-			if rerr := readStagingFile(fpath, toolName, dedupe); rerr != nil && app.Log != nil {
+			if rerr := readStagingFile(fpath, toolName, dedupe); rerr != nil {
 				app.Log.Debug("MergeAllSubdomains: read staging file failed", "file", fpath, "err", rerr)
 			}
 		}
@@ -282,7 +269,7 @@ func MergeAllSubdomains(ctx context.Context, app *appctx.AppContext) error {
 		}
 		records = append(records, line)
 	}
-	if dropped > 0 && app.Log != nil {
+	if dropped > 0 {
 		app.Log.Debug("MergeAllSubdomains: dropped out-of-scope hosts", "dropped", dropped, "kept", len(records))
 	}
 	if len(records) == 0 {
@@ -297,7 +284,7 @@ func MergeAllSubdomains(ctx context.Context, app *appctx.AppContext) error {
 }
 
 // publishEmptySubdomains replaces artefacts/subdomains.jsonl with a present,
-// zero-length file (F3, 15-03). Only MergeAllSubdomains may call it — see the
+// zero-length file. Only MergeAllSubdomains may call it — see the
 // CASE C note on MergeStage for why the per-stage merge must not.
 //
 // output.PublishArtefact bypasses app.Tree.Append deliberately: Append
@@ -308,10 +295,8 @@ func publishEmptySubdomains(app *appctx.AppContext, reason string) error {
 	if err := output.PublishArtefact(app.Target.WorkDir, "subdomains", nil); err != nil {
 		return fmt.Errorf("MergeAllSubdomains: publish empty artefact: %w", err)
 	}
-	if app.Log != nil {
-		app.Log.Debug("MergeAllSubdomains: empty union — published empty artefact",
-			"reason", reason)
-	}
+	app.Log.Debug("MergeAllSubdomains: empty union — published empty artefact",
+		"reason", reason)
 	return nil
 }
 

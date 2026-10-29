@@ -14,8 +14,10 @@
 package output
 
 import (
+	"fmt"
 	"net/netip"
 	"net/url"
+	"os"
 	"regexp"
 	"strings"
 )
@@ -44,6 +46,67 @@ type ScopeFilter interface {
 // ^[a-zA-Z0-9.-]+$) are rejected unconditionally.
 type DefaultScopeFilter struct {
 	Patterns []string
+
+	// Include / Exclude are the v1 `-i <file>` / `-x <file>` scope lists
+	// (subdomains.scope.include_file / exclude_file, or --include-file /
+	// --exclude-file). Entries use the same syntax as Patterns: exact host,
+	// `*.sub.example.com` wildcard, IP literal or CIDR.
+	//
+	// Evaluation order, applied to a value that already matched Patterns:
+	//   1. Exclude — any match drops the value.
+	//   2. Include — when non-empty, the value must match one entry.
+	// Include narrows; it never admits a value outside Patterns, so an include
+	// list cannot widen the engagement past the target's own scope.
+	Include []string
+	Exclude []string
+}
+
+// NewScopeFilter builds the production filter: patterns from the target plus
+// the optional include/exclude list files. An empty path means "no list". A
+// path that cannot be read is an error — config.ValidateScopeFiles rejects it
+// earlier on every path that loads config, so this is the last line, not the
+// first.
+func NewScopeFilter(patterns []string, includeFile, excludeFile string) (*DefaultScopeFilter, error) {
+	f := &DefaultScopeFilter{Patterns: patterns}
+	var err error
+	if f.Include, err = LoadScopeList(includeFile); err != nil {
+		return nil, fmt.Errorf("output: include scope list: %w", err)
+	}
+	if f.Exclude, err = LoadScopeList(excludeFile); err != nil {
+		return nil, fmt.Errorf("output: exclude scope list: %w", err)
+	}
+	return f, nil
+}
+
+// LoadScopeList reads one scope entry per line from path. Blank lines and
+// `#` comments are skipped; entries are trimmed and lowercased. An empty path
+// yields nil, nil.
+func LoadScopeList(path string) ([]string, error) {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return nil, nil
+	}
+	data, err := os.ReadFile(path) //nolint:gosec // operator-supplied scope list
+	if err != nil {
+		return nil, err
+	}
+	return ParseScopeList(string(data)), nil
+}
+
+// ParseScopeList is LoadScopeList over in-memory content.
+func ParseScopeList(content string) []string {
+	var out []string
+	for _, line := range strings.Split(content, "\n") {
+		if i := strings.IndexByte(line, '#'); i >= 0 {
+			line = line[:i]
+		}
+		line = strings.ToLower(strings.TrimSpace(line))
+		if line == "" {
+			continue
+		}
+		out = append(out, line)
+	}
+	return out
 }
 
 // domainRe is the canonical input-validation regex shared with
@@ -73,12 +136,33 @@ func (f *DefaultScopeFilter) IsInScope(host string) bool {
 	if host == "" {
 		return false
 	}
+	if !matchAnyScope(host, f.Patterns) {
+		return false
+	}
+	// Exclude list wins over everything: an operator's -x entry must never be
+	// written, whatever the target scope or include list says.
+	if matchAnyScope(host, f.Exclude) {
+		return false
+	}
+	// Include list narrows within Patterns.
+	if len(f.Include) > 0 && !matchAnyScope(host, f.Include) {
+		return false
+	}
+	return true
+}
 
+// matchAnyScope reports whether the (already lowercased, trimmed) value matches
+// any pattern. Hostnames and IP literals are matched by disjoint rules — see
+// IsInScope.
+func matchAnyScope(host string, patterns []string) bool {
+	if len(patterns) == 0 {
+		return false
+	}
 	// IP-shaped value: only IP and CIDR patterns can admit it. Unmap so an
 	// IPv4-mapped IPv6 form compares equal to its plain IPv4 pattern.
 	if addr, err := netip.ParseAddr(host); err == nil {
 		addr = addr.Unmap()
-		for _, pat := range f.Patterns {
+		for _, pat := range patterns {
 			if matchScopeAddr(addr, pat) {
 				return true
 			}
@@ -90,7 +174,7 @@ func (f *DefaultScopeFilter) IsInScope(host string) bool {
 	if !domainRe.MatchString(host) {
 		return false
 	}
-	for _, pat := range f.Patterns {
+	for _, pat := range patterns {
 		if isAddrPattern(pat) {
 			continue // an IP/CIDR pattern never admits a hostname
 		}

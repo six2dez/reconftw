@@ -1,7 +1,7 @@
 // Source: .planning/phases/14-cutover-and-migration (CUT-08 compat-writer wiring).
 //
-// These tests prove the end-of-scan finalization WIRING — the seam both
-// RunCompositeAsync and RunSubsAsync invoke (writeCompatTree) — turns a
+// These tests prove the end-of-scan finalization WIRING — the seam every scan
+// handler (composite, subs, web, vulns, osint) invokes (writeCompatTree) — turns a
 // finalized workspace's artefacts/*.jsonl into the v1 bash-shape _compat/ tree.
 // Driving writeCompatTree directly (rather than a full RunCompositeAsync boot,
 // which would require a scheduler, backend, live tools, and DNS) exercises the
@@ -17,6 +17,7 @@ import (
 	"testing"
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
+	"github.com/six2dez/reconftw/internal/core/config"
 	"github.com/six2dez/reconftw/internal/core/output"
 )
 
@@ -97,7 +98,7 @@ func TestWriteCompatTreeProducesBashShapeTree(t *testing.T) {
 	)
 
 	// Drive the exact finalization seam the handlers call.
-	writeCompatTree(discardApp(root), root)
+	writeCompatTree(discardApp(root), root, false)
 
 	// subdomains → subdomains.txt + all.txt (sorted-unique, dup collapsed).
 	const wantSubs = "a.example.com\nb.example.com\n"
@@ -137,7 +138,7 @@ func TestWriteCompatTreeSubsOnlyMissingSourcesNoCrash(t *testing.T) {
 	seedArtefact(t, root, "subdomains.jsonl",
 		`{"subdomain":"only.example.com"}`)
 
-	writeCompatTree(discardApp(root), root)
+	writeCompatTree(discardApp(root), root, false)
 
 	// Present source is materialized.
 	if _, err := os.Stat(filepath.Join(root, "_compat", "subdomains", "subdomains.txt")); err != nil {
@@ -155,7 +156,7 @@ func TestWriteCompatTreeNoArtefactsNoCrash(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	// No panic, no fatal — the scan's finalization survives an empty workspace.
-	writeCompatTree(discardApp(root), root)
+	writeCompatTree(discardApp(root), root, false)
 }
 
 // Integration test: the WorkspaceRoot fallback. When app.Tree is not a concrete
@@ -172,8 +173,115 @@ func TestWriteCompatTreeNilTreeUsesWorkspaceRoot(t *testing.T) {
 		Log:  slog.New(slog.NewTextHandler(io.Discard, nil)),
 		Tree: nil, // not a *output.OutputTree → WriteCompat uses WorkspaceRoot
 	}
-	writeCompatTree(app, root)
+	writeCompatTree(app, root, false)
 
 	assertCompatHasLines(t, root, filepath.Join("_compat", "subdomains", "subdomains.txt"),
 		"fallback.example.com")
+}
+
+// ---- CUT-08: Recon/<domain> contract symlink wiring (MIGRATION §2.2) ----
+
+// initEngagementWorkspace boots a workspace exactly as BootReconApp does
+// (output.WorkspaceInit under <engagement>/workspaces) so the identity marker
+// exists and the Recon/ link lands as a sibling of workspaces/.
+func initEngagementWorkspace(t *testing.T, target string) (engagement, workdir string) {
+	t.Helper()
+	engagement = t.TempDir()
+	workdir, err := output.WorkspaceInit(filepath.Join(engagement, "workspaces"), target)
+	if err != nil {
+		t.Fatalf("WorkspaceInit: %v", err)
+	}
+	return engagement, workdir
+}
+
+// With output.compat.recon_symlink = true (the default), finalization creates
+// <engagement>/Recon/example.com → ../workspaces/<slug>/_compat, and a second
+// call is idempotent.
+func TestWriteCompatTreeCreatesReconSymlink(t *testing.T) {
+	t.Parallel()
+	engagement, workdir := initEngagementWorkspace(t, "example.com")
+	seedArtefact(t, workdir, "subdomains.jsonl", `{"subdomain":"a.example.com"}`)
+
+	writeCompatTree(discardApp(workdir), workdir, true)
+	writeCompatTree(discardApp(workdir), workdir, true) // idempotent re-run
+
+	link := filepath.Join(engagement, "Recon", "example.com")
+	got, err := os.Readlink(link)
+	if err != nil {
+		t.Fatalf("Readlink(%s): %v", link, err)
+	}
+	want := filepath.Join("..", "workspaces", filepath.Base(workdir), "_compat")
+	if got != want {
+		t.Fatalf("symlink target = %q; want %q", got, want)
+	}
+	assertCompatHasLines(t, link, filepath.Join("subdomains", "subdomains.txt"), "a.example.com")
+}
+
+// With output.compat.recon_symlink = false, no Recon/ is created at all, while
+// the _compat/ tree is still written.
+func TestWriteCompatTreeReconSymlinkOptOut(t *testing.T) {
+	t.Parallel()
+	engagement, workdir := initEngagementWorkspace(t, "example.com")
+	seedArtefact(t, workdir, "subdomains.jsonl", `{"subdomain":"a.example.com"}`)
+
+	writeCompatTree(discardApp(workdir), workdir, false)
+
+	if _, err := os.Lstat(filepath.Join(engagement, "Recon")); !os.IsNotExist(err) {
+		t.Fatalf("opt-out must not create Recon/; Lstat err = %v", err)
+	}
+	assertCompatHasLines(t, workdir, filepath.Join("_compat", "subdomains", "subdomains.txt"), "a.example.com")
+}
+
+// Default config carries the symlink ON (MIGRATION §2.2: "default true").
+func TestCompatReconSymlinkDefaultTrue(t *testing.T) {
+	t.Parallel()
+	if !config.Defaults().Output.Compat.ReconSymlink {
+		t.Fatal("config.Defaults().Output.Compat.ReconSymlink = false; want true")
+	}
+}
+
+// A workspace that was never WorkspaceInit'd (no identity marker) skips the
+// symlink without failing: the compat tree is still written, nothing panics.
+func TestWriteCompatTreeReconSymlinkSkipsWithoutMarker(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	seedArtefact(t, root, "subdomains.jsonl", `{"subdomain":"a.example.com"}`)
+
+	writeCompatTree(discardApp(root), root, true)
+
+	assertCompatHasLines(t, root, filepath.Join("_compat", "subdomains", "subdomains.txt"), "a.example.com")
+	if _, err := os.Lstat(filepath.Join(filepath.Dir(filepath.Dir(root)), "Recon")); err == nil {
+		t.Fatal("a marker-less workspace must not create a Recon/ link")
+	}
+}
+
+// Wiring guard: every scan handler that finalizes a workspace — the composites
+// AND the standalone subs/web/vulns/osint pipelines — calls writeCompatTree with
+// the config knob, and does so BEFORE persistScanToStore (the finalization seam).
+// A full RunWebAsync/RunVulnsAsync/RunOSINTAsync boot needs a scheduler, backend
+// and live tools, so the call is asserted at the source seam itself; the
+// behaviour of the call is proven by the tests above.
+func TestEveryScanHandlerCallsCompatWriterBeforePersist(t *testing.T) {
+	t.Parallel()
+	const call = "writeCompatTree(app, workdir, cfg.Output.Compat.ReconSymlink)"
+	for _, file := range []string{"composite.go", "subs.go", "web.go", "vulns.go", "osint.go"} {
+		src, err := os.ReadFile(file)
+		if err != nil {
+			t.Fatalf("read %s: %v", file, err)
+		}
+		s := string(src)
+		ci := strings.Index(s, call)
+		if ci < 0 {
+			t.Errorf("%s: missing %q", file, call)
+			continue
+		}
+		pi := strings.Index(s, "persistScanToStore(ctx, boot, opts,")
+		if pi < 0 {
+			t.Errorf("%s: missing persistScanToStore call", file)
+			continue
+		}
+		if ci > pi {
+			t.Errorf("%s: writeCompatTree must run before persistScanToStore (compat=%d persist=%d)", file, ci, pi)
+		}
+	}
 }

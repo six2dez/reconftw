@@ -29,7 +29,7 @@ func TestReadURLsWithCtxResolvesCorpus(t *testing.T) {
 	}
 
 	// No --urls in ctx → resolveURLInput falls to priority 2 (artefacts/urls.jsonl).
-	app := &appctx.AppContext{Target: &appctx.Target{Domain: "example.com", WorkDir: workDir}}
+	app := &appctx.AppContext{Log: appctx.NopLogger(), Target: &appctx.Target{Domain: "example.com", WorkDir: workDir}}
 
 	urls, err := readURLsWithCtx(context.Background(), app)
 	if err != nil {

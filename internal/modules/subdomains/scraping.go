@@ -11,23 +11,19 @@
 //  0. Write the workspace's scheme-bearing URLs to inputs/scraping_subjs_urls.txt.tmp
 //     and pass THAT to subjs -i. subjs has no stdin sentinel: `-i -` fails with
 //     `Could not open input file: open -: no such file or directory`, and nothing
-//     was ever piped to it either (fixed 17-04).
+//     was ever piped to it either.
 //  1. Run subjs → collect output
 //  2. Write output to raw/subjs.tmp.txt
 //  3. Run jsluice with -i raw/subjs.tmp.txt (file input, not stdin)
 //  4. Defer os.Remove on the temp file
 //
-// This resolves the REVIEWS additional finding and the 04-03-PLAN.md constraint.
+// THREAT MODEL:
 //
-// THREAT MODEL (04-03-PLAN.md):
-//
-//	T-04-03-01: tempFile path constructed from WorkDir (validated at Target creation)
-//	            — no user-controlled path component.
-//	T-04-03-02: extract/js returns only Subdomain+URL; secret fields NOT written to staging.
-//	T-04-03-03: SubScrapingTask runs once per target per stage; Scheduler ensures
-//	            single instance per task name (no temp file race).
-//
-// Source: .planning/phases/04-subdomains-e2e-axiom-integration/04-03-PLAN.md Task 2.
+//   - tempFile path is constructed from WorkDir (validated at Target creation)
+//     — no user-controlled path component.
+//   - extract/js returns only Subdomain+URL; secret fields are NOT written to staging.
+//   - SubScrapingTask runs once per target per stage; Scheduler ensures a
+//     single instance per task name (no temp file race).
 package subdomains
 
 import (
@@ -94,7 +90,7 @@ func (SubScrapingTask) Run(ctx context.Context, app *appctx.AppContext) (task.Re
 				candidates = append(candidates, r.Subdomain)
 			}
 		}
-	} else if app.Log != nil {
+	} else {
 		app.Log.Warn("scraping: favirecon failed", "error", err.Error())
 	}
 
@@ -114,16 +110,14 @@ func (SubScrapingTask) Run(ctx context.Context, app *appctx.AppContext) (task.Re
 	// to it, so this leg contributed nothing. Written the same way the file-fed
 	// jsluice call below and web/subjs.go both do it.
 	subjsInputURLs, subjsDropped := scrapingSubjsInput(app)
-	if subjsDropped > 0 && app.Log != nil {
+	if subjsDropped > 0 {
 		app.Log.Debug("scraping: workspace entries without a scheme skipped for subjs",
 			"dropped", subjsDropped)
 	}
 	var subjsOutput []byte
 	if len(subjsInputURLs) == 0 {
-		if app.Log != nil {
-			app.Log.Info("scraping: no workspace URLs for subjs — skipping JS URL collection",
-				"source", "artefacts/hosts.jsonl|urls.jsonl")
-		}
+		app.Log.Info("scraping: no workspace URLs for subjs — skipping JS URL collection",
+			"source", "artefacts/hosts.jsonl|urls.jsonl")
 	} else {
 		subjsInputPath := filepath.Join(app.Target.WorkDir, "inputs", "scraping_subjs_urls.txt.tmp")
 		if wErr := os.MkdirAll(filepath.Dir(subjsInputPath), 0o755); wErr != nil {
@@ -137,9 +131,7 @@ func (SubScrapingTask) Run(ctx context.Context, app *appctx.AppContext) (task.Re
 		}
 		subjsRes, sErr := app.Tools.Run(ctx, "subjs", []string{"-i", subjsInputPath})
 		if sErr != nil {
-			if app.Log != nil {
-				app.Log.Warn("scraping: subjs failed", "error", sErr.Error())
-			}
+			app.Log.Warn("scraping: subjs failed", "error", sErr.Error())
 		} else {
 			subjsOutput = subjsRes.Stdout
 		}
@@ -166,7 +158,7 @@ func (SubScrapingTask) Run(ctx context.Context, app *appctx.AppContext) (task.Re
 				candidates = append(candidates, r.Subdomain)
 			}
 		}
-	} else if app.Log != nil {
+	} else {
 		app.Log.Warn("scraping: jsluice failed", "error", err.Error())
 	}
 
@@ -204,7 +196,7 @@ func writeScrapingStagingFile(app *appctx.AppContext, toolName string, candidate
 	}
 	stagingPath := filepath.Join(inputsDir, "resolved."+toolName+".txt")
 
-	// F3 (phase 15): write-or-REMOVE via output.StageLines. Calling this asserts
+	// Write-or-REMOVE via output.StageLines. Calling this asserts
 	// "this scraping source RAN and found exactly these candidates", so a
 	// zero-result run clears the previous run's file instead of leaving it for
 	// MergeAllSubdomains (which globs inputs/resolved.*.txt) to republish.
@@ -273,9 +265,7 @@ func (SubAnalyticsTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 	res, err := app.Tools.Run(ctx, "analyticsrelationships", []string{"-u", targetURL, "--chain-mode"})
 	var stdout []byte
 	if err != nil {
-		if app.Log != nil {
-			app.Log.Warn("analytics: analyticsrelationships failed (non-fatal)", "error", err.Error())
-		}
+		app.Log.Warn("analytics: analyticsrelationships failed (non-fatal)", "error", err.Error())
 	} else {
 		stdout = res.Stdout
 	}
@@ -453,39 +443,37 @@ func scrapingSubjsInput(app *appctx.AppContext) (urls []string, droppedNoScheme 
 	seen := make(map[string]struct{})
 	for _, src := range []string{"hosts.jsonl", "urls.jsonl"} {
 		path := filepath.Join(app.Target.WorkDir, "artefacts", src)
-		f, err := os.Open(path) //nolint:gosec // within WorkDir
-		if err != nil {
-			continue
-		}
-		sc := bufio.NewScanner(f)
-		sc.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
-		for sc.Scan() {
-			line := strings.TrimSpace(sc.Text())
-			if line == "" {
-				continue
-			}
+		// ForEachJSONLLine rather than ForEachJSONL: a bare URL line (no JSON
+		// object) is accepted as-is, so the raw bytes are inspected first.
+		err := output.ForEachJSONLLine(path, 0, func(b []byte) error {
+			line := strings.TrimSpace(string(b))
 			raw := line
 			if strings.HasPrefix(line, "{") {
 				var rec struct {
 					URL string `json:"url"`
 				}
 				if json.Unmarshal([]byte(line), &rec) != nil || rec.URL == "" {
-					continue
+					return nil
 				}
 				raw = rec.URL
 			}
 			u, uErr := url.Parse(raw)
 			if uErr != nil || u.Scheme == "" || u.Host == "" {
 				droppedNoScheme++
-				continue
+				return nil
 			}
 			if _, ok := seen[raw]; ok {
-				continue
+				return nil
 			}
 			seen[raw] = struct{}{}
 			urls = append(urls, raw)
+			return nil
+		})
+		if err != nil {
+			// A line past the buffer cap or an unreadable file used to end the
+			// walk silently; say so, and keep whatever was collected.
+			app.Log.Warn("scraping: subjs input read stopped early", "file", path, "error", err.Error())
 		}
-		_ = f.Close()
 	}
 	return urls, droppedNoScheme
 }

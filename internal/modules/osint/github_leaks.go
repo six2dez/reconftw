@@ -13,7 +13,7 @@
 // at the sink", mantra.go:162-193):
 //
 //	L1 (type-level): the GitHub token is read via readGitHubToken and passed to
-//	    the subprocess only — never logged (T-07-03-02).
+//	    the subprocess only — never logged.
 //	L2 (runtime registry): for every surfaced secret VALUE, app.Log's Redactor
 //	    .Register(rawValue) is called BEFORE any log line so the substring is
 //	    scrubbed from ALL subsequent slog output (redactor.go:35-58).
@@ -23,16 +23,14 @@
 //
 // Logs report ONLY counts, never raw matches (crlf.go:171-173).
 //
-// KEY GATE (D-O8): reads cfg.Paths.GitHubTokens (the v1 $GITHUB_TOKENS file).
+// KEY GATE: reads cfg.Paths.GitHubTokens (the v1 $GITHUB_TOKENS file).
 // Empty path / empty file → logged Info + StatusSkipped (logged-never-silent).
 //
-// DEPENDENCY (D-O10 fold): DependsOn ["osint.github_repos"] — the enumerated
+// DEPENDENCY: DependsOn ["osint.github_repos"] — the enumerated
 // repo list (inputs/github_repos.txt) feeds the per-repo trufflehog scan.
 //
-// FAILURE POLICY (D-O8): best_effort — engine failure / empty output logs Debug
+// FAILURE POLICY: best_effort — engine failure / empty output logs Debug
 // and returns StatusDone.
-//
-// Source: .planning/phases/07-osint-e2e/07-03-PLAN.md Task 2.
 package osint
 
 import (
@@ -73,7 +71,7 @@ func (t *GitHubLeaksTask) Enabled(cfg *config.Config) bool {
 }
 
 // DependsOn returns the DAG edge to github_repos — the enumerated repo list
-// feeds the per-repo trufflehog scan (D-O10 fold).
+// feeds the per-repo trufflehog scan.
 func (t *GitHubLeaksTask) DependsOn() []string { return []string{"osint.github_repos"} }
 
 // Run executes ghleaks + trufflehog over the enumerated repos with full
@@ -81,18 +79,14 @@ func (t *GitHubLeaksTask) DependsOn() []string { return []string{"osint.github_r
 func (t *GitHubLeaksTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result, error) {
 	root := rootDomain(app)
 	if root == "" {
-		if app.Log != nil {
-			app.Log.Info("osint.github_leaks: no valid root domain — skipping")
-		}
+		app.Log.Info("osint.github_leaks: no valid root domain — skipping")
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
-	// Key gate (D-O8, logged-never-silent).
+	// Key gate (logged-never-silent).
 	token, ok := readGitHubToken(app)
 	if !ok {
-		if app.Log != nil {
-			app.Log.Info("osint.github_leaks: no GITHUB_TOKEN (cfg.paths.github_tokens) — skipping")
-		}
+		app.Log.Info("osint.github_leaks: no GITHUB_TOKEN (cfg.paths.github_tokens) — skipping")
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
@@ -107,7 +101,7 @@ func (t *GitHubLeaksTask) Run(ctx context.Context, app *appctx.AppContext) (task
 	var records []OSINTFindingRecord
 	// engineRan records whether AT LEAST ONE engine invocation was dispatched.
 	// If neither ghleaks nor trufflehog is installed the task observed nothing
-	// and must not clear a previous run's staging (F3 did-not-run — see
+	// and must not clear a previous run's staging (did-not-run rule — see
 	// writeOSINTStaging). Deleting a previous run's leak findings because the
 	// scanner is missing would silently retract a reported secret exposure.
 	engineRan := false
@@ -125,12 +119,10 @@ func (t *GitHubLeaksTask) Run(ctx context.Context, app *appctx.AppContext) (task
 	// XCUT-09 heartbeat: ghleaks can run long — use Stream and drain.
 	// The event lines may embed raw secrets, so they are NEVER logged here.
 	if ev, sErr := app.Tools.Stream(ctx, "ghleaks", ghArgs); sErr != nil {
-		if app.Log != nil {
-			app.Log.Debug("osint.github_leaks: ghleaks stream error (best_effort)", "err", sErr)
-		}
+		app.Log.Debug("osint.github_leaks: ghleaks stream error (best_effort)", "err", sErr)
 	} else {
 		engineRan = true
-		// F6 (phase 15): consume the TERMINAL error before reading ghReport. A
+		// Terminal error: consume the TERMINAL error before reading ghReport. A
 		// ghleaks that exited non-zero leaves a truncated --report file, or none,
 		// in which case the read picks up whatever a PREVIOUS run wrote there —
 		// publishing stale secret findings as this run's result. Return before
@@ -150,9 +142,7 @@ func (t *GitHubLeaksTask) Run(ctx context.Context, app *appctx.AppContext) (task
 		// v1 arg vector (osint.sh:230): trufflehog git <repoURL> -j
 		res, rErr := app.Tools.Run(ctx, "trufflehog", []string{"git", repoURL, "-j"})
 		if rErr != nil {
-			if app.Log != nil {
-				app.Log.Debug("osint.github_leaks: trufflehog run failed (best_effort)", "repo", repoURL, "err", rErr)
-			}
+			app.Log.Debug("osint.github_leaks: trufflehog run failed (best_effort)", "repo", repoURL, "err", rErr)
 			continue
 		}
 		engineRan = true
@@ -160,20 +150,18 @@ func (t *GitHubLeaksTask) Run(ctx context.Context, app *appctx.AppContext) (task
 	}
 
 	// Write staging JSONL — every record is already REDACTED (ValueRedacted="***").
-	// F3: a run that found no leaked secret REMOVES the staging file, so a
+	// Run isolation: a run that found no leaked secret REMOVES the staging file, so a
 	// credential that has since been rotated and purged stops being reported as
 	// still exposed by every later run.
 	if engineRan {
 		writeOSINTStaging(app, inputsDir, "findings.github_leaks.jsonl", records)
-	} else if app.Log != nil {
-		app.Log.Debug("osint.github_leaks: no engine ran — staging preserved (F3 did-not-run)")
+	} else {
+		app.Log.Debug("osint.github_leaks: no engine ran — staging preserved (did-not-run rule)")
 	}
 
 	// XCUT-07: log ONLY the count, never the raw matches.
-	if app.Log != nil {
-		app.Log.Info("osint.github_leaks: completed",
-			"secrets_found", len(records), "repos_scanned", len(repos))
-	}
+	app.Log.Info("osint.github_leaks: completed",
+		"secrets_found", len(records), "repos_scanned", len(repos))
 	return task.Result{
 		Status: task.StatusDone,
 		Stats:  map[string]int{"secrets_found": len(records), "repos_scanned": len(repos)},

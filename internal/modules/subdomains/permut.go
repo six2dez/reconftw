@@ -16,18 +16,16 @@
 //     StatusSkipped — NOT silent drop (SUBD-11 parity requires all found
 //     subdomains to be processed; silent drops reduce parity coverage).
 //
-// REVIEWS FINDING FIX:
+// MEMORY SOURCE:
 // OSMemProvider uses gopsutil/v3/mem.VirtualMemory().Available = OS MemAvailable.
 // This is correct. runtime.ReadMemStats.Sys-runtime.MemStats.Alloc is Go heap
 // reservation delta, NOT OS free memory — NEVER use that here.
 //
 // B1 FIX — SubDNSCewlTask:
-// dnscewl is the THIRD SUBD-03 permutation tool (D-01: gotator + regulator + dnscewl).
+// dnscewl is the THIRD SUBD-03 permutation tool (gotator + regulator + dnscewl).
 // It generates DNS-based permutations from the resolved subdomain list.
-// Input flag: -f (per tools.lock entry plan-00).
+// Input flag: -f (per its tools.lock entry).
 // If binary not found, returns StatusSkipped at Info level (non-critical).
-//
-// Source: .planning/phases/04-subdomains-e2e-axiom-integration/04-04-PLAN.md Task 2.
 package subdomains
 
 import (
@@ -98,7 +96,7 @@ func resolvedMergedPath(app *appctx.AppContext) string {
 // inputs/permut.<tool>.txt, or REMOVES that file when lines is empty. Returns
 // the staging path in both cases.
 //
-// F3 (phase 15): write-or-REMOVE via output.StageLines. Calling it asserts
+// Write-or-REMOVE via output.StageLines. Calling it asserts
 // "this permutation source RAN and produced exactly these candidates", so a
 // zero-result run clears the previous run's file instead of leaving it for
 // MergeAllSubdomains (which globs inputs/permut.*.txt) to republish.
@@ -282,18 +280,16 @@ func (t *SubPermutTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 
 	// SUBD-03: memory back-pressure gate.
 	if !memCheck(ctx, mp, cfg.Subdomains.Permut.MinFreeMemGB) {
-		if app.Log != nil {
-			app.Log.Info("permut_skipped_memory_gate",
-				"event", "permut_skipped_memory_gate",
-				"min_free_mem_gb", cfg.Subdomains.Permut.MinFreeMemGB,
-			)
-		}
+		app.Log.Info("permut_skipped_memory_gate",
+			"event", "permut_skipped_memory_gate",
+			"min_free_mem_gb", cfg.Subdomains.Permut.MinFreeMemGB,
+		)
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
 	inputFile := resolvedMergedPath(app)
 
-	// CR-03. gotator's -perm is the word list it permutes WITH, and until now v2
+	// gotator's -perm is the word list it permutes WITH, and until now v2
 	// never passed one — while cfg.Subdomains.Permut.WordlistMode and
 	// ShortThreshold sat in config read by NOTHING and `deep --help` advertised
 	// "Permut wordlist mode = full". That is the uncommon_ports shape: a
@@ -315,24 +311,20 @@ func (t *SubPermutTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 	// so the readable gate has to run BEFORE dispatch.
 	wordlist, wlWhy := selectPermutationsWordlist(cfg, inputFile)
 	if wordlist == "" {
-		if app.Log != nil {
-			app.Log.Info("subdomains.permut: no permutation wordlist — skipping",
-				"reason", wlWhy,
-				"wordlists_dir", cfg.Paths.WordlistsDir,
-				"mode", cfg.Subdomains.Permut.WordlistMode,
-			)
-		}
+		app.Log.Info("subdomains.permut: no permutation wordlist — skipping",
+			"reason", wlWhy,
+			"wordlists_dir", cfg.Paths.WordlistsDir,
+			"mode", cfg.Subdomains.Permut.WordlistMode,
+		)
 		return task.Result{Status: task.StatusSkipped, Reason: wlWhy}, nil
 	}
 
-	args := []string{
-		"-sub", inputFile,
-		"-perm", wordlist,
-		"-depth", "1",
-		"-numbers", "3",
-		"-md",
-		"-silent",
-	}
+	// -sub/-perm/-silent are fixed; everything between them is the operator's
+	// advanced.tools.gotator.flags (v1 GOTATOR_FLAGS), which was migrated and
+	// defaulted but never read — the depth/numbers/md trio below was hardcoded.
+	args := []string{"-sub", inputFile, "-perm", wordlist}
+	args = append(args, gotatorFlags(cfg.Advanced.Tools.Gotator.Flags)...)
+	args = append(args, "-silent")
 
 	// Run gotator via Stream for XCUT-09 heartbeat.
 	ch, err := app.Tools.Stream(ctx, "gotator", args)
@@ -341,7 +333,7 @@ func (t *SubPermutTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 			fmt.Errorf("gotator: Stream failed: %w", err)
 	}
 
-	// F6 (phase 15): ACCUMULATOR shape — latch the terminal Event.Err inside the
+	// ACCUMULATOR shape — latch the terminal Event.Err inside the
 	// loop and check it after. gotator is the heaviest stage in the pipeline; a
 	// run killed by the OOM killer part way through emits a fraction of its
 	// permutations, and staging that fraction as the run's candidate set is
@@ -362,7 +354,7 @@ func (t *SubPermutTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 			continue
 		}
 		line := strings.ToLower(strings.TrimSpace(string(ev.Line)))
-		// T-17-06-02. The collector stages what it is given, so what it is given
+		// The collector stages what it is given, so what it is given
 		// has to be a hostname. gotator v1.1 puts its banner on stderr (dropped
 		// above), but "the current version prints decoration on the other stream"
 		// is not a property worth depending on — one banner line on stdout would
@@ -377,7 +369,7 @@ func (t *SubPermutTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 			fmt.Errorf("gotator: tool stream ended badly: %w", streamErr)
 	}
 
-	// SUBD-03 / T-17-06-04. cfg.Subdomains.Permut.LimitBytes was the THIRD field
+	// SUBD-03. cfg.Subdomains.Permut.LimitBytes was the THIRD field
 	// in this struct that nothing read (WordlistMode and ShortThreshold were the
 	// other two). v1 applies it — `head -c "$PERMUTATIONS_LIMIT"`,
 	// modules/subdomains.sh:1517 — and it matters more now than before: giving
@@ -385,7 +377,7 @@ func (t *SubPermutTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 	lines = capCandidateBytes(lines, cfg.Subdomains.Permut.LimitBytes)
 
 	// A clean run with zero output (typically an empty input file) still goes
-	// through the helper: F3 requires "ran and found nothing" to CLEAR the
+	// through the helper: write-or-remove requires "ran and found nothing" to CLEAR the
 	// staging file rather than leave the previous run's permutations behind.
 	stagingPath, writeErr := writePermutStagingFile(app, "gotator", lines)
 	if writeErr != nil {
@@ -440,9 +432,9 @@ func (t *SubRegexPermutTask) Run(ctx context.Context, app *appctx.AppContext) (t
 
 	inputFile := resolvedMergedPath(app)
 
-	// CR-04, proven behaviourally against regulator at commit 2371a06 (the clone
+	// Proven behaviourally against regulator at commit 2371a06 (the clone
 	// install.sh creates, run through its own venv). Both halves of the review's
-	// mechanism hold — unusually, since CR-01's did not:
+	// mechanism hold — unusually, since the puredns one's did not:
 	//
 	//	$ main.py hosts.txt example.com                       # what v2 dispatched
 	//	main.py: error: the following arguments are required: -t/--target, -f/--hosts
@@ -484,10 +476,8 @@ func (t *SubRegexPermutTask) Run(ctx context.Context, app *appctx.AppContext) (t
 		if readErr == nil {
 			reason = "regulator ran and its output file was empty (" + rawOutput + ")"
 		}
-		if app.Log != nil {
-			app.Log.Info("subdomains.permut.regex: no candidates — skipping", "reason", reason)
-		}
-		// Still clear the staging file: F3 requires "ran and found nothing" to
+		app.Log.Info("subdomains.permut.regex: no candidates — skipping", "reason", reason)
+		// Still clear the staging file: write-or-remove requires "ran and found nothing" to
 		// remove the previous run's candidates rather than republish them.
 		if _, werr := writePermutStagingFile(app, "regex", nil); werr != nil {
 			return task.Result{Status: task.StatusErrored}, werr
@@ -500,7 +490,7 @@ func (t *SubRegexPermutTask) Run(ctx context.Context, app *appctx.AppContext) (t
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 	for scanner.Scan() {
 		line := strings.ToLower(strings.TrimSpace(scanner.Text()))
-		// Same rule as the gotator collector (T-17-06-02): only hostname-shaped
+		// Same rule as the gotator collector: only hostname-shaped
 		// lines may become candidates.
 		if looksLikeHostnameCandidate(line) {
 			lines = append(lines, line)
@@ -525,13 +515,13 @@ func (t *SubRegexPermutTask) Run(ctx context.Context, app *appctx.AppContext) (t
 // -------------------------------------------------------------------------
 
 // SubDNSCewlTask generates DNS-based subdomain permutations via dnscewl.
-// dnscewl is the THIRD permutation tool named in D-01 (gotator + regulator + dnscewl).
+// dnscewl is the THIRD permutation tool (gotator + regulator + dnscewl).
 // Writes staging file: inputs/permut.dnscewl.txt
 //
 // If dnscewl binary is not found (non-critical per tools.lock), returns
 // StatusSkipped at Info level — does NOT error.
 //
-// Input flag: -f (per tools.lock plan-00 entry input_flag="-f").
+// Input flag: -f (per its tools.lock entry, input_flag="-f").
 type SubDNSCewlTask struct {
 	// MemProv overrides the default OSMemProvider for testing.
 	MemProv sysinfo.MemProvider
@@ -570,12 +560,10 @@ func (t *SubDNSCewlTask) Run(ctx context.Context, app *appctx.AppContext) (task.
 
 	// SUBD-03: memory back-pressure gate.
 	if !memCheck(ctx, mp, cfg.Subdomains.Permut.MinFreeMemGB) {
-		if app.Log != nil {
-			app.Log.Info("dnscewl_skipped_memory_gate",
-				"event", "dnscewl_skipped_memory_gate",
-				"min_free_mem_gb", cfg.Subdomains.Permut.MinFreeMemGB,
-			)
-		}
+		app.Log.Info("dnscewl_skipped_memory_gate",
+			"event", "dnscewl_skipped_memory_gate",
+			"min_free_mem_gb", cfg.Subdomains.Permut.MinFreeMemGB,
+		)
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
@@ -589,18 +577,20 @@ func (t *SubDNSCewlTask) Run(ctx context.Context, app *appctx.AppContext) (task.
 
 	res, err := app.Tools.Run(ctx, "dnscewl", args)
 	if err != nil {
-		// dnscewl not found or failed — treat as non-critical: StatusSkipped.
-		if app.Log != nil {
-			app.Log.Info("dnscewl_skipped",
-				"event", "dnscewl_skipped",
-				"reason", "tool_not_available",
-				"error", err.Error(),
-			)
-		}
-		// Still write an empty staging file so MergeStage finds no orphaned glob.
+		// Absent-vs-failed policy (task.ClassifyToolErr): a dnscewl that never
+		// started is "tool absent"; one that ran and died is degraded with its
+		// own reason. Neither fails the stage — dnscewl is non-critical.
+		status, reason := task.ClassifyToolErr(err)
+		app.Log.Info("dnscewl_skipped",
+			"event", "dnscewl_skipped",
+			"reason", reason,
+			"error", err.Error(),
+		)
+		// Still clear the staging file so MergeStage finds no orphaned glob.
 		stagingPath, _ := writePermutStagingFile(app, "dnscewl", nil)
 		return task.Result{
-			Status:  task.StatusSkipped,
+			Status:  status,
+			Reason:  reason,
 			Outputs: []string{stagingPath},
 		}, nil
 	}
@@ -677,17 +667,19 @@ func (t *SubIAPermutTask) Run(ctx context.Context, app *appctx.AppContext) (task
 		"--no-resolve",
 	})
 	if err != nil {
-		// subwiz not found or failed — non-critical.
-		if app.Log != nil {
-			app.Log.Info("ia_permut_skipped",
-				"event", "ia_permut_skipped",
-				"reason", "tool_not_available",
-				"error", err.Error(),
-			)
-		}
+		// Absent-vs-failed policy (task.ClassifyToolErr), same as dnscewl above:
+		// subwiz is non-critical, but "not installed" and "crashed" are different
+		// facts and get different reasons.
+		status, reason := task.ClassifyToolErr(err)
+		app.Log.Info("ia_permut_skipped",
+			"event", "ia_permut_skipped",
+			"reason", reason,
+			"error", err.Error(),
+		)
 		stagingPath, _ := writePermutStagingFile(app, "ia", nil)
 		return task.Result{
-			Status:  task.StatusSkipped,
+			Status:  status,
+			Reason:  reason,
 			Outputs: []string{stagingPath},
 		}, nil
 	}
@@ -721,3 +713,25 @@ func init() { task.Register(&SubPermutTask{}) }
 func init() { task.Register(&SubRegexPermutTask{}) }
 func init() { task.Register(&SubDNSCewlTask{}) }
 func init() { task.Register(&SubIAPermutTask{}) }
+
+// gotatorDefaultFlags is the v1 GOTATOR_FLAGS default (reconftw.cfg) and the
+// config default; it is what an empty flags string resolves to so a config
+// that clears the key still produces a usable permutation run.
+const gotatorDefaultFlags = " -depth 1 -numbers 3 -mindup -adv -md"
+
+// gotatorFlags splits the operator's flag string into argv tokens. The fixed
+// -sub/-perm/-silent are owned by the task and must not be repeated here.
+func gotatorFlags(flags string) []string {
+	if strings.TrimSpace(flags) == "" {
+		flags = gotatorDefaultFlags
+	}
+	var out []string
+	for _, tok := range strings.Fields(flags) {
+		switch tok {
+		case "-sub", "-perm", "-silent":
+			continue
+		}
+		out = append(out, tok)
+	}
+	return out
+}

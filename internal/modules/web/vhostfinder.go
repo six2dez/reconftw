@@ -6,7 +6,7 @@
 // artefacts as the wordlist. It runs VhostFinder, filters lines containing "+"
 // from stdout, and writes vhost records to artefacts/vhosts.jsonl.
 //
-// ARG VECTOR (RESEARCH §VhostFinder — verbatim v1 form):
+// ARG VECTOR (verbatim v1 form):
 //
 //	VhostFinder -ips <ipsfile> -wordlist <subsfile> -verify
 //
@@ -14,12 +14,10 @@
 //
 // [ASSUMED A9: VhostFinder -ips/-wordlist/-verify flags are current — verify.]
 //
-// T-05-11: IPs sourced from httpx-probed hosts.jsonl (scope-validated at write time).
-// T-05-10: tool stdout routed to run.log only (never INFO terminal, GAP-3).
+// IPs sourced from httpx-probed hosts.jsonl (scope-validated at write time).
+// Tool stdout routed to run.log only (never INFO terminal).
 //
-// VhostFinder is a LocalBackend tool only (D-W13).
-//
-// Source: .planning/phases/05-web-pipeline-e2e/05-03-PLAN.md Task 2.
+// VhostFinder is a LocalBackend tool only.
 package web
 
 import (
@@ -31,6 +29,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/six2dez/reconftw/internal/core/output"
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
 	"github.com/six2dez/reconftw/internal/core/config"
@@ -58,21 +58,17 @@ func (t *VhostFinderTask) DependsOn() []string { return []string{"web.httpx"} }
 func (t *VhostFinderTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result, error) {
 	const toolName = "VhostFinder"
 
-	// Extract IPs from hosts.jsonl (T-05-11: scope-validated by httpx Task).
+	// Extract IPs from hosts.jsonl (scope-validated by httpx Task).
 	ips, err := readIPsFromHostsJSONL(app)
 	if err != nil || len(ips) == 0 {
-		if app.Log != nil {
-			app.Log.Info("web.vhostfinder: no IPs in hosts.jsonl — skipping")
-		}
+		app.Log.Info("web.vhostfinder: no IPs in hosts.jsonl — skipping")
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
 	// Build subdomain wordlist from prior artefacts/subdomains.jsonl or hosts.jsonl.
 	wordlist, err := buildVhostWordlist(app)
 	if err != nil || len(wordlist) == 0 {
-		if app.Log != nil {
-			app.Log.Info("web.vhostfinder: no subdomain wordlist available — skipping")
-		}
+		app.Log.Info("web.vhostfinder: no subdomain wordlist available — skipping")
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
@@ -94,16 +90,18 @@ func (t *VhostFinderTask) Run(ctx context.Context, app *appctx.AppContext) (task
 			fmt.Errorf("web.vhostfinder: write wordlist file: %w", err)
 	}
 
-	// RESEARCH §VhostFinder: VhostFinder -ips <file> -wordlist <file> -verify
+	// v1 form: VhostFinder -ips <file> -wordlist <file> -verify
 	args := []string{"-ips", ipsFile, "-wordlist", wordlistFile, "-verify"}
 
 	res, execErr := app.Tools.Run(ctx, toolName, args)
 	if execErr != nil {
-		if app.Log != nil {
-			app.Log.Info("web.vhostfinder: binary absent or failed — skipping",
-				"err", execErr)
-		}
-		return task.Result{Status: task.StatusSkipped}, nil
+		// Absent-vs-failed policy (task.ClassifyToolErr): a VhostFinder that never
+		// started is "tool absent"; one that could not be run for any other
+		// reason is degraded with its own account of why. Neither fails the
+		// scan (best_effort).
+		status, reason := task.ClassifyToolErr(execErr)
+		app.Log.Info("web.vhostfinder: VhostFinder not run — skipping", "reason", reason)
+		return task.Result{Status: status, Reason: reason}, nil
 	}
 
 	// Filter stdout lines containing "+" (the hit indicator).
@@ -136,15 +134,11 @@ func (t *VhostFinderTask) Run(ctx context.Context, app *appctx.AppContext) (task
 	}
 	if len(lines) > 0 {
 		if appendErr := app.Tree.Append("vhosts", lines); appendErr != nil {
-			if app.Log != nil {
-				app.Log.Debug("web.vhostfinder: Tree.Append failed", "err", appendErr)
-			}
+			app.Log.Debug("web.vhostfinder: Tree.Append failed", "err", appendErr)
 		}
 	}
 
-	if app.Log != nil {
-		app.Log.Debug("web.vhostfinder: completed", "vhosts_found", len(hits))
-	}
+	app.Log.Debug("web.vhostfinder: completed", "vhosts_found", len(hits))
 	return task.Result{
 		Status: task.StatusDone,
 		Stats:  map[string]int{"vhosts_found": len(hits)},
@@ -152,7 +146,7 @@ func (t *VhostFinderTask) Run(ctx context.Context, app *appctx.AppContext) (task
 }
 
 // parseVhostFinderOutput filters lines containing "+" from VhostFinder output.
-// RESEARCH §VhostFinder: "| grep +" is the v1 hit filter pattern.
+// "| grep +" is the v1 hit filter pattern.
 func parseVhostFinderOutput(rawOutput []byte) []VhostRecord {
 	if len(rawOutput) == 0 {
 		return nil
@@ -165,7 +159,7 @@ func parseVhostFinderOutput(rawOutput []byte) []VhostRecord {
 			continue
 		}
 		// Best-effort parse: extract host/IP from the hit line.
-		// VhostFinder output format: "[+] vhostname -> ip" (assumed A9).
+		// VhostFinder output format: "[+] vhostname -> ip" (assumed).
 		fields := strings.Fields(line)
 		host, ip := "", ""
 		for i, f := range fields {
@@ -189,37 +183,34 @@ func parseVhostFinderOutput(rawOutput []byte) []VhostRecord {
 
 // buildVhostWordlist builds the hostname wordlist from prior artefacts.
 // Prefers artefacts/subdomains.jsonl; falls back to hostnames from hosts.jsonl.
+
 func buildVhostWordlist(app *appctx.AppContext) ([]string, error) {
 	// Try subdomains.jsonl first.
 	subsPath := filepath.Join(app.Target.WorkDir, "artefacts", "subdomains.jsonl")
-	if data, err := os.ReadFile(subsPath); err == nil { //nolint:gosec
-		seen := make(map[string]bool)
-		var names []string
-		scanner := bufio.NewScanner(bytes.NewReader(data))
-		for scanner.Scan() {
-			line := bytes.TrimSpace(scanner.Bytes())
-			if len(line) == 0 {
-				continue
-			}
-			var rec struct {
-				Subdomain string `json:"subdomain"`
-				Host      string `json:"host"`
-			}
-			if jerr := json.Unmarshal(line, &rec); jerr != nil {
-				continue
-			}
-			h := rec.Subdomain
-			if h == "" {
-				h = rec.Host
-			}
-			if h != "" && !seen[h] {
-				seen[h] = true
-				names = append(names, h)
-			}
+	seen := make(map[string]bool)
+	var names []string
+	// Best-effort: a missing or unreadable subdomains.jsonl falls through to
+	// hosts.jsonl below, and a malformed record is skipped.
+	_ = output.ForEachJSONLLine(subsPath, 0, func(line []byte) error {
+		var rec struct {
+			Subdomain string `json:"subdomain"`
+			Host      string `json:"host"`
 		}
-		if len(names) > 0 {
-			return names, nil
+		if jerr := json.Unmarshal(line, &rec); jerr != nil {
+			return nil
 		}
+		h := rec.Subdomain
+		if h == "" {
+			h = rec.Host
+		}
+		if h != "" && !seen[h] {
+			seen[h] = true
+			names = append(names, h)
+		}
+		return nil
+	})
+	if len(names) > 0 {
+		return names, nil
 	}
 	// Fallback: extract hostnames from hosts.jsonl.
 	return readHostnamesFromJSONL(app)

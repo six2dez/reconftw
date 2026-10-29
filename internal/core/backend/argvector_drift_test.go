@@ -72,32 +72,16 @@ type driveCase struct {
 }
 
 // undrivableTasks names Tasks this harness deliberately does not drive, with the
-// reason. Its size is asserted by TestUndrivableListIsPinned.
+// reason. Every entry must carry a reason and name a registered Task
+// (TestCensusBucketsCarryReasons); the former len()==N pin was deleted in 21-04
+// as a self-assertion (see internal/modules/DELETED_TESTS.md).
 //
-// This is the detector's COVERAGE LIMIT stated as a number. Growing it is a
-// visible diff and needs a reason in the same commit.
+// This is the detector's COVERAGE LIMIT. Growing it is a visible diff and needs
+// a reason in the same commit.
 var undrivableTasks = map[string]string{
 	"subdomains.takeover.dnstake": "dnstake's argv depends on a resolved-host file the subzy case already covers for this tool class; adding it would duplicate coverage, not extend it",
 	"web.nuclei":                  "runNucleiGroup fans out per host-group and per template path; a hermetic drive would pin one arbitrary group's argv and read as if it covered all of them",
 	"web.portscan":                "dispatches naabu, nmap and smap from one Task through three branches selected by config and by prior-stage output; one drive covers one branch and would misreport as three",
-}
-
-const undrivableTasksSize = 3
-
-// TestUndrivableListIsPinned keeps the exclusion list from growing unnoticed.
-func TestUndrivableListIsPinned(t *testing.T) {
-	if len(undrivableTasks) != undrivableTasksSize {
-		t.Errorf("undrivableTasks has %d entries, constant says %d.\n"+
-			"  This list IS the detector's coverage limit. If you added an entry, say why in the map\n"+
-			"  and raise the constant in the same commit so the reduction in coverage is visible.",
-			len(undrivableTasks), undrivableTasksSize)
-	}
-	for name, why := range undrivableTasks {
-		if why == "" {
-			t.Errorf("undrivableTasks[%q] has no reason — an unexplained exclusion is indistinguishable "+
-				"from an oversight", name)
-		}
-	}
 }
 
 // driveCases are the Tasks driven for their argv. Scoped to the tools in
@@ -281,6 +265,7 @@ func driveTaskForArgs(t *testing.T, tc driveCase) ([]string, bool) {
 	reg.Register(&backend.Tool{Name: tc.tool})
 
 	app := &appctx.AppContext{
+		Log:    appctx.NopLogger(),
 		Tools:  backend.NewRunner(capture, reg, nil),
 		Tree:   permissiveTree{},
 		Cfg:    cfg,

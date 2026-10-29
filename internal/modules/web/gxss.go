@@ -6,21 +6,21 @@
 //
 // DEPENDENCY: DependsOn ["web.urldedup"] — reads artefacts/urls.jsonl.
 //
-// ARG VECTOR (RESEARCH §Gxss, vulns.sh:27):
+// ARG VECTOR (vulns.sh:27):
 //
 //	qsreplace FUZZ < gf/xss.txt | Gxss -c 100 -p Xss
 //
 // v2 form: FUZZ replacement implemented inline in Go (url.Parse + url.Values)
-// — no shell interpolation (T-05-17 mitigation). Gxss reads from stdin.
+// — no shell interpolation. Gxss reads from stdin.
 //
-// T-05-17 mitigation: FUZZ replacement uses pure Go string ops (url.Parse +
+// FUZZ replacement uses pure Go string ops (url.Parse +
 // url.Values), no shell string interpolation.
-// T-05-19 mitigation: Gxss stdout routed to the Result only; not logged at INFO.
+// Gxss stdout routed to the Result only; not logged at INFO.
 //
-// 18-04: THIS FILE NO LONGER BYPASSES THE SEAM. It used to build its own
+// THIS FILE NO LONGER BYPASSES THE SEAM. It used to build its own
 // exec.CommandContext with cmd.Stdin, because the name-keyed Backend/Runner had
-// no way to inject standard input — the reason recorded on its FOUND-10 bypass
-// manifest entry. backend.Runner.RunOpts carries stdin since 18-01, so the
+// no way to inject standard input — the reason recorded on its bypass
+// manifest entry. backend.Runner.RunOpts carries stdin, so the
 // reason is gone and the manifest entry has been REMOVED. Gxss was invisible to
 // logs/tools.jsonl, to the arg-vector census and to the tools.lock contract for
 // its whole life; it is now recorded like any other tool.
@@ -41,9 +41,7 @@
 // both when it finds reflections and when it finds none (verified 2026-08-26
 // against the real binary), so the non-zero arm is a genuine failure and its
 // output is not a result worth publishing. The staging write still happens on
-// that arm — the tool RAN, so zero reflections is a real observation (F3).
-//
-// Source: .planning/phases/05-web-pipeline-e2e/05-05-PLAN.md Task 2.
+// that arm — the tool RAN, so zero reflections is a real observation.
 package web
 
 import (
@@ -52,7 +50,6 @@ import (
 	"context"
 	"encoding/json"
 	"net/url"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -83,23 +80,21 @@ func (t *GxssTask) DependsOn() []string { return []string{"web.urldedup"} }
 func (t *GxssTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result, error) {
 	// NO exec.LookPath GATE. An unresolvable Gxss now returns a typed dispatch
 	// failure from the Runner and is RECORDED as dispatch_failed in
-	// logs/tools.jsonl, instead of vanishing silently — the conflation phase 16
-	// removed for dnstake. The task's status on an absent binary is unchanged
+	// logs/tools.jsonl, instead of vanishing silently — the conflation the
+	// silent-success sweep removed for dnstake. The task's status on an absent binary is unchanged
 	// (StatusSkipped, see the dispatch below).
 
 	// Read urls.jsonl; filter URLs containing "?" (parameterized).
 	paramURLs, readErr := readParamURLsFromJSONL(app)
-	if readErr != nil && app.Log != nil {
+	if readErr != nil {
 		app.Log.Debug("web.gxss: read urls.jsonl error", "err", readErr)
 	}
 	if len(paramURLs) == 0 {
-		if app.Log != nil {
-			app.Log.Info("web.gxss: no parameterized URLs in urls.jsonl — skipping")
-		}
+		app.Log.Info("web.gxss: no parameterized URLs in urls.jsonl — skipping")
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
-	// T-05-17: inline FUZZ replacement (no shell interpolation).
+	// Inline FUZZ replacement (no shell interpolation).
 	// Replaces each query parameter value with "FUZZ" using url.Parse.
 	fuzzedURLs := fuzzReplaceURLParams(paramURLs)
 	if len(fuzzedURLs) == 0 {
@@ -107,7 +102,7 @@ func (t *GxssTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 	}
 
 	// Feed FUZZ-replaced URLs to Gxss via stdin.
-	// ARG VECTOR: Gxss -c 100 -p Xss (RESEARCH §Gxss vulns.sh:27).
+	// ARG VECTOR: Gxss -c 100 -p Xss (vulns.sh:27).
 	stdinData := []byte(strings.Join(fuzzedURLs, "\n") + "\n")
 
 	res, runErr := app.Tools.RunOpts(ctx, gxssToolName, gxssArgs(),
@@ -117,17 +112,14 @@ func (t *GxssTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 		// (Discover leaves Path empty, so cmd.Start fails and LocalBackend
 		// reports NeverStarted), is the SAME graceful skip the exec.LookPath
 		// gate used to give — including not staging, so a run in which Gxss
-		// never ran cannot clear a previous run's reflections (F3 did-not-run).
+		// never ran cannot clear a previous run's reflections (did-not-run).
 		if coreerrors.IsDispatchFailure(runErr) {
-			if app.Log != nil {
-				app.Log.Info("web.gxss: Gxss unavailable — skipping")
-			}
-			return task.Result{Status: task.StatusSkipped}, nil
+			status, reason := task.ClassifyToolErr(runErr)
+			app.Log.Info("web.gxss: Gxss unavailable — skipping", "reason", reason)
+			return task.Result{Status: status, Reason: reason}, nil
 		}
-		if app.Log != nil {
-			app.Log.Debug("web.gxss: Gxss exited non-zero (no partial output on this path)",
-				"err", runErr)
-		}
+		app.Log.Debug("web.gxss: Gxss exited non-zero (no partial output on this path)",
+			"err", runErr)
 	}
 
 	var outBytes []byte
@@ -136,9 +128,9 @@ func (t *GxssTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 	}
 	findings := parseGxssOutput(outBytes)
 
-	// Stage reflection hits for the findings merge (best_effort D-W12).
+	// Stage reflection hits for the findings merge (best_effort).
 	//
-	// F3 (phase 15): staged UNCONDITIONALLY — StageJSONL removes the staging
+	// Staged UNCONDITIONALLY — StageJSONL removes the staging
 	// file when this run found no reflections, so a previous run's hits cannot
 	// be republished.
 	var lines [][]byte
@@ -149,38 +141,34 @@ func (t *GxssTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 		}
 		lines = append(lines, b)
 	}
-	// F3 DID-NOT-RUN, deadline arm (18-06 code review, CR-03). Reaching here with
+	// DID-NOT-RUN, deadline arm. Reaching here with
 	// res == nil means the tool did NOT complete — a tools.lock deadline, a crash,
 	// or a cancelled context. Before the move each of these files applied its own
 	// context.WithTimeout and PARSED the partially-filled buffer, so a timeout
 	// still staged what it had seen. The move removed both, so res is nil and
 	// findings is empty — and StageJSONL implements an empty input as os.Remove.
 	// A run that never observed the corpus has no standing to delete what a
-	// previous run did observe, which is exactly what the F3 comment below claims
+	// previous run did observe, which is exactly what the staging comment below claims
 	// and, on this path, did not deliver.
 	if res == nil {
-		if app.Log != nil {
-			app.Log.Warn("web.gxss: incomplete run — previous staging preserved",
-				"err", runErr)
-		}
+		app.Log.Warn("web.gxss: incomplete run — previous staging preserved",
+			"err", runErr)
 	} else {
 		stagingPath := filepath.Join(app.Target.WorkDir, "inputs", "findings.gxss.jsonl")
-		if wErr := output.StageJSONL(stagingPath, lines); wErr != nil && app.Log != nil {
+		if wErr := output.StageJSONL(stagingPath, lines); wErr != nil {
 			app.Log.Debug("web.gxss: staging write failed",
 				"path", stagingPath, "err", wErr)
 		}
 	}
 
-	if app.Log != nil {
-		app.Log.Debug("web.gxss: completed",
-			"param_urls", len(paramURLs),
-			"reflections", len(findings))
-	}
+	app.Log.Debug("web.gxss: completed",
+		"param_urls", len(paramURLs),
+		"reflections", len(findings))
 
 	return task.Result{
 		Status: task.StatusDone,
 		Stats:  map[string]int{"xss_reflections": len(findings)},
-		// V-04: the tool did not finish (deadline, crash, cancellation), so this run
+		// The tool did not finish (deadline, crash, cancellation), so this run
 		// must NOT be checkpointed as done — otherwise the next run with the same
 		// input hash skips it and the deadline becomes a permanent, silent hole.
 		// Status stays non-error on purpose: this is best-effort and must not fail
@@ -193,15 +181,15 @@ func (t *GxssTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 // test that pins the recorded argv names the same string the dispatch does.
 const gxssToolName = "Gxss"
 
-// gxssArgs returns the Gxss arg vector, VERBATIM as it stood before 18-04 moved
-// this dispatch onto the Runner: `Gxss -c 100 -p Xss` (RESEARCH §Gxss,
+// gxssArgs returns the Gxss arg vector, VERBATIM as it stood before this dispatch moved
+// this dispatch onto the Runner: `Gxss -c 100 -p Xss` (
 // vulns.sh:27). It is a function rather than an inline literal so
 // TestGxssArgvUnchangedAcrossTheMove can assert the process received exactly
 // this slice and nothing prepended it.
 func gxssArgs() []string { return []string{"-c", "100", "-p", "Xss"} }
 
 // fuzzReplaceURLParams replaces all query parameter values with "FUZZ".
-// Implements the qsreplace FUZZ step in pure Go (T-05-17 mitigation).
+// Implements the qsreplace FUZZ step in pure Go.
 // Skips URLs where url.Parse fails or there are no query parameters.
 func fuzzReplaceURLParams(rawURLs []string) []string {
 	var result []string
@@ -249,36 +237,25 @@ func parseGxssOutput(data []byte) []FindingRecord {
 
 // readParamURLsFromJSONL reads artefacts/urls.jsonl and returns URLs containing
 // "?" (parameterized URLs that are XSS reflection candidates).
+
 func readParamURLsFromJSONL(app *appctx.AppContext) ([]string, error) {
 	urlsPath := filepath.Join(app.Target.WorkDir, "artefacts", "urls.jsonl")
-	data, err := os.ReadFile(urlsPath) //nolint:gosec // path within WorkDir
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, nil // urls.jsonl not yet produced — not an error
-		}
-		return nil, err
-	}
-	if len(data) == 0 {
-		return nil, nil
-	}
 	var paramURLs []string
-	scanner := bufio.NewScanner(bytes.NewReader(data))
-	scanner.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
-	for scanner.Scan() {
-		line := bytes.TrimSpace(scanner.Bytes())
-		if len(line) == 0 {
-			continue
-		}
+	err := output.ForEachJSONLLine(urlsPath, 0, func(line []byte) error {
 		var rec struct {
 			URL string `json:"url"`
 		}
 		if err := json.Unmarshal(line, &rec); err != nil {
-			continue
+			return nil // malformed record: skipped, as before
 		}
 		// Filter: only URLs with query parameters (contain "?").
 		if rec.URL != "" && strings.Contains(rec.URL, "?") {
 			paramURLs = append(paramURLs, rec.URL)
 		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 	return paramURLs, nil
 }

@@ -1,16 +1,16 @@
-// staging_lifecycle_test.go — behavioural proof of the F3 write-or-remove
-// staging contract for the vulns package (plan 15-14 Task 1).
+// staging_lifecycle_test.go — behavioural proof of the write-or-remove
+// staging contract for the vulns package.
 //
 // The staging-contract AST guard proves no RAW merger-globbed write remains. It
 // cannot prove the resulting behaviour, and it is structurally blind to two
 // things this file covers:
 //
-//   - a `return` placed in front of an already-correct staging call (the same F3
+//   - a `return` placed in front of an already-correct staging call (the same run-isolation
 //     bug one statement earlier), and
 //   - inputs/gf/<class>.txt, which lives under an inputs/ SUBDIRECTORY that no
 //     merger glob can reach, so gf.go is out of the detector's scope BY
 //     CONSTRUCTION — not exempted. Its correctness is hand-verified in the
-//     15-14 SUMMARY and pinned behaviourally by TestGFBucketRewrittenOnZeroMatch
+//     staging-lifecycle sweep and pinned behaviourally by TestGFBucketRewrittenOnZeroMatch
 //     below.
 //
 // Every "cleared" assertion uses os.Stat explicitly and treats a still-present
@@ -41,7 +41,7 @@ import (
 // stageFakeBackend dispatches on tool name. A tool present in errs fails; a tool
 // present in streamLines produces those lines followed by a clean close; a tool
 // present in terminalErr produces its lines followed by a FINAL event carrying
-// Err (the F6 "ran and ended badly" shape).
+// Err (the "ran and ended badly" shape).
 type stageFakeBackend struct {
 	mu          sync.Mutex
 	calls       []string
@@ -131,13 +131,14 @@ func newStageTestApp(t *testing.T, be backend.Backend, cfg *config.Config) *appc
 		cfg = &config.Config{}
 	}
 	return &appctx.AppContext{
+		Log:    appctx.NopLogger(),
 		Tools:  backend.NewRunner(be, reg, nil),
 		Target: &appctx.Target{Domain: "example.com", WorkDir: t.TempDir()},
 		Cfg:    cfg,
 	}
 }
 
-// seedURLCorpus writes artefacts/urls.jsonl, the D-V5 corpus every URL-driven
+// seedURLCorpus writes artefacts/urls.jsonl, the corpus every URL-driven
 // vulns task resolves.
 func seedURLCorpus(t *testing.T, app *appctx.AppContext, urls ...string) {
 	t.Helper()
@@ -366,11 +367,11 @@ func TestConfigGatedSkipDoesNotClearStaging(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 // TestGate3VulnsProducerToMergedFindings drives the full path the audit's
-// finding F3 describes: run A publishes a vulnerability, run B finds nothing and
+// the run-isolation finding describes: run A publishes a vulnerability, run B finds nothing and
 // the artefact must become PRESENT and EMPTY rather than keeping run A's record.
 //
 // "findings" has no direct artefact writer outside the merge path, so an empty
-// publish is the correct outcome here (15-03 Case A).
+// publish is the correct outcome here (the empty-union case).
 func TestGate3VulnsProducerToMergedFindings(t *testing.T) {
 	be := newStageFakeBackend()
 	be.stdout["smugglex"] = []byte(`{"detected":true,"target":"https://a.example.com/"}` + "\n")
@@ -415,10 +416,10 @@ func TestGate3VulnsProducerToMergedFindings(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Credential redaction survives the migration (XCUT-07 / T-15-14-04)
+// Credential redaction survives the migration (XCUT-07)
 // ---------------------------------------------------------------------------
 
-// TestSprayStagedRecordKeepsCredentialRedacted proves the F3 sweep did not
+// TestSprayStagedRecordKeepsCredentialRedacted proves the run-isolation sweep did not
 // disturb the spray redaction: the staged record carries "***" and no raw
 // credential value reaches inputs/findings.spray.jsonl.
 func TestSprayStagedRecordKeepsCredentialRedacted(t *testing.T) {
@@ -468,7 +469,7 @@ func TestSprayDidNotRunPreservesStaging(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 // TestGFBucketRewrittenOnZeroMatch is the executable half of the gf hand
-// verification (plan 15-14 Task 1).
+// verification.
 //
 // inputs/gf/<class>.txt is a SUBDIRECTORY path, and filepath.Glob's `*` does not
 // cross `/`, so no merger glob can reach it and the staging-contract detector is
@@ -533,7 +534,7 @@ func TestGFBucketRewrittenWhenToolFails(t *testing.T) {
 
 // TestGFEveryClassBucketRewritten pins the enumerated hand verification: after a
 // completed run, EVERY class in gfClasses has a present bucket. A class that
-// could be skipped without its bucket being rewritten is exactly the F3 gap the
+// could be skipped without its bucket being rewritten is exactly the run-isolation gap the
 // hand verification looks for.
 func TestGFEveryClassBucketRewritten(t *testing.T) {
 	be := newStageFakeBackend()
@@ -589,7 +590,7 @@ func seedGFBucket(t *testing.T, app *appctx.AppContext, class string, urls ...st
 
 // attachTree gives the AppContext an OutputTree so MergeVulnsFindings can
 // publish. A nil ScopeFilter admits every record, which is what these
-// F3-lifecycle tests are about — scope behaviour is covered elsewhere.
+// staging-lifecycle tests are about — scope behaviour is covered elsewhere.
 func attachTree(app *appctx.AppContext) error {
 	tree, err := output.NewTree(app.Target.WorkDir, nil)
 	if err != nil {
@@ -620,8 +621,8 @@ func countJSONLines(s string) int {
 
 func countNonBlankLines(s string) int { return countJSONLines(s) }
 
-// ExecOpts satisfies the backend.Backend options seam added in 18-01. It
-// PRESERVES this fake's pre-18-01 dispatch exactly: Runner.Run used to call
+// ExecOpts satisfies the backend.Backend options seam added with the Runner move. It
+// PRESERVES this fake's pre-Runner dispatch exactly: Runner.Run used to call
 // Backend.Exec and Runner.RunEnv used to call Backend.ExecEnv, and both now
 // arrive here, so the env-set case forwards to ExecEnv and the zero case to Exec.
 //

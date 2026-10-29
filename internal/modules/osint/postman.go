@@ -19,15 +19,13 @@
 //	    (the workspace/request URL); ValueRedacted="***". The raw secret is NEVER
 //	    written to a record, log, or artefact.
 //
-// Logs report ONLY counts, never raw matches (T-07-04-01 mitigate).
+// Logs report ONLY counts, never raw matches.
 //
-// SEEDING (D-O1): company/root-domain-seeded — no DependsOn edges.
-// CAPS (D-O8): porch-pirate -l 25; postleaksNg uses the conservative
+// SEEDING: company/root-domain-seeded — no DependsOn edges.
+// CAPS: porch-pirate -l 25; postleaksNg uses the conservative
 // cfg.OSINT.Postman.Threads default.
-// FAILURE POLICY (D-O8): best_effort — engine failure / empty output logs Debug
+// FAILURE POLICY: best_effort — engine failure / empty output logs Debug
 // and returns StatusDone.
-//
-// Source: .planning/phases/07-osint-e2e/07-04-PLAN.md Task 2.
 package osint
 
 import (
@@ -69,7 +67,7 @@ func (t *PostmanTask) Enabled(cfg *config.Config) bool {
 	return cfg.OSINT.Postman.Enabled
 }
 
-// DependsOn returns nil — Postman scanning is company/root-domain-seeded (D-O1).
+// DependsOn returns nil — Postman scanning is company/root-domain-seeded.
 func (t *PostmanTask) DependsOn() []string { return nil }
 
 // postmanThreads resolves the conservative postleaksNg thread count.
@@ -83,16 +81,14 @@ func postmanThreads(cfg *config.Config) int {
 // Run executes porch-pirate + postleaksNg with full XCUT-07 redaction.
 //
 // Steps:
-//  1. Derive + validate the root domain (T-07-04-04).
+//  1. Derive + validate the root domain.
 //  2. Run porch-pirate (-s <domain> -l 25 --dump); parse stdout → redacted records.
 //  3. Run postleaksNg (-k <domain> --output <dir> -t <threads>); parse JSON → records.
 //  4. Write inputs/findings.postman.jsonl (multi-writer staging) — all redacted.
 func (t *PostmanTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result, error) {
 	root := rootDomain(app)
 	if root == "" {
-		if app.Log != nil {
-			app.Log.Info("osint.postman: no valid root domain — skipping")
-		}
+		app.Log.Info("osint.postman: no valid root domain — skipping")
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
@@ -104,10 +100,7 @@ func (t *PostmanTask) Run(ctx context.Context, app *appctx.AppContext) (task.Res
 	osintDir := filepath.Join(app.Target.WorkDir, "osint")
 	_ = os.MkdirAll(osintDir, 0o755) //nolint:errcheck // best_effort
 
-	var logger *slog.Logger
-	if app.Log != nil {
-		logger = app.Log
-	}
+	logger := app.Log
 	var records []OSINTFindingRecord
 
 	// --- Engine 1: porch-pirate (Postman public-library dump) -----------------
@@ -117,12 +110,10 @@ func (t *PostmanTask) Run(ctx context.Context, app *appctx.AppContext) (task.Res
 	ppArgs := []string{"-s", root, "-l", "25", "--dump"}
 	// engineRan records whether EITHER engine was actually dispatched. If neither
 	// is installed the task observed nothing and must not clear a previous run's
-	// staging (F3 did-not-run — see writeOSINTStaging).
+	// staging (did-not-run rule — see writeOSINTStaging).
 	engineRan := false
 	if res, err := app.Tools.Run(ctx, "porch-pirate", ppArgs); err != nil {
-		if app.Log != nil {
-			app.Log.Debug("osint.postman: porch-pirate run failed (best_effort)", "err", err)
-		}
+		app.Log.Debug("osint.postman: porch-pirate run failed (best_effort)", "err", err)
 	} else {
 		engineRan = true
 		records = append(records, parsePorchPirateOutput(res.Stdout, logger)...)
@@ -139,9 +130,7 @@ func (t *PostmanTask) Run(ctx context.Context, app *appctx.AppContext) (task.Res
 		"-t", fmt.Sprintf("%d", postmanThreads(app.Cfg)),
 	}
 	if _, err := app.Tools.Run(ctx, "postleaksNg", plArgs); err != nil {
-		if app.Log != nil {
-			app.Log.Debug("osint.postman: postleaksNg run failed (best_effort)", "err", err)
-		}
+		app.Log.Debug("osint.postman: postleaksNg run failed (best_effort)", "err", err)
 	} else {
 		engineRan = true
 	}
@@ -149,18 +138,16 @@ func (t *PostmanTask) Run(ctx context.Context, app *appctx.AppContext) (task.Res
 	records = append(records, parsePostleaksDir(postleaksOut, logger)...)
 
 	// Step 4: write staging JSONL — every record is already REDACTED.
-	// F3: a run that found no Postman leak REMOVES the staging file, so a
+	// Run isolation: a run that found no Postman leak REMOVES the staging file, so a
 	// collection that has since been made private stops being republished.
 	if engineRan {
 		writeOSINTStaging(app, inputsDir, "findings.postman.jsonl", records)
-	} else if app.Log != nil {
-		app.Log.Debug("osint.postman: no engine ran — staging preserved (F3 did-not-run)")
+	} else {
+		app.Log.Debug("osint.postman: no engine ran — staging preserved (did-not-run rule)")
 	}
 
 	// XCUT-07: log ONLY the count, never the raw matches.
-	if app.Log != nil {
-		app.Log.Info("osint.postman: completed", "leaks_found", len(records))
-	}
+	app.Log.Info("osint.postman: completed", "leaks_found", len(records))
 	return task.Result{
 		Status: task.StatusDone,
 		Stats:  map[string]int{"leaks_found": len(records)},

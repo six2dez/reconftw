@@ -1,6 +1,6 @@
 // Source: .planning/phases/03-foundation-kernel/03-05-PLAN.md Task 1
 // behavior tests 11-19, 23-24 — Scheduler.RunStage + failure_policy fork
-// + checkpoint integration + LifecycleAware hook.
+// + checkpoint integration.
 package scheduler_test
 
 import (
@@ -87,25 +87,6 @@ func (f *fakeTask) Run(ctx context.Context, _ *appctx.AppContext) (task.Result, 
 		return task.Result{Status: task.StatusErrored}, f.err
 	}
 	return task.Result{Status: task.StatusDone, Outputs: []string{"out/" + f.name}}, nil
-}
-
-// lifecycleTask records OnStart/OnEnd invocations.
-type lifecycleTask struct {
-	fakeTask
-	onStart    atomic.Int32
-	onEnd      atomic.Int32
-	onStartErr error
-	onEndErr   error
-}
-
-func (l *lifecycleTask) OnStart(context.Context, *appctx.AppContext) error {
-	l.onStart.Add(1)
-	return l.onStartErr
-}
-
-func (l *lifecycleTask) OnEnd(context.Context, *appctx.AppContext, task.Result) error {
-	l.onEnd.Add(1)
-	return l.onEndErr
 }
 
 func newScheduler(cp checkpoint.Interface) *scheduler.Scheduler {
@@ -249,37 +230,6 @@ func TestDefaultHashUsesInputHash(t *testing.T) {
 	}
 	// We can't observe the hash directly without a hook; the InputHash
 	// path is exercised — coverage will catch regressions.
-}
-
-// Test 23-24: LifecycleAware OnStart called before Run; OnEnd called
-// after. OnEnd errors are logged but don't fail the task.
-func TestLifecycleHooksCalled(t *testing.T) {
-	s := newScheduler(nil)
-	l := &lifecycleTask{fakeTask: fakeTask{name: "l", module: "subdomains"}}
-	if err := s.RunStage(context.Background(), "subdomains", []task.Task{l}); err != nil {
-		t.Fatalf("RunStage error = %v", err)
-	}
-	if l.onStart.Load() != 1 {
-		t.Errorf("OnStart count = %d, want 1", l.onStart.Load())
-	}
-	if l.onEnd.Load() != 1 {
-		t.Errorf("OnEnd count = %d, want 1", l.onEnd.Load())
-	}
-	if l.started.Load() != 1 {
-		t.Errorf("Run count = %d, want 1", l.started.Load())
-	}
-}
-
-func TestLifecycleOnEndErrorIsLoggedNotPropagated(t *testing.T) {
-	s := newScheduler(nil)
-	l := &lifecycleTask{
-		fakeTask: fakeTask{name: "l", module: "subdomains"},
-		onEndErr: errors.New("end-err"),
-	}
-	err := s.RunStage(context.Background(), "subdomains", []task.Task{l})
-	if err != nil {
-		t.Errorf("OnEnd error propagated to RunStage: %v", err)
-	}
 }
 
 // Test (smoke): Checkpoint.Begin error propagates as RunStage error

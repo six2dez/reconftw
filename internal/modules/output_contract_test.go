@@ -61,11 +61,14 @@
 //     and then map it into the wrong field of the output record. Phase 15's F19
 //     is the standing example. This detector sees that a parser is exercised,
 //     not that its mapping is right.
-//   - COVERAGE IS FILE-GRANULAR. "A test in the same package calls this parser
-//     AND that test file references testdata/fixtures" is the coverage test. A
-//     file where one test calls the parser and a DIFFERENT test reads a fixture
-//     counts as covered. Tightening it means matching call to fixture within a
-//     single test function, which is a real dataflow problem, not a drive-by.
+//   - COVERAGE IS CALL-SITE GRANULAR, NOT DATAFLOW. Since 21-04 a parser counts
+//     as covered only when the CALL sits inside a test-file function that itself
+//     reads the fixture tree (a "testdata"/"fixtures" literal in its body, or a
+//     call to a same-package loader that has one). Until then the rule was
+//     "some file in the package mentions fixtures", which let a parser called
+//     from a hand-written-input test count as covered because an unrelated test
+//     in the same package read a fixture. What is still NOT checked is that the
+//     bytes read from the fixture are the bytes handed to the parser.
 //   - A PARSER REACHED ONLY THROUGH A MOCK. The call is what is detected, not
 //     what was fed to it.
 package modules_test
@@ -141,7 +144,7 @@ var parserClassification = map[string]classification{
 
 	// ---- own schema: v2 wrote the file it is reading ----
 	"internal/modules/osint/github_leaks.go:trufflehogLocator":          {classOwnSchema, "reads v2's own staged finding records to locate a hit"},
-	"internal/modules/osint/swagger.go:parseHostLines":                  {classOwnSchema, "reads v2's own host lines"},
+	"internal/modules/osint/swagger.go:readHostLines":                   {classOwnSchema, "reads v2's own host lines"},
 	"internal/modules/subdomains/scraping.go:scrapingSubjsInput":        {classOwnSchema, "reads v2's artefacts/hosts.jsonl|urls.jsonl for the subjs input file (17-04)"},
 	"internal/modules/vulns/bypass4xx.go:read4xxURLsFromVulnsFuzzJSONL": {classOwnSchema, "reads v2's inputs/*.jsonl"},
 	"internal/modules/vulns/graphql.go:readURLsJSONL":                   {classOwnSchema, "reads v2's artefacts/urls.jsonl"},
@@ -191,10 +194,33 @@ var outputContractAllowlist = map[string]string{
 	"internal/modules/vulns/websocket.go:parseWebsocketOutput":         "httpx -json; SAME TOOL as the 2026-08-21 bug, different parser",
 	"internal/modules/web/portscan.go:portscanWriteFingerprintRecords": "nerva fingerprint JSON; no captured fixture yet",
 	"internal/modules/web/ffuf.go:parseFFUFJSONL":                      "ffuf JSONL; reached ONLY as parseFFUFOutput's fallback for non-document output, so no test calls it directly. Closing it needs a captured ffuf JSONL stream, which -of json does not produce — do not hand-write one.",
+
+	// ---- surfaced by 21-04's call-site-granular coverage rule ----
+	// Each of these was "covered" only because an unrelated test in the same
+	// package read a fixture. The call sites named here feed hand-written bytes.
+	"internal/modules/osint/github_repos.go:parseEnumerepoOutput":        "enumerepo JSON; github_repos_test.go writes inline JSON to a temp file — no captured enumerepo output",
+	"internal/modules/osint/ip_info.go:whoisXMLFormatGeo":                "WhoisXML geo API; ip_info_test.go passes an inline JSON literal — capture needs a paid key",
+	"internal/modules/osint/postman.go:parsePostleaksJSON":               "postleaksNg JSON; apileaks_test.go passes an inline report string — no captured postleaksNg output",
+	"internal/modules/subdomains/passive.go:parseCrtJSON":                "crt -json; passive_crt_internal_test.go passes inline JSON and both crt fixtures under testdata/fixtures/passive are TODO stubs",
+	"internal/modules/vulns/fray.go:parseFrayOutput":                     "fray JSON; e2e_producers_test.go feeds mock-produced bytes — no captured fray output",
+	"internal/modules/vulns/fuzzparams.go:parseFuzzparamsOutput":         "nuclei -j fuzzing; e2e_producers_test.go feeds mock-produced bytes — no captured nuclei fuzzing output",
+	"internal/modules/vulns/nuclei_dast.go:parseNucleiDAST":              "nuclei -j DAST; e2e_producers_test.go feeds mock-produced bytes — no captured DAST output",
+	"internal/modules/vulns/smuggling.go:parseSmugglingOutput":           "smugglex JSON; e2e_producers_test.go feeds mock-produced bytes — no captured smugglex output",
+	"internal/modules/vulns/spray.go:parseBrutusHits":                    "brutus JSON hits; spray_test.go passes inline hit lines — the spray fixtures are nmap/fingerprint inputs, not brutus output",
+	"internal/modules/web/nuclei_coverage.go:NucleiCoverage.observeLine": "nuclei -stats -sj; nuclei_coverage_test.go keeps a captured stats line INLINE (`real`) rather than under testdata/fixtures, so no provenance is enforced on it — move it to a fixture with a captured-from header to close",
 }
 
 // outputContractAllowlistSize is pinned so the debt cannot grow unnoticed.
-var outputContractAllowlistSize = len(outputContractAllowlist)
+//
+// A LITERAL, typed by hand. Until 21-04 this read `len(outputContractAllowlist)`,
+// which made the size check below compare the map against itself — a new entry
+// moved both numbers together and nothing could ever fail. Change this number
+// in the same commit as the map, and say why in that commit.
+//
+// 13 seeded by 16-07; 23 after 21-04 tightened coverage to call-site
+// granularity and ten parsers that had only ever met hand-written input fell
+// out (each is named above with the call site that proves it).
+const outputContractAllowlistSize = 23
 
 // fixtureProvenanceAllowlist names fixture files that predate the provenance
 // rule and whose true origin is unknown.
@@ -444,19 +470,33 @@ func bodyDecodesJSON(body *ast.BlockStmt) bool {
 }
 
 // discoverFixtureCoveredFuncs returns "<pkgdir>:<func>" for every function
-// CALLED by a _test.go file in a package whose test files also reference the
-// fixtures tree.
+// CALLED from inside a fixture-reading function of a _test.go file in that
+// package.
 //
-// File-granular by design — see the header's blind-spot note.
+// CALL-SITE GRANULAR (21-04). A function is fixture-reading when its own body
+// carries a string literal that names the fixture tree ("testdata" or
+// "fixtures"), or calls a same-package function that does — the loaders this
+// repo actually uses: fixturesBase(), osintFixturesBase(), vulnsFixturesBase(),
+// loadRealHTTPXFixture(), and the per-package read*TestFixture helpers that take
+// a path built from one of those. One level of indirection, resolved by name
+// within the package.
+//
+// What the old file-granular rule accepted and this one does not: a parser
+// called from a test that feeds it a hand-written []byte, in a package where a
+// DIFFERENT test happens to read a fixture. That parser has never met captured
+// output, and it is exactly the case this file exists to flag.
 func discoverFixtureCoveredFuncs(t *testing.T, root string) map[string]bool {
 	t.Helper()
 	fset := token.NewFileSet()
-	calls := map[string]bool{}
-	pkgHasFixtureRef := map[string]bool{}
-	var testFiles []struct {
+
+	type fn struct {
 		dir  string
-		file *ast.File
+		decl *ast.FuncDecl
 	}
+	var funcs []fn
+	// readsFixture is keyed "<dir>:<func>" and is true when the body itself
+	// names the fixture tree.
+	readsFixture := map[string]bool{}
 
 	err := filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -471,47 +511,91 @@ func discoverFixtureCoveredFuncs(t *testing.T, root string) map[string]bool {
 		if !strings.HasSuffix(p, "_test.go") {
 			return nil
 		}
-		src, rerr := os.ReadFile(p) //nolint:gosec
-		if rerr != nil {
-			return rerr
-		}
-		f, perr := parser.ParseFile(fset, p, src, parser.SkipObjectResolution)
+		f, perr := parser.ParseFile(fset, p, nil, parser.SkipObjectResolution)
 		if perr != nil {
 			return fmt.Errorf("parse %s: %w", p, perr)
 		}
 		dir := repoRelPath(filepath.Dir(p))
-		if strings.Contains(string(src), "fixtures") {
-			pkgHasFixtureRef[dir] = true
+		for _, decl := range f.Decls {
+			fd, ok := decl.(*ast.FuncDecl)
+			if !ok || fd.Body == nil {
+				continue
+			}
+			funcs = append(funcs, fn{dir, fd})
+			if bodyNamesFixtureTree(fd.Body) {
+				readsFixture[dir+":"+declName(fd)] = true
+			}
 		}
-		testFiles = append(testFiles, struct {
-			dir  string
-			file *ast.File
-		}{dir, f})
 		return nil
 	})
 	if err != nil {
 		t.Fatalf("walk tests: %v", err)
 	}
 
-	for _, tf := range testFiles {
-		if !pkgHasFixtureRef[tf.dir] {
+	// A function that calls a fixture-reading loader of its own package is
+	// fixture-reading too (one level).
+	isFixtureReading := func(f fn) bool {
+		if readsFixture[f.dir+":"+declName(f.decl)] {
+			return true
+		}
+		found := false
+		ast.Inspect(f.decl.Body, func(n ast.Node) bool {
+			if found {
+				return false
+			}
+			call, ok := n.(*ast.CallExpr)
+			if !ok {
+				return true
+			}
+			if id, ok := call.Fun.(*ast.Ident); ok && readsFixture[f.dir+":"+id.Name] {
+				found = true
+			}
+			return true
+		})
+		return found
+	}
+
+	calls := map[string]bool{}
+	for _, f := range funcs {
+		if !isFixtureReading(f) {
 			continue
 		}
-		ast.Inspect(tf.file, func(n ast.Node) bool {
+		ast.Inspect(f.decl.Body, func(n ast.Node) bool {
 			call, ok := n.(*ast.CallExpr)
 			if !ok {
 				return true
 			}
 			switch fun := call.Fun.(type) {
 			case *ast.Ident:
-				calls[tf.dir+":"+fun.Name] = true
+				calls[f.dir+":"+fun.Name] = true
 			case *ast.SelectorExpr:
-				calls[tf.dir+":"+fun.Sel.Name] = true
+				calls[f.dir+":"+fun.Sel.Name] = true
 			}
 			return true
 		})
 	}
 	return calls
+}
+
+// bodyNamesFixtureTree reports whether a function body contains a string
+// literal naming the fixture tree.
+func bodyNamesFixtureTree(body *ast.BlockStmt) bool {
+	found := false
+	ast.Inspect(body, func(n ast.Node) bool {
+		if found {
+			return false
+		}
+		lit, ok := n.(*ast.BasicLit)
+		if !ok || lit.Kind != token.STRING {
+			return true
+		}
+		v := strings.Trim(lit.Value, "`\"")
+		if strings.Contains(v, "testdata") || strings.Contains(v, "fixtures") {
+			found = true
+		}
+		return true
+	})
+	return found
 }
 
 // discoverFixtures returns every regular file under a testdata/fixtures tree.

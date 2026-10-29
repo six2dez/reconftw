@@ -1,8 +1,5 @@
 // scraping_test.go — TDD tests for SubScrapingTask, SubAnalyticsTask, SubNSDelegationTask.
 //
-// Source: .planning/phases/04-subdomains-e2e-axiom-integration/04-03-PLAN.md
-// Task 2 behavior tests 1-4.
-//
 // Test infrastructure reuses mockBackend, mockTree, mockStreamBackend from
 // scope_crosscheck_test.go / brute_test.go (same package subdomains_test).
 package subdomains_test
@@ -61,6 +58,7 @@ func buildScrapingApp(t *testing.T) (*appctx.AppContext, string) {
 	runner := backend.NewRunner(mockBe, reg, nil)
 
 	app := &appctx.AppContext{
+		Log:   appctx.NopLogger(),
 		Tools: runner,
 		Tree:  &mockTree{},
 		Target: &appctx.Target{
@@ -311,6 +309,7 @@ func TestSubAnalyticsTaskWritesStagingFile(t *testing.T) {
 	runner := backend.NewRunner(mockBe, reg, nil)
 
 	app := &appctx.AppContext{
+		Log:   appctx.NopLogger(),
 		Tools: runner,
 		Tree:  &mockTree{},
 		Target: &appctx.Target{
@@ -377,6 +376,7 @@ func TestSubNSDelegationTaskWritesStagingFile(t *testing.T) {
 	runner := backend.NewRunner(mockBe, reg, nil)
 
 	app := &appctx.AppContext{
+		Log:   appctx.NopLogger(),
 		Tools: runner,
 		Tree:  &mockTree{},
 		Target: &appctx.Target{
@@ -492,6 +492,7 @@ func TestMergeStageHandlesResolvedStage(t *testing.T) {
 
 	mockTr := &mockTree{}
 	app := &appctx.AppContext{
+		Log:  appctx.NopLogger(),
 		Tree: mockTr,
 		Target: &appctx.Target{
 			Domain:  "example.com",

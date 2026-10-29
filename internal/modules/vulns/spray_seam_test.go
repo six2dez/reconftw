@@ -1,5 +1,5 @@
 // spray_seam_test.go — the proof that vulns/spray.go's brutus dispatch came home
-// to backend.Runner (18-04) through ExecOptions.StdinPath, with its argv
+// to backend.Runner through ExecOptions.StdinPath, with its argv
 // unchanged, its failure policy unchanged, and — the reason this file exists at
 // all — WITHOUT the service-fingerprint payload reaching logs/tools.jsonl.
 //
@@ -9,10 +9,10 @@
 //	cmd := exec.CommandContext(cmdCtx, bin, args...)   // args = --json -o <path> [-u][-p][-k]
 //	cmd.Stdin = f
 //
-// This is the ONLY site in phase 18 whose standard input is an open FILE rather
+// This is the ONLY moved site whose standard input is an open FILE rather
 // than a byte slice, which is exactly what ExecOptions.StdinPath was added for.
 //
-// XCUT-07 (T-18-04-03), IN TWO PARTS, because re-asserting the guarantee here
+// XCUT-07, IN TWO PARTS, because re-asserting the guarantee here
 // rather than assuming it survived the move is what turned up that half of it
 // was never true:
 //
@@ -66,6 +66,7 @@ func newSprayBrutusApp(t *testing.T, toolPath string) *appctx.AppContext {
 	reg.Register(&backend.Tool{Name: brutusToolName, Path: toolPath})
 	reg.Register(&backend.Tool{Name: "nerva", Path: ""})
 	app := &appctx.AppContext{
+		Log:    appctx.NopLogger(),
 		Tools:  backend.NewRunner(&backend.LocalBackend{}, reg, nil),
 		Target: &appctx.Target{Domain: "example.com", WorkDir: workDir},
 		Cfg:    sprayBrutusCfg(),
@@ -111,7 +112,7 @@ func TestSprayStdinPathReachesBrutus(t *testing.T) {
 	}
 }
 
-// TestSprayFingerprintNotRecorded is the T-18-04-03 canary.
+// TestSprayFingerprintNotRecorded is the canary.
 //
 // PRESENCE FIRST, THEN ABSENCE. An absence assertion over a file nothing wrote
 // passes trivially and proves nothing — which is precisely how a leak stays
@@ -171,7 +172,7 @@ func TestSprayFingerprintNotRecorded(t *testing.T) {
 
 	// 2. Only now, ABSENCE.
 	if strings.Contains(string(data), canary) {
-		t.Errorf("SERVICE-FINGERPRINT CONTENT LEAKED INTO logs/tools.jsonl (T-18-04-03) — the "+
+		t.Errorf("SERVICE-FINGERPRINT CONTENT LEAKED INTO logs/tools.jsonl — the "+
 			"canary %q is in the invocation record:\n%s", canary, data)
 	}
 	// And the fingerprint path itself must not be on argv either: it crosses as
@@ -183,7 +184,7 @@ func TestSprayFingerprintNotRecorded(t *testing.T) {
 }
 
 // TestSprayBrutusUnavailableStatusUnchanged pins the FAILURE POLICY across the
-// move (T-18-04-04). Before 18-04 an absent brutus failed exec.LookPath, which
+// move. Before the Runner move an absent brutus failed exec.LookPath, which
 // brutusRunner turned into errBrutusNotInstalled and the task turned into
 // StatusSkipped WITHOUT clearing a previous run's staging (brutusRan == false).
 // After the move the same must hold, driven by the Runner's dispatch-failure
@@ -192,7 +193,7 @@ func TestSprayBrutusUnavailableStatusUnchanged(t *testing.T) {
 	app := newSprayBrutusApp(t, "")
 
 	// A previous run's staged findings that must survive a run in which brutus
-	// never started (F3 did-not-run).
+	// never started (did-not-run rule).
 	staging := filepath.Join(app.Target.WorkDir, "inputs", "findings.spray.jsonl")
 	if err := os.WriteFile(staging, []byte(`{"vuln_class":"spray"}`+"\n"), 0o600); err != nil {
 		t.Fatalf("seed staging: %v", err)
@@ -203,18 +204,18 @@ func TestSprayBrutusUnavailableStatusUnchanged(t *testing.T) {
 		t.Fatalf("Run returned an error for an unavailable brutus: %v", err)
 	}
 	if res.Status != task.StatusDone {
-		t.Fatalf("status on an unavailable brutus = %v, want %v — spraying is best_effort (D-V7) "+
+		t.Fatalf("status on an unavailable brutus = %v, want %v — spraying is best_effort "+
 			"and must never abort the vulns pipeline", res.Status, task.StatusDone)
 	}
 	data, readErr := os.ReadFile(staging) //nolint:gosec // test-owned temp path
 	if readErr != nil || !strings.Contains(string(data), "spray") {
 		t.Fatalf("a run in which brutus never started cleared the previous run's staging "+
-			"(F3 did-not-run must preserve): err=%v content=%q", readErr, data)
+			"(did-not-run rule must preserve): err=%v content=%q", readErr, data)
 	}
 }
 
-// TestSprayConfiguredCredentialsAreNotRecorded is the second half of T-18-04-03,
-// and it exists because the claim it checks WAS FALSE when 18-04 started.
+// TestSprayConfiguredCredentialsAreNotRecorded is the second half of
+// and it exists because the claim it checks WAS FALSE when the Runner move started.
 //
 // spray.go asserted that "credential wordlists cross as FILE PATHS on -u/-p/-k,
 // never as raw values". `brutus --help` on the installed build says otherwise:
@@ -292,7 +293,7 @@ func TestSprayConfiguredCredentialsAreNotRecorded(t *testing.T) {
 
 	for _, canary := range []string{userCanary, passCanary} {
 		if strings.Contains(string(data), canary) {
-			t.Errorf("CONFIGURED BRUTUS CREDENTIAL LEAKED INTO logs/tools.jsonl (T-18-04-03) — "+
+			t.Errorf("CONFIGURED BRUTUS CREDENTIAL LEAKED INTO logs/tools.jsonl — "+
 				"%q is in the invocation record:\n%s", canary, data)
 		}
 	}

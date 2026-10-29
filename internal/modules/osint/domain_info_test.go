@@ -1,5 +1,4 @@
-// domain_info_test.go — behavior tests for the DomainInfoTask Scopify fold
-// (13-05 Task 2).
+// domain_info_test.go — behavior tests for the DomainInfoTask Scopify fold.
 //
 // Proves the PAR-03 parity restore: DomainInfoTask runs Scopify over the
 // registrable company name (companyName / `unfurl format %r`) → osint/scopify.txt
@@ -8,8 +7,6 @@
 //
 // Internal (package osint) to reach unexported helpers + reuse the in-package
 // AppContext idiom.
-//
-// Source: .planning/phases/13-domain-parity/13-05-PLAN.md Task 2.
 package osint
 
 import (
@@ -94,6 +91,7 @@ func runDomainInfoTask(t *testing.T, be *domainInfoBackend) (*appctx.AppContext,
 	runner := backend.NewRunner(be, reg, nil)
 
 	app := &appctx.AppContext{
+		Log:    appctx.NopLogger(),
 		Cfg:    cfg,
 		Tools:  runner,
 		Target: &appctx.Target{Domain: "example.com", WorkDir: workDir},
@@ -191,8 +189,8 @@ func TestDomainInfoTask_ScopifyEmptyOutputNoFile(t *testing.T) {
 	}
 }
 
-// ExecOpts satisfies the backend.Backend options seam added in 18-01. It
-// PRESERVES this fake's pre-18-01 dispatch exactly: Runner.Run used to call
+// ExecOpts satisfies the backend.Backend options seam added with the Runner move. It
+// PRESERVES this fake's pre-Runner dispatch exactly: Runner.Run used to call
 // Backend.Exec and Runner.RunEnv used to call Backend.ExecEnv, and both now
 // arrive here, so the env-set case forwards to ExecEnv and the zero case to Exec.
 //

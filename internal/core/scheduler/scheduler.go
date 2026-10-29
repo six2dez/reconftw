@@ -189,19 +189,28 @@ func (s *Scheduler) RunStage(ctx context.Context, module string, tasks []task.Ta
 	return g.Wait()
 }
 
-// runOne is the per-Task wrapper around checkpoint + heartbeat +
-// LifecycleAware + Task.Run. Returns the Task's error (or nil).
+// checkpointTarget is the target string handed to Checkpoint.Done/Begin/
+// Complete and to the Hash hook. It is EMPTY on purpose: the Scheduler holds
+// no AppContext (import-cycle break, see the package header), so it cannot
+// know the target. The real target reaches the checkpoint row through the
+// Hash closure the caller installs — cmd/reconftw and the MCP handlers capture
+// app.Target.Domain there and ignore this argument. Replaced a targetFor()
+// method that only ever returned "".
+const checkpointTarget = ""
+
+// runOne is the per-Task wrapper around checkpoint + heartbeat + Task.Run.
+// Returns the Task's error (or nil).
 //
 // Checkpoint flow (Test 17/18):
 //  1. Done(ctx, name, target, hash) — if true, skip without running.
 //  2. Begin(ctx, name, target, hash) — record in-progress row.
-//  3. Run the Task (with heartbeat + lifecycle wrappers).
+//  3. Run the Task (with the heartbeat wrapper).
 //  4. Complete(ctx, name, target, hash, outputs, runErr).
 //
 // If Checkpoint is nil, all four steps are skipped — used by tests that
 // disable checkpoint integration.
 func (s *Scheduler) runOne(ctx context.Context, t task.Task) error {
-	target := s.targetFor()
+	target := checkpointTarget
 	hash := s.hashFor(t.Name(), target)
 
 	if s.Checkpoint != nil {
@@ -236,15 +245,6 @@ func (s *Scheduler) runOne(ctx context.Context, t task.Task) error {
 		defer s.Limiter.Release(1)
 	}
 
-	// LifecycleAware OnStart — errors logged as warnings; do not abort.
-	if la, ok := t.(task.LifecycleAware); ok {
-		if err := la.OnStart(ctx, nil); err != nil { // app passed via RunTask closure
-			s.log().Warn("task_onstart_failed",
-				slog.String("task", t.Name()),
-				slog.Any("err", err))
-		}
-	}
-
 	// Heartbeat goroutine (XCUT-09).
 	cadence := time.Duration(s.HeartbeatSeconds) * time.Second
 	stopHB := startHeartbeat(ctx, s.log(), t.Name(), t.Module(), cadence)
@@ -253,15 +253,6 @@ func (s *Scheduler) runOne(ctx context.Context, t task.Task) error {
 	start := time.Now()
 	result, runErr := s.invokeTask(ctx, t)
 	result.Duration = time.Since(start)
-
-	// LifecycleAware OnEnd — errors logged as warnings; main result wins.
-	if la, ok := t.(task.LifecycleAware); ok {
-		if endErr := la.OnEnd(ctx, nil, result); endErr != nil {
-			s.log().Warn("task_onend_failed",
-				slog.String("task", t.Name()),
-				slog.Any("err", endErr))
-		}
-	}
 
 	if s.Checkpoint != nil {
 		// V-04: an INCOMPLETE run must not be checkpointed as done, or the next run
@@ -287,13 +278,6 @@ func (s *Scheduler) invokeTask(ctx context.Context, t task.Task) (task.Result, e
 	}
 	return t.Run(ctx, nil)
 }
-
-// targetFor returns the checkpoint target string. Plan 05 Scheduler does
-// not hold an AppContext reference (import-cycle break), so target comes
-// from the optional Hash hook. Defaults to "" — tests use deterministic
-// hashes anyway; Plan 06 main.go wires the real target via a closure that
-// captures app.Target.Domain.
-func (s *Scheduler) targetFor() string { return "" }
 
 // hashFor computes the checkpoint input_hash. Defaults to a stable hash
 // derived via checkpoint.InputHash with an empty config/wordlist slice

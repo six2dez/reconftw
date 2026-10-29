@@ -1,30 +1,28 @@
-// metadata.go — MetadataTask: doc-metadata fold-in via exiftool (D-O10 / D-O2).
+// metadata.go — MetadataTask: doc-metadata fold-in via exiftool.
 //
-// MetadataTask is the D-O10 metadata fold-in: it extracts document metadata
+// MetadataTask is the metadata fold-in: it extracts document metadata
 // (authors, software, internal file paths) from public documents already
 // downloaded/indexed into the workspace (v1 modules/osint.sh:368 metadata →
 // metafinder/exiftool over discovered docs). Each surfaced metadata datum becomes
-// an informational OSINTFindingRecord (D-O4, Category doc-metadata).
+// an informational OSINTFindingRecord (Category doc-metadata).
 //
-// PURELY OPPORTUNISTIC (D-O2): this is the canonical D-O2 enrichment Task. It reads
+// PURELY OPPORTUNISTIC: this is the canonical enrichment Task. It reads
 // indexed/downloaded docs from the workspace artefacts IF present. When NO
 // workspace docs exist it logs:
 //
 //	"osint.metadata: no workspace docs — skipping enrichment"
 //
 // and returns StatusSkipped — NO fail, NO bootstrap, NO coupling. The run COMPLETES
-// over the root-domain baseline (ARCH-09 best_effort + D-V6 logged-never-silent).
+// over the root-domain baseline (ARCH-09 best_effort + logged-never-silent).
 //
-// SEEDING (D-O1/D-O2): no DependsOn edges — the workspace-doc enrichment is
+// SEEDING: no DependsOn edges — the workspace-doc enrichment is
 // opportunistic, not a DAG edge.
-// FAILURE POLICY (D-O8, ARCH-09): best_effort.
+// FAILURE POLICY (ARCH-09): best_effort.
 //
-// THREAT MODEL (T-07-05-02 accept / T-07-05-03 mitigate): doc metadata (authors,
+// THREAT MODEL: doc metadata (authors,
 // internal paths) is the intended OSINT output (informational; no live
 // credentials). exiftool reads ONLY already-discovered, bounded workspace docs;
 // per-doc invocation keeps any single malicious/huge file isolated.
-//
-// Source: .planning/phases/07-osint-e2e/07-05-PLAN.md Task 2.
 package osint
 
 import (
@@ -40,7 +38,7 @@ import (
 	"github.com/six2dez/reconftw/internal/core/task"
 )
 
-// metadataMaxDocs bounds the per-doc exiftool loop (T-07-05-03 — bound the parse
+// metadataMaxDocs bounds the per-doc exiftool loop (bound the parse
 // volume against a flood of workspace docs).
 const metadataMaxDocs = 200
 
@@ -54,7 +52,7 @@ var metadataDocExtensions = map[string]struct{}{
 	".tiff": {}, ".svg": {}, ".webp": {}, ".mp3": {},
 }
 
-// MetadataTask runs exiftool over workspace docs (D-O10 fold-in, D-O2 opportunistic).
+// MetadataTask runs exiftool over workspace docs (fold-in, opportunistic).
 type MetadataTask struct{}
 
 // Name returns the globally unique dot-namespaced task identifier.
@@ -65,7 +63,7 @@ func (t *MetadataTask) Module() string { return "osint" }
 
 // Description returns a human-readable one-line description.
 func (t *MetadataTask) Description() string {
-	return "Document metadata extraction (exiftool fold-in, D-O10 / D-O2 opportunistic)"
+	return "Document metadata extraction (exiftool fold-in, opportunistic)"
 }
 
 // Enabled reports whether the metadata fold-in is configured.
@@ -73,26 +71,24 @@ func (t *MetadataTask) Enabled(cfg *config.Config) bool {
 	return cfg.OSINT.Metadata.Enabled
 }
 
-// DependsOn returns nil — the workspace-doc enrichment (D-O2) is OPPORTUNISTIC,
+// DependsOn returns nil — the workspace-doc enrichment is OPPORTUNISTIC,
 // not a DAG edge.
 func (t *MetadataTask) DependsOn() []string { return nil }
 
-// Run extracts metadata from already-discovered workspace docs (D-O2 opportunistic).
+// Run extracts metadata from already-discovered workspace docs (opportunistic).
 //
 // Steps:
-//  1. D-O2: discover indexed/downloaded docs in the workspace IF present; absent →
+//  1. discover indexed/downloaded docs in the workspace IF present; absent →
 //     log the canonical skip note + StatusSkipped (best_effort, NO fail/bootstrap).
 //  2. Loop exiftool per doc (v1 osint.sh:368 metafinder/exiftool over docs).
 //  3. Parse metadata (authors, software, paths) into informational records.
 //  4. Write inputs/findings.metadata.jsonl (multi-writer staging).
 func (t *MetadataTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result, error) {
-	// Step 1: D-O2 opportunistic doc discovery.
+	// Step 1: opportunistic doc discovery.
 	docs := discoverWorkspaceDocs(app.Target.WorkDir)
 	if len(docs) == 0 {
-		// D-O2 canonical log-skip — best_effort, NO fail/bootstrap.
-		if app.Log != nil {
-			app.Log.Info("osint.metadata: no workspace docs — skipping enrichment")
-		}
+		// canonical log-skip — best_effort, NO fail/bootstrap.
+		app.Log.Info("osint.metadata: no workspace docs — skipping enrichment")
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
@@ -103,14 +99,14 @@ func (t *MetadataTask) Run(ctx context.Context, app *appctx.AppContext) (task.Re
 	}
 
 	if len(docs) > metadataMaxDocs {
-		docs = docs[:metadataMaxDocs] // bound the parse volume (T-07-05-03)
+		docs = docs[:metadataMaxDocs] // bound the parse volume
 	}
 
 	var records []OSINTFindingRecord
 	// exiftoolRan records whether AT LEAST ONE document was actually processed,
 	// and cancelled records an interrupted loop. Neither an absent exiftool nor a
 	// cancelled run observed the corpus, so neither may clear a previous run's
-	// staging (F3 did-not-run — see writeOSINTStaging).
+	// staging (did-not-run rule — see writeOSINTStaging).
 	exiftoolRan := false
 	cancelled := false
 	for _, doc := range docs {
@@ -124,9 +120,7 @@ func (t *MetadataTask) Run(ctx context.Context, app *appctx.AppContext) (task.Re
 		res, err := app.Tools.Run(ctx, "exiftool",
 			[]string{"-S", "-Author", "-Creator", "-Producer", "-Software", "-Company", doc})
 		if err != nil {
-			if app.Log != nil {
-				app.Log.Debug("osint.metadata: exiftool run failed (best_effort)", "doc", doc, "err", err)
-			}
+			app.Log.Debug("osint.metadata: exiftool run failed (best_effort)", "doc", doc, "err", err)
 			continue
 		}
 		exiftoolRan = true
@@ -134,17 +128,15 @@ func (t *MetadataTask) Run(ctx context.Context, app *appctx.AppContext) (task.Re
 	}
 
 	// Step 4: write staging JSONL (multi-writer contract).
-	// F3: a run in which exiftool extracted no author/software metadata REMOVES
+	// Run isolation: a run in which exiftool extracted no author/software metadata REMOVES
 	// the staging file rather than republishing the previous run's metadata.
 	if exiftoolRan && !cancelled {
 		writeOSINTStaging(app, inputsDir, "findings.metadata.jsonl", records)
-	} else if app.Log != nil {
-		app.Log.Debug("osint.metadata: exiftool did not process the corpus — staging preserved (F3 did-not-run)")
+	} else {
+		app.Log.Debug("osint.metadata: exiftool did not process the corpus — staging preserved (did-not-run rule)")
 	}
 
-	if app.Log != nil {
-		app.Log.Info("osint.metadata: completed", "findings", len(records), "docs_scanned", len(docs))
-	}
+	app.Log.Info("osint.metadata: completed", "findings", len(records), "docs_scanned", len(docs))
 	return task.Result{
 		Status: task.StatusDone,
 		Stats:  map[string]int{"findings": len(records), "docs_scanned": len(docs)},
@@ -152,7 +144,7 @@ func (t *MetadataTask) Run(ctx context.Context, app *appctx.AppContext) (task.Re
 }
 
 // discoverWorkspaceDocs walks the workspace osint/ and artefacts/ doc directories
-// for already-downloaded documents (D-O2: opportunistic — reads IF present). It
+// for already-downloaded documents (opportunistic — reads IF present). It
 // returns the absolute paths of files whose extension is in metadataDocExtensions.
 // Returns nil when no doc directory or no matching docs exist (the log-skip path).
 func discoverWorkspaceDocs(workDir string) []string {
@@ -184,8 +176,8 @@ func discoverWorkspaceDocs(workDir string) []string {
 
 // parseMetadataOutput parses exiftool -S key/value output for a single doc into
 // informational doc-metadata records. Each non-empty "Tag: Value" line yields one
-// record carrying the doc basename + tag + value (non-secret OSINT data,
-// T-07-05-02 accept). Lines without a value are skipped.
+// record carrying the doc basename + tag + value (non-secret OSINT data).
+// Lines without a value are skipped.
 func parseMetadataOutput(data []byte, doc string) []OSINTFindingRecord {
 	if len(bytes.TrimSpace(data)) == 0 {
 		return nil

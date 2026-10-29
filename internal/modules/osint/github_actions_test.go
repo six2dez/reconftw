@@ -1,7 +1,7 @@
 // github_actions_test.go — XCUT-07 redaction + parse assertions for the gato
 // GitHub Actions audit (OSINT-06).
 //
-// CRITICAL (T-07-03-01): gato output may embed live workflow secrets. These
+// CRITICAL: gato output may embed live workflow secrets. These
 // tests prove the raw secret VALUE is NEVER propagated to a record — every
 // secret-exposure record carries ValueRedacted="***" and only a non-secret
 // locator survives.
@@ -113,7 +113,7 @@ func runGitHubActions(t *testing.T, gatoJSON, token string) (*gatoFakeBackend, *
 	t.Helper()
 	workDir := t.TempDir()
 
-	// Token file (the D-O8 key gate source).
+	// Token file (the key gate source).
 	tokenFile := filepath.Join(workDir, "github_tokens.txt")
 	if err := os.WriteFile(tokenFile, []byte(token+"\n"), 0o600); err != nil {
 		t.Fatalf("write token file: %v", err)
@@ -199,7 +199,7 @@ func TestGitHubActions_SideFileHasNoRawSecret(t *testing.T) {
 	}
 }
 
-// TestGitHubActions_GHTokenEnvAndNoLogLeak proves GAP-02 + T-07-09-01: gato is
+// TestGitHubActions_GHTokenEnvAndNoLogLeak proves GAP-02 + gato is
 // invoked with GH_TOKEN in its child env (off argv), and the token value never
 // appears in any log line.
 func TestGitHubActions_GHTokenEnvAndNoLogLeak(t *testing.T) {
@@ -267,8 +267,8 @@ func TestDorkRecords_Dedup(t *testing.T) {
 	}
 }
 
-// ExecOpts satisfies the backend.Backend options seam added in 18-01. It
-// PRESERVES this fake's pre-18-01 dispatch exactly: Runner.Run used to call
+// ExecOpts satisfies the backend.Backend options seam added with the Runner move. It
+// PRESERVES this fake's pre-Runner dispatch exactly: Runner.Run used to call
 // Backend.Exec and Runner.RunEnv used to call Backend.ExecEnv, and both now
 // arrive here, so the env-set case forwards to ExecEnv and the zero case to Exec.
 //

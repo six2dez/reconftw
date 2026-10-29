@@ -2,7 +2,7 @@ package subdomains
 
 // Package subdomains implements reconFTW v2's subdomain enumeration pipeline.
 //
-// STAGING CONTRACT (addresses REVIEWS finding #2 + #3 — OutputTree.Append=REPLACE):
+// STAGING CONTRACT (OutputTree.Append is REPLACE):
 // Tasks do NOT call app.Tree.Append("subdomains", ...) directly during Run.
 // Instead, each Task writes its raw output (one hostname per line) to a private
 // staging file at:   workspaces/<target>/inputs/passive.<tool>.txt

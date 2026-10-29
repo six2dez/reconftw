@@ -1,4 +1,4 @@
-// cloud_enum_test.go — CloudEnumTask + MisconfigTask parser assertions (OSINT-07 / D-O10).
+// cloud_enum_test.go — CloudEnumTask + MisconfigTask parser assertions (OSINT-07).
 //
 // These verify the security-severity classification of exposed cloud buckets and
 // third-party misconfigurations, and the per-provider (S3/GCP/Azure) tagging.

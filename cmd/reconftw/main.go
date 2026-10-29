@@ -187,6 +187,12 @@ func run() error {
 	// Phase 9 (D-08): rewrite v1 alias forms into v2 invocations before cobra
 	// parses. translateV1Args leaves the original flag in the slice so
 	// MarkDeprecated still emits its one-time warning (MODE-09).
+	//
+	// Removed v1 flags are refused first: `-y` was --ai in v1 and used to be
+	// rewritten to `deep`, which started a full deep scan instead of a report.
+	if err := rejectRemovedV1Flags(os.Args[1:]); err != nil {
+		return err
+	}
 	translated := translateV1Args(os.Args[1:])
 	rootCmd := newRootCmd(nil, cfg)
 	rootCmd.SetArgs(translated)

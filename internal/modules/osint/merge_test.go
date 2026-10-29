@@ -1,4 +1,4 @@
-// merge_test.go — F3 (15-03) empty-union behaviour for the osint merger.
+// merge_test.go — run-isolation empty-union behaviour for the osint merger.
 //
 // "findings" is a CASE-A stage: artefacts/findings.jsonl has NO direct
 // app.Tree.Append writer outside the merge path, so an empty union must publish
@@ -26,6 +26,7 @@ func newOSINTMergeApp(t *testing.T) *appctx.AppContext {
 		t.Fatalf("output.NewTree: %v", err)
 	}
 	return &appctx.AppContext{
+		Log:    appctx.NopLogger(),
 		Tree:   tree,
 		Target: &appctx.Target{Domain: "example.com", WorkDir: workdir},
 	}
@@ -39,7 +40,7 @@ func TestMergeOSINTFindingsEmptyRunPublishesEmptyArtefact(t *testing.T) {
 	if err := os.MkdirAll(filepath.Dir(staged), 0o755); err != nil {
 		t.Fatalf("mkdir inputs: %v", err)
 	}
-	// Company-seeded OSINT record (class=="osint", D-O1): no host, no url.
+	// Company-seeded OSINT record (class=="osint"): no host, no url.
 	if err := os.WriteFile(staged,
 		[]byte("{\"class\":\"osint\",\"name\":\"whois\",\"value\":\"registrar\"}\n"), 0o644); err != nil {
 		t.Fatalf("write staging: %v", err)

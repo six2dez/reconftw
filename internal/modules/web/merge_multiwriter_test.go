@@ -1,6 +1,6 @@
 // merge_multiwriter_test.go — Multi-writer integration tests for MergeAllWebArtefacts.
 //
-// Verifies the staging-contract fix for CR-01/CR-02:
+// Verifies the staging-contract fix:
 //   - URLs from multiple producers are UNIONED (not last-writer-wins)
 //   - Findings from multiple producers are UNIONED with dedup
 //   - WAF records from multiple producers are UNIONED
@@ -10,8 +10,6 @@
 // These tests are RED against pre-fix code (which never writes
 // inputs/<artefact>.<tool>.jsonl staging files).  They turn GREEN after
 // Tasks 2–3 apply the staging contract across all multi-writer tasks.
-//
-// Source: .planning/phases/05-web-pipeline-e2e/05-09-PLAN.md Task 1.
 package web_test
 
 import (
@@ -95,6 +93,7 @@ func writeJSONLFile(t *testing.T, dir, name string, records []map[string]string)
 // makeTestApp returns an AppContext wired to workDir with the given captureTree.
 func makeTestApp(workDir string, tree *captureTree) *appctx.AppContext {
 	return &appctx.AppContext{
+		Log:    appctx.NopLogger(),
 		Cfg:    &config.Config{},
 		Target: &appctx.Target{WorkDir: workDir},
 		Tree:   tree,

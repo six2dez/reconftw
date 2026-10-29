@@ -302,6 +302,16 @@ func evaluateValue(raw string) evalResult {
 		}
 		return evalResult{v, true}
 	}
+	// Bash array literal `(a b "c d")` (v1 moved GOTATOR_FLAGS, NUCLEI_EXTRA_ARGS,
+	// NUCLEI_DAST_EXTRA_ARGS and AXIOM_EXTRA_ARGS to arrays for IFS safety). The
+	// v2 targets are flag strings consumed via strings.Fields, so the elements
+	// are joined with single spaces; `()` → "". Without this the literal
+	// "(-depth 1 … -md)" reached gotator as its first argument.
+	if len(v) >= 2 && v[0] == '(' && v[len(v)-1] == ')' {
+		elems := bashArrayElems(v[1 : len(v)-1])
+		joined := strings.Join(elems, " ")
+		return evalResult{joined, shellRe.MatchString(joined)}
+	}
 	inner, wasDouble := unquote(v)
 	// ${VAR:-default} → its literal default (never an env lookup — deterministic).
 	if m := varDefaultRe.FindStringSubmatch(inner); m != nil {
@@ -337,6 +347,61 @@ func stripInlineComment(s string) string {
 		}
 	}
 	return s
+}
+
+// bashArrayElems splits the inside of a bash array literal into its elements:
+// whitespace-separated words, with '…' and "…" quoting respected (and the quotes
+// removed; double-quoted escapes applied). No expansion is performed.
+func bashArrayElems(inner string) []string {
+	var (
+		elems []string
+		cur   strings.Builder
+		have  bool
+	)
+	flush := func() {
+		if have {
+			elems = append(elems, cur.String())
+			cur.Reset()
+			have = false
+		}
+	}
+	for i := 0; i < len(inner); i++ {
+		c := inner[i]
+		switch c {
+		case ' ', '\t', '\n':
+			flush()
+		case '\'':
+			j := strings.IndexByte(inner[i+1:], '\'')
+			if j < 0 {
+				cur.WriteString(inner[i+1:])
+				i = len(inner)
+			} else {
+				cur.WriteString(inner[i+1 : i+1+j])
+				i += j + 1
+			}
+			have = true
+		case '"':
+			j := i + 1
+			for j < len(inner) && inner[j] != '"' {
+				if inner[j] == '\\' && j+1 < len(inner) {
+					j++
+				}
+				j++
+			}
+			end := j
+			if end > len(inner) {
+				end = len(inner)
+			}
+			cur.WriteString(unescapeDoubleQuoted(inner[i+1 : end]))
+			i = end
+			have = true
+		default:
+			cur.WriteByte(c)
+			have = true
+		}
+	}
+	flush()
+	return elems
 }
 
 // unquote strips one layer of matching surrounding quotes. The second return is

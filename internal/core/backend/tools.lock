@@ -647,11 +647,13 @@ input_flag      = ""
 name            = "dalfox"
 kind            = "go"
 go_module       = "github.com/hahwul/dalfox/v2"
-description     = "XSS scanner (parameter-based; D-V6 WAF-friendly thread cap)"
+description     = "XSS scanner (parameter-based; v2/v3 common arg vector)"
 default_args    = []
 timeout_seconds = 0
 critical        = false
-version         = "v2.9.2"
+# 21-07a: pin follows the installed major (dalfox 3.2.3, Rust/clap); the XSS arg
+# vector is restricted to flags v2.9 and v3.2 both accept, so either works.
+version         = "v3.2.3"
 input_flag      = ""
 [[tools]]
 name            = "sqlmap"

@@ -1,4 +1,4 @@
-// httpx_test.go — CR-02: httpx must never be handed one path as both its input
+// httpx_test.go — httpx must never be handed one path as both its input
 // list and its output file.
 //
 // WHAT THIS FILE IS FOR, stated once so a later reader does not retire the wrong

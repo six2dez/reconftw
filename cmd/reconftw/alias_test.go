@@ -3,6 +3,7 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"strings"
 	"testing"
 
@@ -67,10 +68,10 @@ func TestTranslateV1Args(t *testing.T) {
 			wantFlags: []string{"--target"},
 		},
 		{
-			name:      "short -y with -d",
-			input:     []string{"-y", "-d", "x"},
-			wantHead:  "deep",
-			wantFlags: []string{"--target"},
+			name:      "scope lists: -i and -x rewrite to --include-file/--exclude-file",
+			input:     []string{"-r", "-d", "x", "-i", "in.txt", "-x", "out.txt"},
+			wantHead:  "recon",
+			wantFlags: []string{"--include-file in.txt", "--exclude-file out.txt"},
 		},
 		{
 			name:  "no double-insertion when subcommand already at position 0",
@@ -251,5 +252,55 @@ func TestV1DeprecationWarningAllLongFlags(t *testing.T) {
 				t.Errorf("%s: expected deprecation warning, got: %q", tc.flag, combined)
 			}
 		})
+	}
+}
+
+// TestTranslateV1ArgsNeverMapsDashYToDeep pins the Problem-C fix: v1's -y was
+// --ai, so it must not inject the deep subcommand (which started a full scan).
+func TestTranslateV1ArgsNeverMapsDashYToDeep(t *testing.T) {
+	if _, ok := v1SubcommandFlags["-y"]; ok {
+		t.Fatal("-y must not be a mode alias (v1 -y was --ai, not deep)")
+	}
+	got := translateV1Args([]string{"-y", "-d", "x"})
+	if len(got) > 0 && got[0] == "deep" {
+		t.Fatalf("translateV1Args([-y -d x]) injected deep: %v", got)
+	}
+}
+
+// TestRejectRemovedV1FlagsDashY asserts -y is refused with an actionable
+// message naming both replacements, and that nothing else is refused.
+func TestRejectRemovedV1FlagsDashY(t *testing.T) {
+	err := rejectRemovedV1Flags([]string{"-y", "-d", "example.com"})
+	if err == nil {
+		t.Fatal("expected -y to be rejected")
+	}
+	var rfe *removedFlagError
+	if !errors.As(err, &rfe) {
+		t.Fatalf("want *removedFlagError, got %T: %v", err, err)
+	}
+	for _, want := range []string{"-y", "--ai", "report", "deep"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error %q should mention %q", err.Error(), want)
+		}
+	}
+	for _, ok := range [][]string{
+		{"recon", "--target", "x"},
+		{"-r", "-d", "x", "-i", "in.txt"},
+		{"deep", "--target", "x"},
+		{"report", "--", "-y"}, // positional after --
+		{},
+	} {
+		if err := rejectRemovedV1Flags(ok); err != nil {
+			t.Errorf("rejectRemovedV1Flags(%v) = %v, want nil", ok, err)
+		}
+	}
+}
+
+// TestRootHasNoDashYShorthand asserts cobra itself no longer accepts -y, so a
+// code path that skips rejectRemovedV1Flags still cannot start a deep scan.
+func TestRootHasNoDashYShorthand(t *testing.T) {
+	root := newRootCmd(nil, &config.Config{})
+	if f := root.PersistentFlags().ShorthandLookup("y"); f != nil {
+		t.Fatalf("-y is still wired to --%s", f.Name)
 	}
 }

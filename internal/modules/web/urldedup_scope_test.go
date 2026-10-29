@@ -64,6 +64,7 @@ func newScopedURLDedupApp(t *testing.T, urls []string) (*appctx.AppContext, stri
 
 	cfg := config.Defaults()
 	app := &appctx.AppContext{
+		Log:    appctx.NopLogger(),
 		Cfg:    cfg,
 		Tree:   tree,
 		Tools:  backend.NewRunner(backend.NewLocalBackend(0), backend.NewToolRegistry(), nil),

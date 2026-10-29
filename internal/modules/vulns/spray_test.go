@@ -1,4 +1,4 @@
-// spray_test.go — behavior tests for SprayTask (13-07 Task 1).
+// spray_test.go — behavior tests for SprayTask.
 //
 // Internal (package vulns) so the tests override the unexported brutusRunner
 // seam and exercise unexported parse helpers (parseBrutesprayHits,
@@ -6,7 +6,7 @@
 // vectors passed to brutespray/nerva so argument fidelity is asserted without a
 // real binary; the brutus stdin seam is stubbed via the brutusRunner package var.
 //
-// Coverage (plan 13-07 Task 1 behavior spec):
+// Coverage:
 //   - identity (Name/Module/Enabled)
 //   - gating: IP target / no-gnmap / deep-gate → StatusSkipped (bash parity)
 //   - brutespray arg vector + credential redaction (XCUT-07)
@@ -107,6 +107,7 @@ func newSprayTestApp(t *testing.T, be backend.Backend, cfg *config.Config) *appc
 		reg.Register(&backend.Tool{Name: name})
 	}
 	return &appctx.AppContext{
+		Log:    appctx.NopLogger(),
 		Tools:  backend.NewRunner(be, reg, nil),
 		Target: &appctx.Target{Domain: "example.com", WorkDir: t.TempDir()},
 		Cfg:    cfg,
@@ -398,13 +399,13 @@ func TestSprayBrutusStdinAndRedaction(t *testing.T) {
 		t.Fatalf("Status = %q, want done", res.Status)
 	}
 
-	// stdin carries the service-fingerprint JSON (13-03 artefact).
+	// stdin carries the service-fingerprint JSON (portscan artefact).
 	if !strings.HasSuffix(gotStdinPath, filepath.Join("hosts", "service_fingerprints.jsonl")) {
 		t.Errorf("brutus stdin path = %q, want hosts/service_fingerprints.jsonl", gotStdinPath)
 	}
 	// arg vector: --json -o vulns/brutus.jsonl -u <usernames> -p <passwords>.
 	// NOTE: brutus documents -u/-p as comma-separated VALUES, not file paths —
-	// 18-04 confirmed that against `brutus --help`. The fixture happens to use
+	// The Runner move confirmed that against `brutus --help`. The fixture happens to use
 	// path-shaped strings; nothing here requires them to be paths.
 	joined := strings.Join(gotArgs, " ")
 	if !hasArg(gotArgs, "--json") {
@@ -522,7 +523,7 @@ func TestParseBrutusHitsRedacts(t *testing.T) {
 	}
 }
 
-// TestSprayBrutusConfinesRawOutput proves the WR-13-03 secret-at-rest fix: after
+// TestSprayBrutusConfinesRawOutput proves the secret-at-rest fix: after
 // brutus writes its raw --json hit file (0644, carrying a live user:pass), the
 // task (1) restricts it to owner-only 0600 and (2) registers the discovered
 // credential with the log Redactor so a later log line echoing it is scrubbed.
@@ -547,7 +548,7 @@ func TestSprayBrutusConfinesRawOutput(t *testing.T) {
 		if outPath == "" {
 			t.Fatal("brutus args missing -o output path")
 		}
-		// brutus writes the raw hit at world-readable 0644 — the exposure WR-13-03
+		// brutus writes the raw hit at world-readable 0644 — the exposure the secret-at-rest fix
 		// closes. Note the file is created 0644 here; the task must tighten it.
 		return os.WriteFile(outPath,
 			[]byte(`{"host":"1.2.3.4","port":22,"service":"ssh","username":"operator","password":"`+rawPass+`","success":true}`+"\n"),
@@ -565,14 +566,14 @@ func TestSprayBrutusConfinesRawOutput(t *testing.T) {
 		t.Fatalf("stat brutus.jsonl: %v", err)
 	}
 	if perm := info.Mode().Perm(); perm != 0o600 {
-		t.Errorf("brutus.jsonl perm = %04o, want 0600 (WR-13-03: not world-readable)", perm)
+		t.Errorf("brutus.jsonl perm = %04o, want 0600 (not world-readable)", perm)
 	}
 
 	// (2) The discovered credential must be registered with the Redactor: logging
 	// it now must emit "***", never the raw value.
 	app.Log.Info("probe", "cred", rawPass)
 	if strings.Contains(buf.String(), rawPass) {
-		t.Fatalf("WR-13-03 VIOLATION: raw brutus credential not registered — leaked to logs:\n%s", buf.String())
+		t.Fatalf("SECRET-AT-REST VIOLATION: raw brutus credential not registered — leaked to logs:\n%s", buf.String())
 	}
 
 	// The redacted findings stream still carries only "***".
@@ -620,10 +621,10 @@ func argValue(args []string, flag string) string {
 }
 
 // -------------------------------------------------------------------------
-// F20 bullet 3 — shared-IP attribution (plan 15-14 Task 3)
+// Shared-IP attribution
 // -------------------------------------------------------------------------
 
-// TestSprayHostsByIPKeepsEveryHostname is the core of the F20 fix. Three
+// TestSprayHostsByIPKeepsEveryHostname is the core of the shared-IP attribution fix. Three
 // unrelated names share 10.0.0.5, as they do on any shared-hosting address or
 // CDN edge. The old index kept the FIRST one and discarded the rest, so a
 // successful credential spray was filed against whichever name happened to be
@@ -654,7 +655,7 @@ func TestSprayHostsByIPKeepsEveryHostname(t *testing.T) {
 	}
 }
 
-// TestSprayAmbiguousIPKeepsIPLocatorAndListsEveryHost is F20's behavioural
+// TestSprayAmbiguousIPKeepsIPLocatorAndListsEveryHost is the shared-IP fix's behavioural
 // assertion: with several names on the address the finding must NOT be
 // attributed to any one of them. Filing a confirmed credential spray against
 // the wrong domain sends a disclosure to a party with no relationship to the
@@ -723,7 +724,7 @@ func TestSprayUnmappableIPKeepsIPLocator(t *testing.T) {
 	}
 }
 
-// TestSprayIPLiteralSurvivesScopeGate is T-15-14-03. Keeping the IP as the
+// TestSprayIPLiteralSurvivesScopeGate is. Keeping the IP as the
 // locator is only correct if an IP-literal finding is actually ADMITTED for an
 // in-scope address. Dropping credential-spray results at the scope boundary is
 // the exact class of silent finding loss an earlier audit fixed, and
@@ -763,7 +764,7 @@ func TestSprayIPLiteralSurvivesScopeGate(t *testing.T) {
 	}
 }
 
-// TestSprayAttributionKeepsCredentialRedacted — the F20 rewrite must not touch
+// TestSprayAttributionKeepsCredentialRedacted — the shared-IP rewrite must not touch
 // XCUT-07. No raw credential may appear in the record or in any log line
 // produced while resolving attribution.
 func TestSprayAttributionKeepsCredentialRedacted(t *testing.T) {
@@ -801,7 +802,7 @@ func TestSprayAttributionKeepsCredentialRedacted(t *testing.T) {
 }
 
 // TestSprayDeterminismCommentIsGone pins the removal of the comment that
-// documented the F20 defect while presenting it as a feature ("the first host
+// documented the first-host-wins defect while presenting it as a feature ("the first host
 // seen for an IP wins, keeping the result deterministic for shared IPs").
 // Determinism is not correctness; a comment asserting otherwise is how the
 // defect survived review.
@@ -813,7 +814,7 @@ func TestSprayDeterminismCommentIsGone(t *testing.T) {
 	body := string(src)
 	if strings.Contains(body, "first host seen for an IP wins") {
 		t.Errorf("spray.go still claims the first host seen for an IP wins — that comment " +
-			"describes the F20 defect as if it were the design")
+			"describes the first-host-wins defect as if it were the design")
 	}
 	if strings.Contains(body, "mapped the service IP back to its in-scope host") {
 		t.Errorf("spray.go still logs a claim the spray result does not support")
@@ -837,12 +838,13 @@ func newSprayIndexApp(t *testing.T, lines ...string) *appctx.AppContext {
 		t.Fatalf("write hosts.jsonl: %v", err)
 	}
 	return &appctx.AppContext{
+		Log:    appctx.NopLogger(),
 		Target: &appctx.Target{Domain: "example.com", WorkDir: workDir},
 	}
 }
 
-// ExecOpts satisfies the backend.Backend options seam added in 18-01. It
-// PRESERVES this fake's pre-18-01 dispatch exactly: Runner.Run used to call
+// ExecOpts satisfies the backend.Backend options seam added with the Runner move. It
+// PRESERVES this fake's pre-Runner dispatch exactly: Runner.Run used to call
 // Backend.Exec and Runner.RunEnv used to call Backend.ExecEnv, and both now
 // arrive here, so the env-set case forwards to ExecEnv and the zero case to Exec.
 //

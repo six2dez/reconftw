@@ -1,5 +1,5 @@
 // bypass4xx_seam_test.go — the proof that vulns.bypass4xx came home to
-// backend.Runner (18-05) AND that it now resolves nomore403 by the same path
+// backend.Runner AND that it now resolves nomore403 by the same path
 // web.nomore403 does.
 //
 // THE CONTROL IS THE PRE-MOVE INVOCATION, captured from bypass4xx.go as it stood
@@ -123,6 +123,7 @@ func newBypass4xxApp(t *testing.T, workDir string, reg *backend.ToolRegistry) *a
 	cfg := config.Defaults()
 	cfg.Vulns.Bypass4xx.Enabled = true
 	return &appctx.AppContext{
+		Log:    appctx.NopLogger(),
 		Tools:  backend.NewRunner(&backend.LocalBackend{}, reg, nil),
 		Cfg:    cfg,
 		Target: &appctx.Target{Domain: "example.com", WorkDir: workDir},
@@ -214,14 +215,14 @@ func TestBypass4xxSkipsWhenUnresolvable(t *testing.T) {
 	}
 	if _, statErr := os.Stat(filepath.Join(workDir, "inputs", "findings.bypass4xx.jsonl")); statErr == nil {
 		t.Errorf("a staging file was written for a run in which nomore403 never dispatched — " +
-			"that lets the findings merge clear a previous run's bypasses (F3 did-not-run)")
+			"that lets the findings merge clear a previous run's bypasses (did-not-run rule)")
 	}
 }
 
 // TestBypass4xxAndNomore403ResolveTheSameBinary is the point of doing these two
 // files together.
 //
-// Before 18-05, web/nomore403.go joined the tools root through
+// Before the Runner move, web/nomore403.go joined the tools root through
 // web.resolveToolsDir and vulns/bypass4xx.go joined it through
 // vulns.resolveToolsDirVulns — two module-local copies of one decision, which is
 // how two call sites for one tool drift apart. Both now ask the registry.
@@ -249,6 +250,7 @@ func TestBypass4xxAndNomore403ResolveTheSameBinary(t *testing.T) {
 	webCfg := config.Defaults()
 	webCfg.Vulns.Bypass4xx.Enabled = true
 	webApp := &appctx.AppContext{
+		Log:    appctx.NopLogger(),
 		Tools:  backend.NewRunner(&backend.LocalBackend{}, reg, nil),
 		Cfg:    webCfg,
 		Target: &appctx.Target{Domain: "example.com", WorkDir: webWork},
@@ -267,7 +269,7 @@ func TestBypass4xxAndNomore403ResolveTheSameBinary(t *testing.T) {
 			"  vulns.bypass4xx ran %q\n"+
 			"  web.nomore403   ran %q\n"+
 			"Two modules independently deciding where a binary lives is how they drifted; "+
-			"after 18-05 both must ask the registry.", vulnsSelf[0], webSelf[0])
+			"after the Runner move both must ask the registry.", vulnsSelf[0], webSelf[0])
 	}
 	if len(vulnsCWD) != 1 || len(webCWD) != 1 || vulnsCWD[0] != webCWD[0] {
 		t.Fatalf("THE TWO MODULES RAN THE TOOL IN DIFFERENT DIRECTORIES: vulns=%v web=%v — "+

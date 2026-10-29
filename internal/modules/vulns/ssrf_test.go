@@ -1,12 +1,12 @@
 // ssrf_test.go — behavior tests for the BOUNDED interactsh-client auto-start
-// that restores SSRF OOB detection (13-07 Task 2).
+// that restores SSRF OOB detection.
 //
 // Internal (package vulns) so the tests override the unexported
 // startInteractshClient seam and drive resolveSSRFCollabSession / SSRFTask.Run
 // directly. The seam is stubbed via a package var — no real interactsh-client
 // binary is spawned, so the tests are hermetic and fast.
 //
-// Coverage (plan 13-07 Task 2 behavior spec):
+// Coverage:
 //   - CollabServer set  → configured server used, NO subprocess (regression guard)
 //   - CollabServer unset + interactsh present → bounded auto-start, OOB payloads
 //   - CollabServer unset + interactsh absent  → in-band only (no crash)
@@ -45,7 +45,7 @@ func newSSRFTestApp(t *testing.T, buf *bytes.Buffer, cfg *config.Config) *appctx
 	reg := backend.NewToolRegistry()
 	reg.Register(&backend.Tool{Name: "ffuf"})
 	be := newSprayFakeBackend() // reused: Stream returns an immediately-closed channel
-	var logger *slog.Logger
+	logger := appctx.NopLogger()
 	if buf != nil {
 		logger = slog.New(slog.NewTextHandler(buf, &slog.HandlerOptions{Level: slog.LevelDebug}))
 	}

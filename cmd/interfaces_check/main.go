@@ -17,7 +17,6 @@
 // That is the canonical BINDING enforcement gate end-to-end:
 //
 //   - var _ task.Task = (*placeholderTask)(nil)          (ADR §5.1)
-//   - var _ task.LifecycleAware = (*placeholderLifecycle)(nil) (ADR §5.1)
 //   - var _ backend.Backend = (*placeholderBackend)(nil) (ADR §5.2)
 //   - var _ appctx.SchedulerRunner = (*placeholderSched)(nil) (Plan 05 cycle-break)
 //
@@ -58,17 +57,6 @@ func (placeholderTask) Enabled(_ *config.Config) bool { return false }
 func (placeholderTask) DependsOn() []string           { return nil }
 func (placeholderTask) Run(_ context.Context, _ *appctx.AppContext) (task.Result, error) {
 	return task.Result{}, nil
-}
-
-// placeholderLifecycle satisfies task.LifecycleAware (optional extension).
-type placeholderLifecycle struct{}
-
-func (placeholderLifecycle) OnStart(_ context.Context, _ *appctx.AppContext) error {
-	return nil
-}
-
-func (placeholderLifecycle) OnEnd(_ context.Context, _ *appctx.AppContext, _ task.Result) error {
-	return nil
 }
 
 // --------------------------------------------------------------------------
@@ -129,7 +117,6 @@ func (placeholderScheduler) MaxConcurrency() int { return 0 }
 
 var (
 	_ task.Task              = (*placeholderTask)(nil)
-	_ task.LifecycleAware    = (*placeholderLifecycle)(nil)
 	_ backend.Backend        = (*placeholderBackend)(nil)
 	_ appctx.SchedulerRunner = (*placeholderScheduler)(nil)
 )

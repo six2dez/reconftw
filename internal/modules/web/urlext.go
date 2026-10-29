@@ -1,4 +1,4 @@
-// urlext.go — WebURLExtTask: sensitive-extension URL bucketing (PAR-04).
+// urlext.go — WebURLExtTask: sensitive-extension URL bucketing.
 //
 // Name: "web.url_ext"  DependsOn: nil (sequential stage; reads the URL corpus)
 //
@@ -10,7 +10,7 @@
 // dead config.
 //
 // The bash reader is .tmp/url_extract_tmp.txt; the Go equivalent is the deduped
-// URL corpus artefacts/urls.jsonl (urldedup.go is its sole writer, WEB-14). This
+// URL corpus artefacts/urls.jsonl (urldedup.go is its sole writer). This
 // task READS that corpus and WRITES the webs/urls_by_ext.txt contract artefact —
 // it never writes the urls artefact.
 //
@@ -19,13 +19,11 @@
 // web.sh:2154) or the URL corpus is empty.
 //
 // WIRING NOTE: self-registered via init(); the stage-list placement (after
-// urls-dedup) is added in plan 13-08. Unit tests exercise Run directly.
+// urls-dedup) is added by the stage wiring. Unit tests exercise Run directly.
 //
-// Symbol hygiene (checker LOW #7): all unexported helpers are urlext*-prefixed so
-// this file, wellknown.go, wordlistgen.go, and portscan.go (13-03) compile
+// Symbol hygiene: all unexported helpers are urlext*-prefixed so
+// this file, wellknown.go, wordlistgen.go, and portscan.go compile
 // together without duplicate-symbol collisions.
-//
-// Source: .planning/phases/13-domain-parity/13-04-PLAN.md Task 1.
 package web
 
 import (
@@ -87,7 +85,7 @@ func (t *WebURLExtTask) Enabled(cfg *config.Config) bool {
 }
 
 // DependsOn returns nil: url_ext is a sequential stage that reads the deduped
-// URL corpus; plan 13-08 places it after urls-dedup in the stage order.
+// URL corpus; the stage order places it after urls-dedup.
 func (t *WebURLExtTask) DependsOn() []string { return nil }
 
 // Run classifies the URL corpus by sensitive extension and writes
@@ -95,17 +93,13 @@ func (t *WebURLExtTask) DependsOn() []string { return nil }
 func (t *WebURLExtTask) Run(_ context.Context, app *appctx.AppContext) (task.Result, error) {
 	// bash guard (web.sh:2154): url_ext is skipped for bare-IP targets.
 	if app.Target != nil && app.Target.IsIP {
-		if app.Log != nil {
-			app.Log.Info("web.url_ext: IP-literal target — skipping (bash parity)")
-		}
+		app.Log.Info("web.url_ext: IP-literal target — skipping (bash parity)")
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
 	urls := urlextReadURLCorpus(app)
 	if len(urls) == 0 {
-		if app.Log != nil {
-			app.Log.Info("web.url_ext: URL corpus empty (no artefacts/urls.jsonl) — skipping")
-		}
+		app.Log.Info("web.url_ext: URL corpus empty (no artefacts/urls.jsonl) — skipping")
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
@@ -158,10 +152,8 @@ func (t *WebURLExtTask) Run(_ context.Context, app *appctx.AppContext) (task.Res
 			fmt.Errorf("web.url_ext: write urls_by_ext.txt: %w", err)
 	}
 
-	if app.Log != nil {
-		app.Log.Debug("web.url_ext: completed",
-			"corpus_urls", len(urls), "extensions", len(buckets), "matched_urls", matched)
-	}
+	app.Log.Debug("web.url_ext: completed",
+		"corpus_urls", len(urls), "extensions", len(buckets), "matched_urls", matched)
 	return task.Result{
 		Status:  task.StatusDone,
 		Outputs: []string{outFile},
@@ -172,13 +164,10 @@ func (t *WebURLExtTask) Run(_ context.Context, app *appctx.AppContext) (task.Res
 // urlextReadURLCorpus reads the deduped URL corpus (artefacts/urls.jsonl) and
 // returns the url-field strings. Reuses extractURLStringsAndSources (urldedup.go)
 // which is the canonical JSONL URL reader. Missing/empty corpus → nil.
+
 func urlextReadURLCorpus(app *appctx.AppContext) []string {
 	corpus := filepath.Join(app.Target.WorkDir, "artefacts", "urls.jsonl")
-	data, err := os.ReadFile(corpus) //nolint:gosec // path within WorkDir
-	if err != nil {
-		return nil
-	}
-	urls, _ := extractURLStringsAndSources(data)
+	urls, _, _ := extractURLStringsAndSources(corpus)
 	return urls
 }
 

@@ -8,10 +8,8 @@
 // STREAM PATTERN (XCUT-09): puredns and long-running dnsx calls use
 // app.Tools.Stream (not Run) so the heartbeat channel fires during long scans.
 //
-// BACKEND-AGNOSTIC (D-05): No task branches on cfg.Axiom. AxiomBackend vs
+// BACKEND-AGNOSTIC: No task branches on cfg.Axiom. AxiomBackend vs
 // LocalBackend dispatch is transparent to tasks via the Runner abstraction.
-//
-// Source: .planning/phases/04-subdomains-e2e-axiom-integration/04-02-PLAN.md Task 1.
 package subdomains
 
 import (
@@ -61,7 +59,7 @@ func runStreamTask(ctx context.Context, app *appctx.AppContext, toolName string,
 		return degradeResolveTool(ctx, app, toolName, err)
 	}
 
-	// F6 (phase 15): ACCUMULATOR shape — latch the terminal Event.Err inside the
+	// ACCUMULATOR shape — latch the terminal Event.Err inside the
 	// loop and check it after. A puredns or dnsx that dies half way through the
 	// resolve leaves a PARTIAL hostname set; staging it would silently shrink
 	// the resolved corpus that every later stage builds on, and the run would
@@ -144,7 +142,7 @@ func runExecTask(ctx context.Context, app *appctx.AppContext, toolName string, a
 // resolved staging file, or REMOVES that file when lines is empty. Returns the
 // staging path in both cases.
 //
-// F3 (phase 15): write-or-REMOVE via output.StageLines, same contract as
+// Write-or-REMOVE via output.StageLines, same contract as
 // writeStagingFile (passive) and writeScrapingStagingFile. It previously wrote
 // an EMPTY file for zero hostnames, which is equivalent for the glob-based
 // MergeAllSubdomains but leaves "the resolver ran and resolved nothing"
@@ -189,7 +187,7 @@ func normalizeHost(s string) string {
 
 // inScope reports whether host is within the configured scope. It reuses the
 // canonical app.Tree.InScope check (the same anchored filter MergeStage uses) —
-// T-13-01-01 mitigation: reverse-IP/dnsregs output can include off-scope hosts.
+// Reverse-IP/dnsregs output can include off-scope hosts, so it is filtered.
 // Returns true when no tree/scope filter is configured (tests, unscoped runs);
 // MergeStage remains the final authority.
 func inScope(app *appctx.AppContext, host string) bool {
@@ -387,10 +385,8 @@ func degradeResolveTool(ctx context.Context, app *appctx.AppContext, toolName st
 		return task.Result{Status: task.StatusErrored},
 			fmt.Errorf("%s: %w", toolName, cause)
 	}
-	if app.Log != nil {
-		app.Log.Warn("resolve: tool failed (non-fatal degrade)",
-			"tool", toolName, "error", cause.Error())
-	}
+	app.Log.Warn("resolve: tool failed (non-fatal degrade)",
+		"tool", toolName, "error", cause.Error())
 	stagingPath, writeErr := writeResolvedStagingFile(app, toolName, nil)
 	if writeErr != nil {
 		return task.Result{Status: task.StatusErrored}, writeErr
@@ -434,10 +430,8 @@ func (SubActiveTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resu
 	// resolver list. Same rule as the brute.go header: runtime conditions live
 	// in Run(), because Scheduler.runOne never calls Enabled().
 	if !resolverListUsable(cfg.Paths.Resolvers) {
-		if app.Log != nil {
-			app.Log.Error("resolve: no usable DNS resolver list",
-				"resolver_file", cfg.Paths.Resolvers, "tool", toolName)
-		}
+		app.Log.Error("resolve: no usable DNS resolver list",
+			"resolver_file", cfg.Paths.Resolvers, "tool", toolName)
 		return task.Result{Status: task.StatusErrored}, errNoResolvers(cfg.Paths.Resolvers, nil)
 	}
 
@@ -474,7 +468,7 @@ func (SubActiveTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resu
 	activePath := resolvedStagingPath(app, "active")
 	if defaultPath != activePath {
 		if renameErr := os.Rename(defaultPath, activePath); renameErr != nil {
-			// F3 (phase 15): the rename source is ABSENT precisely when this run
+			// The rename source is ABSENT precisely when this run
 			// resolved nothing — writeResolvedStagingFile removed it. Leaving
 			// the rename to fail silently would strand a PREVIOUS run's
 			// resolved.active.txt for MergeAllSubdomains to republish, which is
@@ -483,10 +477,8 @@ func (SubActiveTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resu
 			// sees. Any other rename failure is still non-fatal.
 			if os.IsNotExist(renameErr) {
 				if rmErr := os.Remove(activePath); rmErr != nil && !os.IsNotExist(rmErr) {
-					if app.Log != nil {
-						app.Log.Debug("subdomains.active: clear stale active staging failed",
-							"path", activePath, "err", rmErr)
-					}
+					app.Log.Debug("subdomains.active: clear stale active staging failed",
+						"path", activePath, "err", rmErr)
 				}
 			}
 		}
@@ -537,6 +529,12 @@ func (SubTLSTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result,
 		"-cn",
 		"-silent",
 		"-ro",
+	}
+	// advanced.tools.tlsx.threads (v1 TLSX_THREADS) → "-c/-concurrency"; 0 keeps
+	// the tool default. Migrated and defaulted to 1000, read by nothing until
+	// now.
+	if n := app.Cfg.Advanced.Tools.TLSX.Threads; n > 0 {
+		args = append(args, "-c", strconv.Itoa(n))
 	}
 	return runStreamTask(ctx, app, toolName, args)
 }
@@ -654,10 +652,8 @@ func (SubDNSTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result,
 		}
 		// Non-fatal tool degrade: log + continue with empty records so one flaky
 		// resolver does not abort the fail_fast subs stage (bash CONTINUE_ON_TOOL_ERROR).
-		if app.Log != nil {
-			app.Log.Warn("resolve: dnsx recon failed (non-fatal degrade)",
-				"tool", toolName, "error", err.Error())
-		}
+		app.Log.Warn("resolve: dnsx recon failed (non-fatal degrade)",
+			"tool", toolName, "error", err.Error())
 	} else {
 		dnsregs = res.Stdout
 	}
@@ -700,7 +696,7 @@ func (SubDNSTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result,
 	}
 
 	// hakip2host reverse-IP fold (gated). Adds in-scope hostnames to the same set.
-	// DEFER (→ Phase 14): the ip.thc.org curl reverse source (bash sub_dns:937-946)
+	// DEFERRED: the ip.thc.org curl reverse source (bash sub_dns:937-946)
 	// is a secondary/niche provider and is intentionally NOT ported here.
 	if cfg.Subdomains.ReverseIP.Enabled {
 		for _, h := range reverseIPHosts(ctx, app, pubIPs.list()) {
@@ -761,12 +757,12 @@ func (SubSRVTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result,
 	return runExecTask(ctx, app, toolName, args)
 }
 
-// SubPTRTask REMOVED (13-01 Task 2): it was dead code — it read inputs/asn.ips.txt
+// SubPTRTask REMOVED: it was dead code — it read inputs/asn.ips.txt
 // which no task ever writes, and it ran in the resolve stage BEFORE the asn task
 // that would produce IPs. The default-path reverse-IP capability is now covered by
 // the hakip2host fold in SubDNSTask (reverseip.go). The full ASN-CIDR PTR sweep
 // (bash sub_ptr_cidrs, gated PTR_SWEEP=false by default — not on the recon/all
-// default path) is DEFERRED to Phase 14; the SubPTRSweep config struct + PTRSweep
+// default path) is DEFERRED; the SubPTRSweep config struct + PTRSweep
 // default are retained as dead scaffold for that deferred feature.
 
 // -------------------------------------------------------------------------

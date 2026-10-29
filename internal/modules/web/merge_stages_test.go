@@ -1,11 +1,11 @@
 // merge_stages_test.go — completeness guard for directArtefactWriterStages.
 //
-// Plan 15-03 Task 2 gave web.MergeStage a never-truncate rule for the four
+// web.MergeStage carries a never-truncate rule for the four
 // merged stages whose artefact ALSO has a direct app.Tree.Append writer outside
 // the merge path. That rule is only correct while the set is COMPLETE: if
 // someone adds a direct artefact writer for a merged stage and forgets to
 // declare it, the merge silently starts truncating an artefact it does not own
-// — reintroducing exactly the data loss 15-03 fixed.
+// — reintroducing exactly the data loss that rule fixed.
 //
 // This test AST-scans the four module packages for app.Tree.Append("<literal>")
 // calls outside merge.go and asserts the two directions:
@@ -142,7 +142,7 @@ func TestDirectArtefactWriterStagesComplete(t *testing.T) {
 
 // TestArtefactSeedStagesIsHostsOnly pins the OTHER named set. Widening it to
 // "urls" would re-import the pre-dedup staging URLs on top of urldedup's
-// deduplicated artefact and undo WEB-14; the two sets encode different
+// deduplicated artefact and undo the single-writer rule; the two sets encode different
 // concerns and must not be conflated.
 func TestArtefactSeedStagesIsHostsOnly(t *testing.T) {
 	if len(artefactSeedStages) != 1 || !artefactSeedStages["hosts"] {

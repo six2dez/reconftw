@@ -7,13 +7,10 @@
 //
 // JSONL SCHEMAS (downstream contract):
 //   - SubdomainRecord: written to artefacts/subdomains.jsonl by MergeStage.
-//   - TakeoverRecord:  written to artefacts/findings.jsonl by Phase 4 plan-02.
-//   - BucketRecord:    written to artefacts/buckets.jsonl by Phase 4 plan-02.
-//   - ASNRecord:       written to artefacts/asns.jsonl by Phase 4 plan-05.
-//   - HostRecord:      written to artefacts/hosts.jsonl by Phase 5.
-//
-// Source: .planning/phases/04-subdomains-e2e-axiom-integration/04-01-PLAN.md
-// Task 1 Step B (record schemas) + Task 2 (Task implementations).
+//   - TakeoverRecord:  staged by the takeover tasks, merged into artefacts/findings.jsonl.
+//   - BucketRecord:    written to artefacts/buckets.jsonl by SubBucketsTask.
+//   - ASNRecord:       written to artefacts/asns.jsonl by SubASNTask.
+//   - HostRecord:      written to artefacts/hosts.jsonl by SubGeoTask and web/httpx.
 package subdomains
 
 import (
@@ -35,7 +32,7 @@ import (
 )
 
 // -------------------------------------------------------------------------
-// JSONL Record Types (exported — downstream contract for Phase 5 + Phase 10)
+// JSONL Record Types (exported — downstream contract for web, monitor and reports)
 // -------------------------------------------------------------------------
 
 // SubdomainRecord is the JSONL schema for artefacts/subdomains.jsonl.
@@ -47,7 +44,7 @@ type SubdomainRecord struct {
 }
 
 // TakeoverRecord is the JSONL schema for artefacts/findings.jsonl (takeover class).
-// Written by TakeoverSubzyTask / TakeoverDNSTakeTask in Phase 4 plan-02.
+// Written by TakeoverSubzyTask / TakeoverDNSTakeTask.
 type TakeoverRecord struct {
 	Type       string   `json:"type"`
 	Host       string   `json:"host"`
@@ -58,7 +55,7 @@ type TakeoverRecord struct {
 }
 
 // BucketRecord is the JSONL schema for artefacts/buckets.jsonl.
-// Written by S3BucketsTask in Phase 4 plan-02.
+// Written by SubBucketsTask.
 type BucketRecord struct {
 	Provider string `json:"provider"`
 	Name     string `json:"name"`
@@ -67,7 +64,7 @@ type BucketRecord struct {
 }
 
 // ASNRecord is the JSONL schema for artefacts/asns.jsonl.
-// Written by ASNTask in Phase 4 plan-05.
+// Written by SubASNTask.
 type ASNRecord struct {
 	ASN   string   `json:"asn"`
 	Org   string   `json:"org"`
@@ -75,7 +72,7 @@ type ASNRecord struct {
 }
 
 // HostRecord is the JSONL schema for artefacts/hosts.jsonl.
-// Written by the web/hosts pipeline in Phase 5.
+// Written by SubGeoTask and the web/hosts pipeline.
 type HostRecord struct {
 	Host    string `json:"host"`
 	IP      string `json:"ip"`
@@ -131,7 +128,7 @@ const defaultSubfinderMaxTimeMinutes = 180
 // subfinderMaxTimeMinutes returns the value for subfinder's -max-time flag in
 // the unit subfinder documents.
 //
-// CR-07. `subfinder -h` on v2.14.0:
+// `subfinder -h` on v2.14.0:
 //
 //	-timeout int   seconds to wait before timing out (default 30)
 //	-max-time int  minutes to wait for enumeration results (default 10)
@@ -146,14 +143,14 @@ const defaultSubfinderMaxTimeMinutes = 180
 // The WARN below exists because the same inversion can return through config:
 // the process deadline in tools.lock silently wins over any -max-time larger
 // than itself, and a budget that is silently overruled is exactly the shape
-// this phase is removing. Nothing is clamped — the operator's configured value
+// being removed. Nothing is clamped — the operator's configured value
 // is still what subfinder is asked for — but the run says so.
 func subfinderMaxTimeMinutes(app *appctx.AppContext) int {
 	minutes := defaultSubfinderMaxTimeMinutes
 	if app.Cfg != nil && app.Cfg.Advanced.Tools.Subfinder.TimeoutMinutes > 0 {
 		minutes = app.Cfg.Advanced.Tools.Subfinder.TimeoutMinutes
 	}
-	if app.Log == nil || app.Tools == nil || app.Tools.Registry == nil {
+	if app.Tools == nil || app.Tools.Registry == nil {
 		return minutes
 	}
 	tool, ok := app.Tools.Registry.Lookup("subfinder")
@@ -293,7 +290,7 @@ func (GithubSubdomainsTask) Run(ctx context.Context, app *appctx.AppContext) (ta
 	const toolName = "github-subdomains"
 	tokenFile := app.Cfg.Paths.GitHubTokens
 
-	// Read token content so we can register it as a secret (XCUT-07 T-04-01-02).
+	// Read token content so we can register it as a secret (XCUT-07).
 	tokenBytes, err := os.ReadFile(tokenFile) //nolint:gosec // path validated at Target creation
 	if err != nil {
 		return task.Result{Status: task.StatusErrored},
@@ -315,7 +312,7 @@ func (GithubSubdomainsTask) Run(ctx context.Context, app *appctx.AppContext) (ta
 	if tokenStr != "" && app.Secrets != nil {
 		app.Secrets.Register(tokenStr)
 	}
-	if tokenStr != "" && app.Log != nil {
+	if tokenStr != "" {
 		app.Log.Debug("github-subdomains: token file loaded",
 			"file", tokenFile,
 			"len", len(tokenStr),
@@ -357,7 +354,7 @@ func (GitlabSubdomainsTask) Run(ctx context.Context, app *appctx.AppContext) (ta
 	const toolName = "gitlab-subdomains"
 	tokenFile := app.Cfg.Paths.GitLabTokens
 
-	// Read token content so we can register it as a secret (XCUT-07 T-04-01-02).
+	// Read token content so we can register it as a secret (XCUT-07).
 	tokenBytes, err := os.ReadFile(tokenFile) //nolint:gosec // path validated at Target creation
 	if err != nil {
 		return task.Result{Status: task.StatusErrored},
@@ -379,7 +376,7 @@ func (GitlabSubdomainsTask) Run(ctx context.Context, app *appctx.AppContext) (ta
 	if tokenStr != "" && app.Secrets != nil {
 		app.Secrets.Register(tokenStr)
 	}
-	if tokenStr != "" && app.Log != nil {
+	if tokenStr != "" {
 		app.Log.Debug("gitlab-subdomains: token file loaded",
 			"file", tokenFile,
 			"len", len(tokenStr),
@@ -429,7 +426,7 @@ func (UrlfinderTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resu
 //
 // It used to say "Tasks with special dispatch (HackertargetTask) call
 // writeStagingFile directly instead". That task was the only exception and it
-// was deleted in 17-07 (CR-05): it ran `httpx -silent -u <api url>` and parsed
+// was deleted: it ran `httpx -silent -u <api url>` and parsed
 // the result as the API response body, but httpx prints the PROBED URL, so the
 // URL itself was staged as a hostname and the task reported one subdomain found
 // on every run. There is no longer a special-dispatch passive Task; a future one
@@ -468,7 +465,7 @@ func runPassiveTask(ctx context.Context, app *appctx.AppContext, toolName string
 // both cases (the caller records it in task.Result.Outputs, which is stored as
 // a string and never stat-ed).
 //
-// F3 (phase 15): this is write-or-REMOVE via output.StageLines. Calling it is
+// This is write-or-REMOVE via output.StageLines. Calling it is
 // the statement "this passive source RAN and these are ALL the hostnames it saw
 // this invocation", so a zero-result run clears the file instead of leaving the
 // previous run's hostnames for MergeAllSubdomains to republish. A task skipped

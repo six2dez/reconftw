@@ -69,7 +69,7 @@ func TestTaskInterfaceMatchesADR(t *testing.T) {
 // divergence) — instead, this test asserts that the upgraded
 // cmd/interfaces_check/main.go references the canonical pieces of
 // ADR §5.1: imports the real internal/core/task package and declares
-// compile-time assertions on task.Task + task.LifecycleAware.
+// compile-time assertions on task.Task.
 //
 // Plan 03-07 Task 3 UPGRADED this file from placeholder `interface{}`
 // types to real `internal/core/{task,backend,appctx,config}` imports
@@ -92,10 +92,10 @@ func TestInterfacesCheckSignaturesMatch(t *testing.T) {
 		`"github.com/six2dez/reconftw/internal/core/backend"`,
 		`"github.com/six2dez/reconftw/internal/core/appctx"`,
 		`"github.com/six2dez/reconftw/internal/core/config"`,
-		// Compile-time assertions on Task + LifecycleAware (ADR §5.1) + Backend (§5.2)
-		// + SchedulerRunner (Plan 05 cycle-break).
+		// Compile-time assertions on Task (ADR §5.1) + Backend (§5.2)
+		// + SchedulerRunner (Plan 05 cycle-break). LifecycleAware is gone:
+		// it had no implementer and the Scheduler invoked it with a nil app.
 		"_ task.Task = (*placeholderTask)(nil)",
-		"_ task.LifecycleAware = (*placeholderLifecycle)(nil)",
 		"_ backend.Backend = (*placeholderBackend)(nil)",
 		"_ appctx.SchedulerRunner = (*placeholderScheduler)(nil)",
 		// Run signature on the placeholder concrete type — must match real shape.

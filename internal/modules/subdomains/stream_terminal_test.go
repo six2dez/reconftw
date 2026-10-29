@@ -1,4 +1,4 @@
-// stream_terminal_test.go — F6 (phase 15, plan 15-13 Task 2) acceptance gate 5
+// stream_terminal_test.go — terminal-stream acceptance gate 5
 // for the subdomains package, asserted in BOTH directions.
 //
 // This package is where getting the direction wrong is most expensive.
@@ -76,6 +76,7 @@ func newStreamApp(t *testing.T, workDir string, be backend.Backend, tools ...str
 	cfg.Subdomains.DNSResolve.PurednsPublicLimit = 5000
 	cfg.Subdomains.DNSResolve.PurednsTrustedLimit = 5000
 	return &appctx.AppContext{
+		Log:    appctx.NopLogger(),
 		Tools:  backend.NewRunner(be, reg, nil),
 		Tree:   &mockTree{},
 		Cfg:    cfg,
@@ -193,7 +194,7 @@ func TestSubBruteExitSevenErrorsAndStagesNothing(t *testing.T) {
 // StatusErrored on an absent binary — which comes from app.Tools.Run, not from
 // any stream — is tolerated. What this plan must guarantee is narrower and is
 // what is asserted here: the absent-tool outcome is still the DISPATCH error and
-// was NOT converted into a terminal-stream error by the F6 migration.
+// was NOT converted into a terminal-stream error by the terminal-stream migration.
 func TestSubdomainsPassiveAbsentToolNotEscalated(t *testing.T) {
 	absent := errors.New("executable file not found in $PATH")
 
@@ -209,7 +210,7 @@ func TestSubdomainsPassiveAbsentToolNotEscalated(t *testing.T) {
 			_, err := lookupSubTask(t, taskName).Run(context.Background(), app)
 			if err != nil && strings.Contains(err.Error(), "tool stream ended badly") {
 				t.Errorf("%s: an ABSENT tool was reported as a terminal stream failure — "+
-					"the F6 migration must never convert a dispatch error into one: %v",
+					"the terminal-stream migration must never convert a dispatch error into one: %v",
 					taskName, err)
 			}
 			// No staging may be produced either way: the source never ran.
@@ -267,8 +268,8 @@ func lookupSubTask(t *testing.T, name string) task.Task {
 	return tsk
 }
 
-// ExecOpts satisfies the backend.Backend options seam added in 18-01. It
-// PRESERVES this fake's pre-18-01 dispatch exactly: Runner.Run used to call
+// ExecOpts satisfies the backend.Backend options seam. It PRESERVES this
+// fake's original dispatch exactly: Runner.Run used to call
 // Backend.Exec and Runner.RunEnv used to call Backend.ExecEnv, and both now
 // arrive here, so the env-set case forwards to ExecEnv and the zero case to Exec.
 //

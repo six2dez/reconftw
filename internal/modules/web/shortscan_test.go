@@ -1,5 +1,5 @@
 // shortscan_test.go — the proof that web.shortscan came home to backend.Runner
-// (18-04) by an EXPLICIT VERDICT rather than by grandfathering.
+// by an EXPLICIT VERDICT rather than by grandfathering.
 //
 // THE CONTROL IS THE PRE-MOVE ARG VECTOR, captured from shortscan.go as it stood
 // at f436d2e BEFORE the edit:
@@ -60,6 +60,7 @@ func newShortscanTestApp(t *testing.T, workDir, toolPath string) *appctx.AppCont
 	cfg := config.Defaults()
 	cfg.Web.IISShortname.Enabled = true
 	return &appctx.AppContext{
+		Log:    appctx.NopLogger(),
 		Tools:  backend.NewRunner(&backend.LocalBackend{}, reg, nil),
 		Cfg:    cfg,
 		Target: &appctx.Target{Domain: "example.com", WorkDir: workDir, Scope: []string{"*.example.com"}},
@@ -163,7 +164,7 @@ func TestShortscanIsRecorded(t *testing.T) {
 }
 
 // TestShortscanUnavailableToolStatusUnchanged pins the FAILURE POLICY across the
-// move (T-18-04-04): the exec.LookPath gate returned StatusSkipped, and so must
+// move: the exec.LookPath gate returned StatusSkipped, and so must
 // the dispatch-failure arm — including NOT clearing a previous run's staging.
 func TestShortscanUnavailableToolStatusUnchanged(t *testing.T) {
 	workDir := seedShortscanWorkspace(t)
@@ -188,11 +189,11 @@ func TestShortscanUnavailableToolStatusUnchanged(t *testing.T) {
 	}
 }
 
-// TestShortscanKeepsFindingsCollectedBeforeADispatchFailure pins the WR-06 fix.
+// TestShortscanKeepsFindingsCollectedBeforeADispatchFailure pins the latch-not-return fix.
 //
 // The loop returned StatusSkipped from INSIDE itself on the first dispatch
 // failure, throwing away every finding earlier iterations had collected. With
-// CR-04 fixed a rate-limiter or context error mid-loop IS a dispatch failure, so a
+// A rate-limiter or context error mid-loop IS a dispatch failure, so a
 // Ctrl-C or a task deadline part-way through reaches that arm and silently
 // discarded a partial but perfectly valid result set.
 //

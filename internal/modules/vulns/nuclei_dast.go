@@ -6,7 +6,7 @@
 // DEPENDENCY: DependsOn ["vulns.gf"] — reads inputs/gf/*.txt buckets (all classes).
 //
 // INPUT CONTRACT:
-//   - artefacts/urls.jsonl   (deduped URL corpus from Phase 5)
+//   - artefacts/urls.jsonl   (deduped URL corpus from the web stage)
 //   - inputs/gf/*.txt        (per-class buckets from GFTask)
 //   - Both merged+deduped into inputs/nuclei_dast_targets.txt
 //
@@ -23,18 +23,16 @@
 // Backend.Stream used — nuclei DAST can run for hours on large URL corpora.
 // The UI must never appear stuck.
 //
-// DEEP_LIMIT2 GATE (T-06-07-03):
+// DEEP_LIMIT2 GATE:
 // If URL count > cfg.Advanced.DeepLimit2 and !cfg.Advanced.Deep → StatusSkipped.
 // Mirrors v1 nuclei_dast() DEEP_LIMIT2 check (vulns.sh:1041).
 //
-// PAYLOAD REDACTION (XCUT-07, T-06-07-01):
+// PAYLOAD REDACTION (XCUT-07):
 // nuclei DAST matched-at and extracted-results contain raw payload/response
 // data — NEVER logged at Info/Warn. Only template-id + severity + count.
 // PayloadRedacted = "***" always.
 //
 // Config: cfg.Vulns.NucleiDAST (VulnNucleiDAST) — NOT cfg.Web.NucleiDAST.
-//
-// Source: .planning/phases/06-vulnerability-scanning-e2e/06-07-PLAN.md Task 1.
 package vulns
 
 import (
@@ -79,7 +77,7 @@ func (t *NucleiDASTTask) DependsOn() []string { return []string{"vulns.gf"} }
 // Run executes the nuclei DAST pipeline:
 //  1. Collect targets: merge artefacts/urls.jsonl + inputs/gf/*.txt; dedup.
 //  2. Write inputs/nuclei_dast_targets.txt.
-//  3. Deep-limit gate (T-06-07-03).
+//  3. Deep-limit gate.
 //  4. Resolve dastTemplatesPath from cfg.Vulns.NucleiDAST.TemplatesPath (fallback cfg.Paths.NucleiTemplates+"/dast").
 //  5. Run nuclei -dast via Backend.Stream (XCUT-09 heartbeat).
 //  6. Drain stream; parse staging file; build VulnFindingRecord slice (XCUT-07 redaction).
@@ -95,15 +93,13 @@ func (t *NucleiDASTTask) Run(ctx context.Context, app *appctx.AppContext) (task.
 			fmt.Errorf("vulns.nuclei_dast: mkdir inputs/: %w", err)
 	}
 
-	// Step 1: Collect targets — URL corpus (D-V5) + inputs/gf/*.txt.
+	// Step 1: Collect targets — URL corpus + inputs/gf/*.txt.
 	targetURLs, err := collectNucleiDASTTargets(ctx, app, workDir)
-	if err != nil && app.Log != nil {
+	if err != nil {
 		app.Log.Debug("vulns.nuclei_dast: target collection error (best_effort)", "err", err)
 	}
 	if len(targetURLs) == 0 {
-		if app.Log != nil {
-			app.Log.Info("vulns.nuclei_dast: no targets from URL corpus + gf buckets — skipping")
-		}
+		app.Log.Info("vulns.nuclei_dast: no targets from URL corpus + gf buckets — skipping")
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
@@ -114,16 +110,14 @@ func (t *NucleiDASTTask) Run(ctx context.Context, app *appctx.AppContext) (task.
 			fmt.Errorf("vulns.nuclei_dast: write targets file: %w", err)
 	}
 
-	// Step 3: Deep-limit gate (T-06-07-03, mirrors v1 DEEP_LIMIT2 check).
+	// Step 3: Deep-limit gate (mirrors v1 DEEP_LIMIT2 check).
 	deepLimit2 := cfg.Advanced.DeepLimit2
 	if deepLimit2 <= 0 {
 		deepLimit2 = 5000 // v1 default DEEP_LIMIT2
 	}
 	if !cfg.Advanced.Deep && len(targetURLs) > deepLimit2 {
-		if app.Log != nil {
-			app.Log.Info("vulns.nuclei_dast: too many URLs — skipped (use --deep to override)",
-				"url_count", len(targetURLs), "deep_limit2", deepLimit2)
-		}
+		app.Log.Info("vulns.nuclei_dast: too many URLs — skipped (use --deep to override)",
+			"url_count", len(targetURLs), "deep_limit2", deepLimit2)
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
@@ -135,10 +129,8 @@ func (t *NucleiDASTTask) Run(ctx context.Context, app *appctx.AppContext) (task.
 		dastTemplates = filepath.Join(cfg.Paths.NucleiTemplates, "dast")
 	}
 	if _, statErr := os.Stat(dastTemplates); statErr != nil {
-		if app.Log != nil {
-			app.Log.Info("vulns.nuclei_dast: dast templates path not accessible — skipping",
-				"path", dastTemplates, "err", statErr)
-		}
+		app.Log.Info("vulns.nuclei_dast: dast templates path not accessible — skipping",
+			"path", dastTemplates, "err", statErr)
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
@@ -162,14 +154,14 @@ func (t *NucleiDASTTask) Run(ctx context.Context, app *appctx.AppContext) (task.
 	rawOutFile := filepath.Join(inputsDir, "nuclei_dast_raw.jsonl")
 	// Discard any previous run's raw output BEFORE dispatching: nuclei creates
 	// the file lazily, so a run that finds nothing would otherwise be handed the
-	// last run's hits and republish them as this run's findings (F3).
-	if rmErr := os.Remove(rawOutFile); rmErr != nil && !os.IsNotExist(rmErr) && app.Log != nil {
+	// last run's hits and republish them as this run's findings (run isolation).
+	if rmErr := os.Remove(rawOutFile); rmErr != nil && !os.IsNotExist(rmErr) {
 		app.Log.Debug("vulns.nuclei_dast: could not clear stale raw output",
 			"path", rawOutFile, "err", rmErr)
 	}
 
 	// Step 5: Build arg vector and run via Backend.Stream.
-	// -duc: disable update check (T-06-07-02 — mandatory; dev Mac DNS block).
+	// -duc: disable update check (mandatory; dev Mac DNS block).
 	args := []string{
 		"-l", targetsFile,
 		"-dast",
@@ -191,15 +183,13 @@ func (t *NucleiDASTTask) Run(ctx context.Context, app *appctx.AppContext) (task.
 	eventCh, streamErr := app.Tools.Stream(ctx, toolName, args)
 	// nucleiRan records whether nuclei was actually DISPATCHED. A dispatch
 	// failure means the binary is absent: the task observed nothing and must not
-	// clear a previous run's staging (F3 did-not-run — staging.go).
+	// clear a previous run's staging (did-not-run rule — staging.go).
 	nucleiRan := streamErr == nil
 	if streamErr != nil {
-		if app.Log != nil {
-			app.Log.Debug("vulns.nuclei_dast: stream error (best_effort)", "err", streamErr)
-		}
+		app.Log.Debug("vulns.nuclei_dast: stream error (best_effort)", "err", streamErr)
 		// Non-fatal per best_effort policy.
 	} else {
-		// F6 (phase 15): consume the TERMINAL error. The very next statement reads
+		// Terminal error: consume the TERMINAL error. The very next statement reads
 		// rawOutFile, so a nuclei killed by OOM or dying on a bad template used to
 		// lead straight to parsing a TRUNCATED file — or, when it died before
 		// writing anything, whatever a PREVIOUS run left at that path. Return
@@ -215,15 +205,13 @@ func (t *NucleiDASTTask) Run(ctx context.Context, app *appctx.AppContext) (task.
 	// Step 6: Parse staging file → VulnFindingRecord slice.
 	data, readErr := os.ReadFile(rawOutFile) //nolint:gosec // path within WorkDir
 	if readErr != nil && !os.IsNotExist(readErr) {
-		if app.Log != nil {
-			app.Log.Debug("vulns.nuclei_dast: read staging file error", "err", readErr)
-		}
+		app.Log.Debug("vulns.nuclei_dast: read staging file error", "err", readErr)
 	}
 	findings := parseNucleiDAST(data)
 
 	// Step 7: Write inputs/findings.nuclei_dast.jsonl (staging contract — doc.go).
 	//
-	// F3 (phase 15): staged through stageVulnFindings so a clean DAST run REMOVES
+	// Run isolation: staged through stageVulnFindings so a clean DAST run REMOVES
 	// the previous run's staging instead of republishing findings that have since
 	// been remediated. The staging NAME is unchanged — it is the file the
 	// inputs/findings.*.jsonl merge glob reaches.
@@ -231,9 +219,7 @@ func (t *NucleiDASTTask) Run(ctx context.Context, app *appctx.AppContext) (task.
 	stageVulnFindings(app, "vulns.nuclei_dast", stagingPath, nucleiRan, findings)
 
 	// XCUT-07: log only template-id + severity + count, never raw matched-at / extracted-results.
-	if app.Log != nil {
-		app.Log.Info("vulns.nuclei_dast: completed", "findings", len(findings))
-	}
+	app.Log.Info("vulns.nuclei_dast: completed", "findings", len(findings))
 
 	return task.Result{
 		Status: task.StatusDone,
@@ -241,14 +227,14 @@ func (t *NucleiDASTTask) Run(ctx context.Context, app *appctx.AppContext) (task.
 	}, nil
 }
 
-// collectNucleiDASTTargets merges the D-V5 URL corpus (--urls ctx > artefacts/urls.jsonl)
+// collectNucleiDASTTargets merges the URL corpus (--urls ctx > artefacts/urls.jsonl)
 // with all inputs/gf/*.txt bucket files, deduplicating entries. Returns a
 // stable slice of unique URLs.
 //
 // This mirrors v1 _nuclei_dast_collect_targets() (vulns.sh:1016-1036):
 // reads webs/webs_all.txt + webs/url_extract_nodupes.txt + all gf/*.txt.
 //
-// D-V5 fix: Source 1 now resolves via resolveURLInput so --urls seed file
+// fix: Source 1 now resolves via resolveURLInput so --urls seed file
 // is honoured instead of always reading artefacts/urls.jsonl directly.
 func collectNucleiDASTTargets(ctx context.Context, app *appctx.AppContext, workDir string) ([]string, error) {
 	seen := make(map[string]struct{})
@@ -265,7 +251,7 @@ func collectNucleiDASTTargets(ctx context.Context, app *appctx.AppContext, workD
 		}
 	}
 
-	// Source 1: D-V5 URL corpus — resolveURLInput honors --urls ctx > artefacts/urls.jsonl.
+	// Source 1: URL corpus — resolveURLInput honors --urls ctx > artefacts/urls.jsonl.
 	corpusURLs, _ := readURLsWithCtx(ctx, app)
 	for _, u := range corpusURLs {
 		addURL(u)
@@ -339,10 +325,10 @@ func parseNucleiDAST(data []byte) []VulnFindingRecord {
 			// values as hostnames, rejected every DAST finding. findingHost
 			// reduces either form to the hostname and drops the port.
 			Host: findingHost(nl.Host),
-			// Phase 4/5 SARIF-compatible fields.
+			// Base SARIF-compatible fields.
 			Severity:   nl.Info.Severity,
 			Confidence: "high",
-			// Phase 6 vuln-class fields.
+			// Vuln-class fields.
 			VulnClass:       vulnClass,
 			PayloadRedacted: "***", // XCUT-07: raw DAST payload never stored
 			Engine:          "nuclei-dast",

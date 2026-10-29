@@ -1,4 +1,4 @@
-// urlext_test.go — behavior tests for WebURLExtTask (13-04 Task 1).
+// urlext_test.go — behavior tests for WebURLExtTask .
 //
 // Internal (package web) so the pure-transform helpers (urlextExtOf) and the
 // shared fakeToolBackend (portscan_test.go) are reachable. The zero-tool-call
@@ -24,6 +24,7 @@ func newURLExtTestApp(t *testing.T, isIP bool) *appctx.AppContext {
 	cfg := &config.Config{}
 	cfg.Web.URLs.ExtClassify = true
 	return &appctx.AppContext{
+		Log:    appctx.NopLogger(),
 		Target: &appctx.Target{Domain: "example.com", WorkDir: t.TempDir(), IsIP: isIP},
 		Cfg:    cfg,
 	}

@@ -1,16 +1,16 @@
 // bypass4xx.go — Bypass4xxTask: nomore403 4xx bypass scanner (VULN-13).
 //
-// Bypass4xxTask reads artefacts/fuzz.jsonl (Phase 5 ffuf output), filters for
+// Bypass4xxTask reads artefacts/fuzz.jsonl (web-stage ffuf output), filters for
 // 4xx responses excluding 404, and runs nomore403 to discover bypass techniques.
 //
 // DEPENDENCY: DependsOn ["vulns.gf"] — follows the vulns DAG root; inputs
-// come from Phase 5 web run (artefacts/fuzz.jsonl), not from GFTask directly.
+// come from the web run (artefacts/fuzz.jsonl), not from GFTask directly.
 //
 // REPO-CLONE BINARY (mirrors web/nomore403.go Pitfall 2):
 // nomore403 is NOT a `go install` tool. It is cloned from GitHub and built
 // locally, at <tools_dir>/nomore403/nomore403.
 //
-// 18-05: IT COMES HOME, ALONGSIDE web/nomore403.go AND BY THE SAME PATH. That
+// IT COMES HOME, ALONGSIDE web/nomore403.go AND BY THE SAME PATH. That
 // sameness is the point of doing the two together. Both files used to join the
 // tools root THEMSELVES — this one through resolveToolsDirVulns, the other
 // through web.resolveToolsDir — so two modules independently decided where one
@@ -18,7 +18,7 @@
 // TestBypass4xxAndNomore403ResolveTheSameBinary asserts they get the same
 // answer.
 //
-// CRITICAL (T-05-16 mitigation carried to vulns phase), unchanged as a
+// CRITICAL (a path-containment mitigation carried over from web), unchanged as a
 // REQUIREMENT: nomore403 must run with its own directory as cwd because it
 // resolves its payload wordlists relative to it. That cwd now comes from
 // Tool.WorkDir (tools.lock clone_workdir = true), NOT from an ExecOptions.Dir
@@ -43,8 +43,6 @@
 // PAYLOAD REDACTION (XCUT-07):
 // nomore403 stdout bypass lines contain target URL path info.
 // PayloadRedacted = "***" always. PoCRedacted = "***" always.
-//
-// Source: .planning/phases/06-vulnerability-scanning-e2e/06-07-PLAN.md Task 2.
 package vulns
 
 import (
@@ -61,6 +59,7 @@ import (
 	"github.com/six2dez/reconftw/internal/core/backend"
 	"github.com/six2dez/reconftw/internal/core/config"
 	coreerrors "github.com/six2dez/reconftw/internal/core/errors"
+	"github.com/six2dez/reconftw/internal/core/output"
 	"github.com/six2dez/reconftw/internal/core/task"
 )
 
@@ -69,13 +68,13 @@ import (
 const bypass4xxToolName = "nomore403"
 
 // bypass4xxArgs is the arg vector: EMPTY, the captured pre-move value. nomore403
-// takes its targets from standard input and the pre-18-05 call was
+// takes its targets from standard input and the pre-Runner call was
 // exec.CommandContext(cmdCtx, binaryPath) with no arguments. tools.lock declares
 // default_args = [] for the row, so applyToolContract prepends nothing.
 func bypass4xxArgs() []string { return nil }
 
 // fuzzJSONLRecord is the minimal fuzz.jsonl record shape for 4xx URL extraction.
-// Matches the FuzzRecord schema from internal/modules/web/ffuf.go (D-W11).
+// Matches the FuzzRecord schema from internal/modules/web/ffuf.go.
 type fuzzJSONLRecord struct {
 	URL    string `json:"url"`
 	Status int    `json:"status"`
@@ -99,7 +98,7 @@ func (t *Bypass4xxTask) Description() string {
 func (t *Bypass4xxTask) Enabled(cfg *config.Config) bool { return cfg.Vulns.Bypass4xx.Enabled }
 
 // DependsOn returns the DAG edges — Bypass4xxTask follows the vulns DAG root.
-// The fuzz.jsonl input comes from Phase 5 (artefacts/fuzz.jsonl); vulns.gf
+// The fuzz.jsonl input comes from the web stage (artefacts/fuzz.jsonl); vulns.gf
 // ensures the DAG sequencing contract is honoured.
 func (t *Bypass4xxTask) DependsOn() []string { return []string{"vulns.gf"} }
 
@@ -127,14 +126,12 @@ func (t *Bypass4xxTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 
 	// Step 2: Read fuzz.jsonl; collect 4xx URLs excluding 404.
 	fuzzURLs, err := read4xxURLsFromVulnsFuzzJSONL(workDir)
-	if err != nil && app.Log != nil {
+	if err != nil {
 		app.Log.Debug("vulns.bypass4xx: read fuzz.jsonl error", "err", err)
 	}
 	// Step 3: Skip if no 4xx bypass candidates.
 	if len(fuzzURLs) == 0 {
-		if app.Log != nil {
-			app.Log.Info("vulns.bypass4xx: no 4xx URLs in fuzz.jsonl — bypass4xx skipped")
-		}
+		app.Log.Info("vulns.bypass4xx: no 4xx URLs in fuzz.jsonl — bypass4xx skipped")
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
@@ -155,17 +152,14 @@ func (t *Bypass4xxTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 	if runErr != nil {
 		// Unresolvable tool: the SAME graceful skip the os.Stat gate gave, and
 		// crucially WITHOUT staging — a run in which nomore403 never dispatched
-		// must not clear a previous run's bypasses (F3 did-not-run).
+		// must not clear a previous run's bypasses (did-not-run rule).
 		if coreerrors.IsDispatchFailure(runErr) {
-			if app.Log != nil {
-				app.Log.Info("vulns.bypass4xx: nomore403 unavailable — run reconftw install")
-			}
-			return task.Result{Status: task.StatusSkipped}, nil
+			status, reason := task.ClassifyToolErr(runErr)
+			app.Log.Info("vulns.bypass4xx: nomore403 unavailable — run reconftw install", "reason", reason)
+			return task.Result{Status: status, Reason: reason}, nil
 		}
-		if app.Log != nil {
-			app.Log.Debug("vulns.bypass4xx: nomore403 exited non-zero (no partial output on this path)",
-				"err", runErr)
-		}
+		app.Log.Debug("vulns.bypass4xx: nomore403 exited non-zero (no partial output on this path)",
+			"err", runErr)
 	}
 
 	// Step 6: Parse stdout for bypass lines.
@@ -177,36 +171,32 @@ func (t *Bypass4xxTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 
 	// Step 7: Write inputs/findings.bypass4xx.jsonl (staging contract — doc.go).
 	//
-	// F3 (phase 15): staged UNCONDITIONALLY, and reaching here now MEANS the
+	// Run isolation: staged UNCONDITIONALLY, and reaching here now MEANS the
 	// tool ran — the dispatch-failure arm above returns before this point, so
 	// zero findings is a real observation and stageVulnFindings removes the
 	// previous run's staging file rather than leaving a bypass that no longer
-	// exists to be republished. Before 18-05 that guarantee rested on an os.Stat
+	// exists to be republished. Before the Runner move that guarantee rested on an os.Stat
 	// probe that could succeed while the process still failed to start.
-	// F3 DID-NOT-RUN, deadline arm (18-06 code review, CR-03). Reaching here with
+	// DID-NOT-RUN, deadline arm. Reaching here with
 	// res == nil means the tool did NOT complete — a tools.lock deadline, a crash,
 	// or a cancelled context. Before the move each of these files applied its own
 	// context.WithTimeout and PARSED the partially-filled buffer, so a timeout
 	// still staged what it had seen. The move removed both, so res is nil and
 	// findings is empty — and StageJSONL implements an empty input as os.Remove.
 	// A run that never observed the corpus has no standing to delete what a
-	// previous run did observe, which is exactly what the F3 comment below claims
+	// previous run did observe, which is exactly what the run-isolation comment below claims
 	// and, on this path, did not deliver.
 	stagingPath := filepath.Join(inputsDir, "findings.bypass4xx.jsonl")
 	if res == nil {
-		if app.Log != nil {
-			app.Log.Warn("vulns.bypass4xx: incomplete run — previous staging preserved",
-				"err", runErr)
-		}
+		app.Log.Warn("vulns.bypass4xx: incomplete run — previous staging preserved",
+			"err", runErr)
 	} else {
 		stageVulnFindings(app, "vulns.bypass4xx", stagingPath, true, findings)
 	}
 
-	if app.Log != nil {
-		app.Log.Info("vulns.bypass4xx: completed",
-			"input_urls", len(fuzzURLs),
-			"bypasses", len(findings))
-	}
+	app.Log.Info("vulns.bypass4xx: completed",
+		"input_urls", len(fuzzURLs),
+		"bypasses", len(findings))
 
 	return task.Result{
 		Status: task.StatusDone,
@@ -226,28 +216,22 @@ func (t *Bypass4xxTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 // directly (not through AppContext to avoid cross-package dependency).
 func read4xxURLsFromVulnsFuzzJSONL(workDir string) ([]string, error) {
 	fuzzPath := filepath.Join(workDir, "artefacts", "fuzz.jsonl")
-	data, err := os.ReadFile(fuzzPath) //nolint:gosec // path within WorkDir
-	if err != nil {
-		return nil, fmt.Errorf("read fuzz.jsonl: %w", err)
-	}
 	var urls []string
-	sc := bufio.NewScanner(bytes.NewReader(data))
-	sc.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
-	for sc.Scan() {
-		line := bytes.TrimSpace(sc.Bytes())
-		if len(line) == 0 {
-			continue
-		}
+	err := output.ForEachJSONLLine(fuzzPath, 0, func(line []byte) error {
 		var rec fuzzJSONLRecord
 		if err := json.Unmarshal(line, &rec); err != nil {
-			continue
+			return nil
 		}
 		// Filter: 4xx excluding 404 (status >= 400 AND <= 499 AND != 404).
 		if rec.Status >= 400 && rec.Status <= 499 && rec.Status != 404 && rec.URL != "" {
 			urls = append(urls, rec.URL)
 		}
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("read fuzz.jsonl: %w", err)
 	}
-	return urls, sc.Err()
+	return urls, nil
 }
 
 // parseBypass4xxOutput parses nomore403 stdout.
@@ -279,10 +263,10 @@ func parseBypass4xxOutput(data []byte) []VulnFindingRecord {
 			// result line (e.g. "200 https://host/path"), so the per-finding
 			// host is recoverable without falling back to the scan target.
 			Host: bypass4xxExtractHost(line),
-			// Phase 4/5 SARIF-compatible fields.
+			// Base SARIF-compatible fields.
 			Severity:   "low",
 			Confidence: "medium",
-			// Phase 6 vuln-class fields.
+			// Vuln-class fields.
 			VulnClass:       "4xx-bypass",
 			PayloadRedacted: "***", // XCUT-07
 			PoCRedacted:     "***", // XCUT-07

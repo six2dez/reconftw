@@ -52,7 +52,7 @@ func TestHTTPXTotalParseFailureIsNotOK(t *testing.T) {
 	if !strings.Contains(res.Reason, "failed to parse") {
 		t.Errorf("Reason %q does not carry parseHTTPXOutput's own diagnosis", res.Reason)
 	}
-	// The F3 contract survives: an empty run still publishes an EMPTY artefact.
+	// The empty-run contract survives: an empty run still publishes an EMPTY artefact.
 	assertArtefactEmptied(t, workDir, "hosts")
 }
 
@@ -90,7 +90,7 @@ func TestHTTPXNoHostsFromNonEmptyInputIsNotOK(t *testing.T) {
 // correct and must not be softened into a skip — "run `subs` first" is a real
 // instruction, not a silent success.
 //
-// The inputCount == 0 branch added in phase 16 covers a DIFFERENT state: an input
+// The inputCount == 0 branch added later covers a DIFFERENT state: an input
 // file that resolves but is empty. Keeping the two apart is the point; collapsing
 // them would make a first-run web-only invocation look either broken or fine, and
 // both readings would be wrong.

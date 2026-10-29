@@ -1,6 +1,6 @@
 // dag_test.go — Web task-DAG build + topological-order regression guard.
 //
-// These tests close the structural gap behind CR-01/CR-02/CR-03 (05-REVIEW):
+// These tests close the structural gap behind three review findings:
 // the multi-writer staging tests (merge_multiwriter_test.go) call
 // MergeAllWebArtefacts directly and NEVER build the DAG, so a circular
 // DependsOn (web.urldedup -> web.subjs -> web.urldedup) passed `go build` and
@@ -15,9 +15,7 @@
 // TestWebDAGTopoOrder asserts the topological order places web.urldedup AFTER
 // every URL producer (katana/urlfinder/waymore/subjs/jsluice/jsa/mantra) and
 // BEFORE its only legitimate consumers (web.arjun/web.gxss). This catches a
-// reintroduced backwards edge AND a stage/DependsOn contradiction (CR-02).
-//
-// Source: .planning/phases/05-web-pipeline-e2e/05-REVIEW.md CR-03 / WR-01.
+// reintroduced backwards edge AND a stage/DependsOn contradiction.
 package web_test
 
 import (

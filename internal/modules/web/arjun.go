@@ -6,11 +6,11 @@
 //
 // DEPENDENCY: DependsOn ["web.urldedup"] — reads artefacts/urls.jsonl.
 //
-// DEEP MODE (RESEARCH §arjun, web.sh:1289; Open Question 1 RESOLVED):
+// DEEP MODE (web.sh:1289):
 // v1 runs arjun only in DEEP mode. v2 default mirrors this: skip unless
 // cfg.Advanced.Deep is true. This matches v1 fidelity (Q1 resolution).
 //
-// ARG VECTOR (RESEARCH §arjun, web.sh:1329):
+// ARG VECTOR (web.sh:1329):
 //
 //	arjun -i <urlfile> -t <threads> -oT <outputfile>
 //
@@ -18,10 +18,8 @@
 // THREADS default: cfg.Advanced.Tools.Arjun.Threads (default 10, v1 AVAILABLE_CORES * 5).
 // INPUT CAP: cfg.Web.ParamDiscover.Enabled only; no separate max_urls in config.
 //
-// XCUT-09 / Pitfall 5: arjun can run up to 2h (tools.lock timeout 7200s).
+// arjun can run up to 2h (tools.lock timeout 7200s).
 // Backend.Stream is MANDATORY for heartbeat delivery.
-//
-// Source: .planning/phases/05-web-pipeline-e2e/05-05-PLAN.md Task 2.
 package web
 
 import (
@@ -66,22 +64,18 @@ func (t *ArjunTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resul
 	// DEEP mode only (Open Question 1 RESOLVED: v1 default, cfg.Advanced.Deep).
 	// DeepOnly behavior: skip if deep mode is not active.
 	if !cfg.Advanced.Deep {
-		if app.Log != nil {
-			app.Log.Info("web.arjun: skipped — deep_only=true and not in deep mode",
-				"deep", cfg.Advanced.Deep)
-		}
+		app.Log.Info("web.arjun: skipped — deep_only=true and not in deep mode",
+			"deep", cfg.Advanced.Deep)
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
 	// Read urls.jsonl for all URLs.
 	allURLs, readErr := readAllURLsFromJSONL(app)
-	if readErr != nil && app.Log != nil {
+	if readErr != nil {
 		app.Log.Debug("web.arjun: read urls.jsonl error", "err", readErr)
 	}
 	if len(allURLs) == 0 {
-		if app.Log != nil {
-			app.Log.Info("web.arjun: no URLs in urls.jsonl — skipping")
-		}
+		app.Log.Info("web.arjun: no URLs in urls.jsonl — skipping")
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
@@ -119,7 +113,7 @@ func (t *ArjunTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resul
 		threads = 10 // absolute fallback
 	}
 
-	// Build arg vector (RESEARCH §arjun, web.sh:1329):
+	// Build arg vector (web.sh:1329):
 	// arjun -i <urlfile> -t <threads> -oT <outputfile>
 	args := []string{
 		"-i", inputFile,
@@ -127,23 +121,24 @@ func (t *ArjunTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resul
 		"-oT", stagingFile,
 	}
 
-	// XCUT-09 / Pitfall 5: arjun runs up to 2h; Backend.Stream is MANDATORY.
+	// arjun runs up to 2h; Backend.Stream is MANDATORY.
 	eventCh, err := app.Tools.Stream(ctx, toolName, args)
 	if err != nil {
-		// arjun not on PATH: StatusSkipped (best_effort D-W12).
-		if app.Log != nil {
-			app.Log.Info("web.arjun: arjun binary not found or stream failed — skipping",
-				"err", err)
-		}
-		return task.Result{Status: task.StatusSkipped}, nil
+		// Absent-vs-failed policy (task.ClassifyToolErr): a arjun that never
+		// started is "tool absent"; one that could not be run for any other
+		// reason is degraded with its own account of why. Neither fails the
+		// scan (best_effort).
+		status, reason := task.ClassifyToolErr(err)
+		app.Log.Info("web.arjun: arjun not run — skipping", "reason", reason)
+		return task.Result{Status: status, Reason: reason}, nil
 	}
-	// F6 (phase 15): consume the TERMINAL error before touching stagingFile.
+	// Consume the TERMINAL error before touching stagingFile.
 	// An arjun killed mid-run leaves a partial -oT file, or none at all while a
 	// PREVIOUS run's file sits at the same path — either way its contents are
 	// not this run's result. Return StatusErrored and parse nothing.
 	//
 	// This is NOT the same as the Stream() error above: that one means arjun is
-	// not on PATH and keeps its StatusSkipped handling (D-W12 best-effort).
+	// not on PATH and keeps its StatusSkipped handling (best-effort).
 	if drainErr := backend.Drain(eventCh); drainErr != nil {
 		return task.Result{Status: task.StatusErrored},
 			terminalStreamError(toolName, drainErr)
@@ -151,7 +146,7 @@ func (t *ArjunTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resul
 
 	// Parse staging file (plain text, one endpoint per line).
 	//
-	// F3 (phase 15): the "no output file" case used to `return StatusDone`
+	// The "no output file" case used to `return StatusDone`
 	// right here, which SKIPPED the staging write below and left a previous
 	// run's inputs/findings.arjun.jsonl for the findings merge to republish.
 	// arjun RAN and found no parameters, so it must fall through to the
@@ -168,9 +163,9 @@ func (t *ArjunTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resul
 
 	findings := parseArjunOutput(stagingData)
 
-	// Stage findings for the findings merge (best_effort D-W12).
+	// Stage findings for the findings merge (best_effort).
 	//
-	// F3 (phase 15): staged UNCONDITIONALLY. output.StageJSONL removes the
+	// Staged UNCONDITIONALLY. output.StageJSONL removes the
 	// staging file when this run produced nothing, so a previous run's arjun
 	// findings can never be republished by the merge. This task reaching here
 	// means it RAN; the early StatusSkipped returns above never get here.
@@ -183,16 +178,14 @@ func (t *ArjunTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resul
 		lines = append(lines, b)
 	}
 	stagingPath := filepath.Join(app.Target.WorkDir, "inputs", "findings.arjun.jsonl")
-	if wErr := output.StageJSONL(stagingPath, lines); wErr != nil && app.Log != nil {
+	if wErr := output.StageJSONL(stagingPath, lines); wErr != nil {
 		app.Log.Debug("web.arjun: staging write failed",
 			"path", stagingPath, "err", wErr)
 	}
 
-	if app.Log != nil {
-		app.Log.Debug("web.arjun: completed",
-			"input_urls", len(allURLs),
-			"params", len(findings))
-	}
+	app.Log.Debug("web.arjun: completed",
+		"input_urls", len(allURLs),
+		"params", len(findings))
 
 	return task.Result{
 		Status: task.StatusDone,
@@ -228,35 +221,24 @@ func parseArjunOutput(data []byte) []FindingRecord {
 }
 
 // readAllURLsFromJSONL reads artefacts/urls.jsonl and returns all URL strings.
+
 func readAllURLsFromJSONL(app *appctx.AppContext) ([]string, error) {
 	urlsPath := filepath.Join(app.Target.WorkDir, "artefacts", "urls.jsonl")
-	data, err := os.ReadFile(urlsPath) //nolint:gosec // path within WorkDir
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, nil
-		}
-		return nil, err
-	}
-	if len(data) == 0 {
-		return nil, nil
-	}
 	var urls []string
-	scanner := bufio.NewScanner(bytes.NewReader(data))
-	scanner.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
-	for scanner.Scan() {
-		line := bytes.TrimSpace(scanner.Bytes())
-		if len(line) == 0 {
-			continue
-		}
+	err := output.ForEachJSONLLine(urlsPath, 0, func(line []byte) error {
 		var rec struct {
 			URL string `json:"url"`
 		}
 		if err := json.Unmarshal(line, &rec); err != nil {
-			continue
+			return nil // malformed record: skipped, as before
 		}
 		if rec.URL != "" {
 			urls = append(urls, rec.URL)
 		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 	return urls, nil
 }

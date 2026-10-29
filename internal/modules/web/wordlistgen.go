@@ -1,5 +1,5 @@
 // wordlistgen.go — WebWordlistGenTask: roboxtractor + getjswords wordlist
-// generation (PAR-04). pydictor (leet) is DEFERRED to Phase 14.
+// generation. pydictor (leet) is DEFERRED to Phase 14.
 //
 // Name: "web.wordlistgen"  DependsOn: nil (sequential stage; reads web + JS corpus)
 //
@@ -12,18 +12,18 @@
 //
 // cfg.Web.Wordlist.* (defaults.go:145) was previously unreferenced. Each
 // generator degrades INDEPENDENTLY: a missing tool / empty input logs a warning
-// and skips ONLY that generator — the task still returns StatusDone (T-13-04-02).
+// and skips ONLY that generator — the task still returns StatusDone.
 //
 // pydictor (leet-password wordlists) is a Deferred Idea (niche, 13-CONTEXT.md
 // "Deferred Ideas") → DEFERRED to Phase 14, documented below, and NOT invoked.
 //
-// SUBPROCESS NOTE (FOUND-10) — REWRITTEN BY 18-05, because the old text became
+// SUBPROCESS NOTE — REWRITTEN, because the old text became
 // false for one of this file's two shapes and stayed true for the other. It is
-// the SAME correction 18-04 made for shortscan: an entry can be right for a new
+// the SAME correction made for shortscan: an entry can be right for a new
 // reason, and the wrong fix is to delete it.
 //
-//	roboxtractor — HOME (18-05 Task 2). It was stdin-only, which is exactly what
-//	  18-01's ExecOptions.Stdin serves. It now dispatches through
+//	roboxtractor — HOME. It was stdin-only, which is exactly what
+//	  ExecOptions.Stdin serves. It now dispatches through
 //	  backend.Runner, is recorded in logs/tools.jsonl, and takes its 120s
 //	  deadline from the roboxtractor row in tools.lock rather than from a
 //	  constant here.
@@ -41,13 +41,11 @@
 //	  config (e.g. a clone_interpreter_config_key that names web.js.getjswords_
 //	  python), getjswords gets a tools.lock row with clone_dir = "." and
 //	  clone_entry = "getjswords.py", and this leg comes home with no loss of
-//	  operator control. See 18-05-SUMMARY.md for the full adjudication.
+//	  operator control.
 //
-// XCUT-07: no secrets on argv (URLs / paths only).
+// No secrets on argv (URLs / paths only).
 //
-// Symbol hygiene (checker LOW #7): all unexported helpers are wordlistgen*-prefixed.
-//
-// Source: .planning/phases/13-domain-parity/13-04-PLAN.md Task 3.
+// Symbol hygiene: all unexported helpers are wordlistgen*-prefixed.
 package web
 
 import (
@@ -70,7 +68,7 @@ import (
 const roboxtractorToolName = "roboxtractor"
 
 // roboxtractorArgs is the PRE-MOVE arg vector, captured from this file before
-// 18-05 touched it: exec.CommandContext(cmdCtx, bin, "-m", "1", "-wb").
+// the move: exec.CommandContext(cmdCtx, bin, "-m", "1", "-wb").
 // tools.lock declares default_args = [] for the row, so applyToolContract
 // prepends nothing and the command line is byte-for-byte unchanged.
 func roboxtractorArgs() []string { return []string{"-m", "1", "-wb"} }
@@ -83,17 +81,13 @@ const wordlistgenPydictorDeferred = "pydictor leet wordlists deferred to Phase 1
 // Per-invocation timeout for the getjswords leg (a short per-URL fetch+parse).
 //
 // roboxtractor's former 120s constant is GONE: its dispatch moved onto
-// backend.Runner in 18-05, so tools.lock's timeout_seconds = 120 is now the
+// backend.Runner, so tools.lock's timeout_seconds = 120 is now the
 // SINGLE owner of that bound. The two agreed exactly, which is why removing the
-// local one changes nothing today and prevents them drifting tomorrow. It is
-// retained below as wordlistgenRoboxFormerTimeout, and pinned against the
-// manifest by TestRoboxtractorDeadlineMatchesItsFormerBound.
+// local one changes nothing today and prevents them drifting tomorrow. The
+// derivation lives in the roboxtractor row of tools.lock; its former pin test
+// compared the TOML number with a copy of itself and was deleted
+// (internal/modules/DELETED_TESTS.md).
 const wordlistgenGetJSWTimeout = 30 * time.Second
-
-// wordlistgenRoboxFormerTimeout is the bound this file applied before 18-05.
-// Duplicated as a literal in the pin test ON PURPOSE: importing it would mean
-// deleting it makes the test compile against nothing rather than fail loudly.
-const wordlistgenRoboxFormerTimeout = 120 * time.Second //nolint:unused // retained derivation; the pin test duplicates the literal on purpose
 
 // wordlistgenRoboxtractorRunner runs `roboxtractor -m 1 -wb` with the web target
 // URLs on stdin and returns raw stdout (robots-derived paths). Overridable in
@@ -107,7 +101,7 @@ var wordlistgenRoboxtractorRunner = func(ctx context.Context, app *appctx.AppCon
 		backend.ExecOptions{Stdin: stdin})
 	if err != nil {
 		if coreerrors.IsDispatchFailure(err) {
-			return nil, nil // not installed — graceful skip (D-O2), unchanged
+			return nil, nil // not installed — graceful skip, unchanged
 		}
 		// PARTIAL OUTPUT ON THE ERROR PATH IS NO LONGER PARSED, and the cost is
 		// stated rather than left to inference. Measured on 2026-08-26: the real
@@ -117,7 +111,7 @@ var wordlistgenRoboxtractorRunner = func(ctx context.Context, app *appctx.AppCon
 		// StreamOpts would buy nothing here. The one path that DOES discard work
 		// is the 120s deadline, which the same run showed is not far from this
 		// tool's natural runtime against a live host. That discard is the seam's
-		// uniform, tested decision (local.go's CR-07 note,
+		// uniform, tested decision (local.go's note,
 		// TestDeadlineDiscardsBufferedStdout); the remedy is the bound in
 		// tools.lock, not a per-tool exception here.
 		return nil, err
@@ -141,11 +135,11 @@ var wordlistgenGetJSWordsRunner = func(ctx context.Context, app *appctx.AppConte
 	}
 	pyBin, err := exec.LookPath(python)
 	if err != nil {
-		return nil, nil // python absent — graceful skip (D-O2)
+		return nil, nil // python absent — graceful skip
 	}
-	// THE TOOLS ROOT IS NAMED ONCE (18-02): config.Config.ToolsRoot() over
+	// THE TOOLS ROOT IS NAMED ONCE: config.Config.ToolsRoot() over
 	// paths.tools_dir. This used to call web.resolveToolsDir, a module-local copy
-	// that read cfg.Paths.DataDir — the very conflation 17-06 recorded, since
+	// that read cfg.Paths.DataDir — the very conflation already recorded, since
 	// data_dir already means the workspace root. That copy is deleted; this is
 	// its last former caller.
 	script := filepath.Join(app.Cfg.ToolsRoot(), "getjswords.py")
@@ -155,7 +149,7 @@ var wordlistgenGetJSWordsRunner = func(ctx context.Context, app *appctx.AppConte
 	var out bytes.Buffer
 	for _, u := range jsURLs {
 		cmdCtx, cancel := context.WithTimeout(ctx, wordlistgenGetJSWTimeout)
-		//nolint:gosec // pyBin+script validated above; u is a scope-filtered JS URL (XCUT-07)
+		//nolint:gosec // pyBin+script validated above; u is a scope-filtered JS URL
 		cmd := exec.CommandContext(cmdCtx, pyBin, script, u)
 		var buf bytes.Buffer
 		cmd.Stdout = &buf
@@ -186,7 +180,7 @@ func (t *WebWordlistGenTask) Enabled(cfg *config.Config) bool {
 }
 
 // DependsOn returns nil: wordlistgen is a sequential stage reading the web + JS
-// corpus; plan 13-08 places it in the stage order.
+// corpus; the stage wiring places it in the stage order.
 func (t *WebWordlistGenTask) DependsOn() []string { return nil }
 
 // Run drives the two independent best-effort generators (bash wordlist_gen).
@@ -194,16 +188,12 @@ func (t *WebWordlistGenTask) DependsOn() []string { return nil }
 func (t *WebWordlistGenTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result, error) {
 	wl := app.Cfg.Web.Wordlist
 	if !wl.Enabled {
-		if app.Log != nil {
-			app.Log.Info("web.wordlistgen: disabled (cfg.Web.Wordlist.Enabled=false) — skipping")
-		}
+		app.Log.Info("web.wordlistgen: disabled (cfg.Web.Wordlist.Enabled=false) — skipping")
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 	// bash guard: wordlist_gen is skipped for bare-IP targets (web.sh:2657).
 	if app.Target != nil && app.Target.IsIP {
-		if app.Log != nil {
-			app.Log.Info("web.wordlistgen: IP-literal target — skipping (bash parity)")
-		}
+		app.Log.Info("web.wordlistgen: IP-literal target — skipping (bash parity)")
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
@@ -215,11 +205,9 @@ func (t *WebWordlistGenTask) Run(ctx context.Context, app *appctx.AppContext) (t
 	robotsWords := wordlistgenRunRoboxtractor(ctx, app, websDir, wl)
 	jsWords := wordlistgenRunGetJSWords(ctx, app, websDir)
 
-	if app.Log != nil {
-		app.Log.Debug("web.wordlistgen: completed",
-			"robots_words", robotsWords, "js_words", jsWords,
-			"pydictor", "deferred")
-	}
+	app.Log.Debug("web.wordlistgen: completed",
+		"robots_words", robotsWords, "js_words", jsWords,
+		"pydictor", "deferred")
 	return task.Result{
 		Status: task.StatusDone,
 		Stats:  map[string]int{"robots_words": robotsWords, "js_words": jsWords},
@@ -235,13 +223,11 @@ func wordlistgenRunRoboxtractor(ctx context.Context, app *appctx.AppContext, web
 	}
 	urls, _ := readHostURLsFromJSONL(app)
 	if len(urls) == 0 {
-		if app.Log != nil {
-			app.Log.Debug("web.wordlistgen: no web targets for roboxtractor — skipping robots wordlist")
-		}
+		app.Log.Debug("web.wordlistgen: no web targets for roboxtractor — skipping robots wordlist")
 		return 0
 	}
 	raw, err := wordlistgenRoboxtractorRunner(ctx, app, urls)
-	if err != nil && app.Log != nil {
+	if err != nil {
 		app.Log.Info("web.wordlistgen: roboxtractor failed/absent — skipping robots wordlist", "err", err)
 	}
 	words := wordlistgenSplitLines(raw)
@@ -256,13 +242,11 @@ func wordlistgenRunRoboxtractor(ctx context.Context, app *appctx.AppContext, web
 func wordlistgenRunGetJSWords(ctx context.Context, app *appctx.AppContext, websDir string) int {
 	jsURLs, _ := readJSURLsFromJSONL(app)
 	if len(jsURLs) == 0 {
-		if app.Log != nil {
-			app.Log.Debug("web.wordlistgen: no JS URLs for getjswords — skipping JS wordlist")
-		}
+		app.Log.Debug("web.wordlistgen: no JS URLs for getjswords — skipping JS wordlist")
 		return 0
 	}
 	raw, err := wordlistgenGetJSWordsRunner(ctx, app, jsURLs)
-	if err != nil && app.Log != nil {
+	if err != nil {
 		app.Log.Info("web.wordlistgen: getjswords failed/absent — skipping JS wordlist", "err", err)
 	}
 	words := wordlistgenSplitLines(raw)

@@ -140,6 +140,7 @@ func TestRealToolArgVectors(t *testing.T) {
 				return
 			}
 			census.recordPresent(p.name)
+			census.recordVerified(p.name) // the REAL vector is what runs below
 			logResolution(t, r)
 			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 			defer cancel()
@@ -223,6 +224,7 @@ func TestRealToolArgVectors(t *testing.T) {
 				return
 			}
 			census.recordPresent(name)
+			census.recordVerified(name)
 			logResolution(t, r)
 
 			// The safe arg vector per tool. nomore403 reads its 4xx candidates

@@ -276,7 +276,7 @@ const (
 	// reconcile. The plan asked for "the failing run that produced the
 	// constants"; there was none, and inventing one would be the fabrication this
 	// file exists to prevent. MUTATION 1 and MUTATION 2 (below, in
-	// TestCensusAccountingIdentity's comment) were run instead, to prove the pins
+	// the per-bucket pins' comments) were run instead, to prove the pins
 	// still FAIL on a wrong value rather than merely agreeing with a right one.
 	//
 	// What 18-06 DID change here is two REASONS, both false of their own files
@@ -433,70 +433,11 @@ func TestEveryRegisteredTaskIsAccountedFor(t *testing.T) {
 	pin("excluded", nExcluded, censusExcluded)
 }
 
-// TestCensusAccountingIdentity asserts the PINNED CONSTANTS are internally
-// consistent, without driving a single Task.
+// TestCensusBucketsCarryReasons asserts the reasoned buckets are reasoned.
 //
-// TestEveryRegisteredTaskIsAccountedFor already checks the identity over the
-// LIVE counts and then pins each bucket separately. This test checks the same
-// identity over the CONSTANTS, and it is not a duplicate of that:
-//
-//   - It costs microseconds, so an arithmetically impossible pin set is
-//     rejected before the ~20-second drive even starts.
-//   - It fails on a constant edit that no live count can contradict. Raise
-//     censusRegistered by one and lower nothing, and the live test reports one
-//     disagreement (registered) while the CONSTANTS silently stop summing. Here
-//     that is a second, differently-worded failure that names the identity.
-//   - It pins censusDriven as a DERIVED value (checked+notable). The live test
-//     computes nDriven the same way, so the live test can never see the two
-//     drift apart; only a constants-side check can.
-//
-// # WHY A PER-BUCKET PIN IS ALSO REQUIRED, PROVEN BY MUTATION
-//
-// The identity alone is INSUFFICIENT, and 18-06 proved it rather than asserting
-// it. MUTATION 1 raised censusNotable 62 -> 63 and lowered censusNoDispatch
-// 10 -> 9, keeping the sum at 96. Under the identity alone that is invisible: a
-// Task could move between buckets — coverage going down — with the total
-// balanced. It fails only because TestEveryRegisteredTaskIsAccountedFor pins
-// EVERY bucket individually, which it has done since 17-04:
-//
-//	ARGV_COVERAGE notable=62, pinned constant says 63.
-//	ARGV_COVERAGE nodispatch=10, pinned constant says 9.
-//
-// So the per-bucket pins are the load-bearing guard and this identity is the
-// cheap cross-check that keeps THEM consistent with each other. Deleting either
-// one leaves a hole the other does not cover; say which class you are giving up
-// before removing one.
-func TestCensusAccountingIdentity(t *testing.T) {
-	if sum := censusChecked + censusNotable + censusNoDispatch + censusTimedOut + censusExcluded; sum != censusRegistered {
-		t.Errorf("the pinned buckets sum to %d but censusRegistered = %d.\n"+
-			"  checked=%d + notable=%d + nodispatch=%d + timedout=%d + excluded=%d must equal registered.\n"+
-			"  A pin set that cannot describe any real run is not a pin — it is a number that will be\n"+
-			"  edited until the test passes, which is the failure mode this census exists to remove.",
-			sum, censusRegistered,
-			censusChecked, censusNotable, censusNoDispatch, censusTimedOut, censusExcluded)
-	}
-	if censusChecked+censusNotable != censusDriven {
-		t.Errorf("censusDriven = %d but checked(%d) + notable(%d) = %d.\n"+
-			"  `driven` is DERIVED, not measured: the live census computes it as checked+notable, so it\n"+
-			"  can never report this disagreement. Only a constants-side identity can.",
-			censusDriven, censusChecked, censusNotable, censusChecked+censusNotable)
-	}
-	if censusTimedOut != 0 {
-		t.Errorf("censusTimedOut = %d, want 0. A timed-out Task is NOT COVERED; pinning a non-zero "+
-			"value converts a hang into an accounted bucket, which is the absorption this file forbids.",
-			censusTimedOut)
-	}
-	if len(noDispatchTasks) != censusNoDispatch {
-		t.Errorf("noDispatchTasks holds %d entries but censusNoDispatch = %d.\n"+
-			"  Every Task in the nodispatch bucket must have an entry (the live census errors if one\n"+
-			"  does not), so a surplus entry is a STALE excuse for a Task that has come home, and a\n"+
-			"  shortfall means the pin was raised without writing the reason.",
-			len(noDispatchTasks), censusNoDispatch)
-	}
-}
-
-// TestCensusBucketsCarryReasons asserts the reasoned buckets are reasoned,
-// exactly as TestUndrivableListIsPinned already does for its list.
+// undrivableTasks is checked here too since 21-04: its own test
+// (TestUndrivableListIsPinned) was a len()==N self-assertion and was deleted,
+// but the reason-and-registered checks it also carried are real and live on.
 func TestCensusBucketsCarryReasons(t *testing.T) {
 	for _, b := range []struct {
 		name string
@@ -504,6 +445,7 @@ func TestCensusBucketsCarryReasons(t *testing.T) {
 	}{
 		{"noDispatchTasks", noDispatchTasks},
 		{"censusExcludedTasks", censusExcludedTasks},
+		{"undrivableTasks", undrivableTasks},
 	} {
 		for name, why := range b.m {
 			if strings.TrimSpace(why) == "" {
@@ -743,6 +685,12 @@ func genericSeed(t *testing.T, workDir string, cfg *config.Config) {
 	// up. Point it at the same empty directory, for the same reason: a census run
 	// must not be able to reach a real binary in the operator's home.
 	cfg.Paths.ToolsDir = cfg.Paths.DataDir
+	// The one clone artefact a Task reads as DATA rather than executes:
+	// gitdorks_go's dorks file (osint.gitdorks passes it as -gd, and skips with
+	// "dorks file missing" when it is not there). One dork is enough to drive
+	// the arg vector; the tools root stays binary-free.
+	dorks := filepath.Join(cfg.Paths.ToolsDir, "gitdorks_go", "Dorks", "smalldorks.txt")
+	seedFile(t, dorks, "filename:.env\n")
 
 	cfg.Paths.Resolvers = resolvers
 	cfg.Paths.SubsWordlist = wl

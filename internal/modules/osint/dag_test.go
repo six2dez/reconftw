@@ -1,7 +1,7 @@
 // dag_test.go — OSINT task-DAG build + all-tasks-present regression guard.
 //
 // These tests close the structural gap mirroring vulns/dag_test.go +
-// web/dag_test.go (Phase 5 CR-01 / Phase 6 lesson): the multi-writer staging
+// web/dag_test.go (a lesson from the web package): the multi-writer staging
 // and parity tests exercise parse/merge helpers directly and NEVER build the
 // DAG, so a circular DependsOn (or a Task that silently failed to register)
 // could pass `go build` and the whole unit suite while the `osint` subcommand
@@ -14,11 +14,9 @@
 // TestOSINTDAGContainsAllTasks asserts every registered osint.* Task name is
 // PRESENT in the built DAG (registration regression guard). Unlike vulns (which
 // has a single gf root), OSINT has NO single root — most Tasks have nil
-// DependsOn (D-O1, root-domain seeded). The only real edge is
-// osint.github_leaks DependsOn osint.github_repos (D-O10 fold: the enumerated
+// DependsOn (root-domain seeded). The only real edge is
+// osint.github_leaks DependsOn osint.github_repos (the enumerated
 // repo list feeds the per-repo trufflehog scan), which this test also asserts.
-//
-// Source: .planning/phases/07-osint-e2e/07-06-PLAN.md Task 1.
 package osint_test
 
 import (
@@ -32,7 +30,7 @@ import (
 
 // allOSINTTaskNames lists every Task the osint package registers via init().
 // A missing name in the built DAG is a registration regression; the list is
-// the authoritative coverage contract (20 Tasks, matching 07-06-PLAN.md Task 1).
+// the authoritative coverage contract (20 Tasks, one per osint task).
 var allOSINTTaskNames = []string{
 	"osint.domain_info",
 	"osint.ip_info",
@@ -90,7 +88,7 @@ func TestOSINTDAGContainsAllTasks(t *testing.T) {
 		}
 	}
 
-	// The single real DAG edge (D-O10 fold): github_leaks reads the repo list
+	// The single real DAG edge: github_leaks reads the repo list
 	// produced by github_repos, so it MUST topo-sort AFTER it. A reversed or
 	// dropped edge deadlocks the pipeline at runtime.
 	reposIdx, reposOK := pos["osint.github_repos"]
@@ -102,7 +100,7 @@ func TestOSINTDAGContainsAllTasks(t *testing.T) {
 		t.Error("osint.github_leaks not present in built DAG — registration regression")
 	case leaksIdx <= reposIdx:
 		t.Errorf("topo order: osint.github_leaks (idx %d) must follow osint.github_repos (idx %d) — "+
-			"github_leaks DependsOn github_repos to read its enumerated repo list (D-O10)",
+			"github_leaks DependsOn github_repos to read its enumerated repo list",
 			leaksIdx, reposIdx)
 	}
 }

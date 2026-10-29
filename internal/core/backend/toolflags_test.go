@@ -313,43 +313,14 @@ func TestToolFlagSetsHaveProvenance(t *testing.T) {
 // NEVER add an entry to silence a NEW finding. A new undefined flag is a bug
 // found before it shipped, which is the entire point of this file.
 //
-// EMPTY, and pinned at zero (17-04). The single entry — subzy's `--verify-ssl`,
-// recorded by 16-04 — was deleted in the same change that fixed the vector at
+// EMPTY (17-04). The single entry — subzy's `--verify-ssl`, recorded by 16-04 —
+// was deleted in the same change that fixed the vector at
 // internal/modules/subdomains/takeover.go, exactly as the stale direction of the
 // ratchet forces. Re-populating this map means SHIPPING A KNOWN-BROKEN ARG
-// VECTOR ON PURPOSE, so it needs the constant raised in the same commit and the
-// reason written in the map.
+// VECTOR ON PURPOSE, so it needs the reason written in the map. (The len()==0
+// pin that used to sit here was deleted in 21-04 as a self-assertion; see
+// internal/modules/DELETED_TESTS.md.)
 var knownBadArgVectors = map[string][]string{}
-
-const knownBadArgVectorsSize = 0
-
-// TestKnownBadArgVectorsArePinned stops the list growing without a diff.
-func TestKnownBadArgVectorsArePinned(t *testing.T) {
-	n := 0
-	for _, flags := range knownBadArgVectors {
-		n += len(flags)
-	}
-	if n != knownBadArgVectorsSize {
-		t.Errorf("knownBadArgVectors holds %d flag(s), constant says %d.\n"+
-			"  Growing this list means shipping a KNOWN-BROKEN arg vector on purpose. If that is\n"+
-			"  really the intent, raise the constant in the same commit and say why in the map.",
-			n, knownBadArgVectorsSize)
-	}
-	for tool, flags := range knownBadArgVectors {
-		set, ok := knownToolFlags[tool]
-		if !ok {
-			t.Errorf("knownBadArgVectors names %q, which has no flag table — the entry asserts nothing", tool)
-			continue
-		}
-		for _, f := range flags {
-			if set.has(f) {
-				t.Errorf("%s: %q is on the known-bad list but IS a flag the tool defines (%s).\n"+
-					"  STALE: either the flag table was corrected or the entry was wrong. Delete it.",
-					tool, f, set.source)
-			}
-		}
-	}
-}
 
 // assertFlagsDefined is the reusable assertion: every dash-prefixed token in
 // argv must be a flag the tool defines.

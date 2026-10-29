@@ -1,4 +1,4 @@
-// staging_lifecycle_test.go — F3 (phase 15, plan 15-13 Task 1) write-then-clear
+// staging_lifecycle_test.go — the write-then-clear
 // behaviour for the web producers, plus the end-to-end gate-3 experiment
 // through web.MergeStage.
 //
@@ -12,7 +12,7 @@
 // The end-to-end test drives MergeStage on "findings" DELIBERATELY. "findings"
 // has no direct app.Tree.Append writer outside merge.go, so the MERGE owns the
 // empty publish. It must NOT be written against fuzz, origins, urls or hosts:
-// for those four the merge is barred from truncating (15-03's
+// for those four the merge is barred from truncating (
 // directArtefactWriterStages) and the empty publish belongs to their own direct
 // writer instead — see artefact_publish_test.go.
 //
@@ -91,7 +91,7 @@ func (m *webMockBackend) Stream(_ context.Context, _ *backend.Tool, args []strin
 }
 
 // ExecEnv / StreamEnv satisfy the Backend interface; the env channel is not
-// exercised by any of the tasks under test, so they delegate (ADR §0 D-07: a
+// exercised by any of the tasks under test, so they delegate (a
 // nil env must behave byte-for-byte like the non-Env form).
 func (m *webMockBackend) ExecEnv(ctx context.Context, t *backend.Tool, args, _ []string) (*backend.Result, error) {
 	return m.Exec(ctx, t, args)
@@ -121,6 +121,7 @@ func newWebApp(t *testing.T, workDir string, be *webMockBackend, tools ...string
 	cfg.Web.WAF.Enabled = true
 	cfg.Web.WellKnown = config.WebWellKnown{Enabled: true, MaxTargets: 200}
 	return &appctx.AppContext{
+		Log:    appctx.NopLogger(),
 		Tools:  backend.NewRunner(be, reg, nil),
 		Tree:   tree,
 		Cfg:    cfg,
@@ -396,8 +397,8 @@ func wellknownStub(t *testing.T, securityTxt string) string {
 	return srv.URL
 }
 
-// ExecOpts satisfies the backend.Backend options seam added in 18-01. It
-// PRESERVES this fake's pre-18-01 dispatch exactly: Runner.Run used to call
+// ExecOpts satisfies the backend.Backend options seam. It
+// PRESERVES this fake's pre-seam dispatch exactly: Runner.Run used to call
 // Backend.Exec and Runner.RunEnv used to call Backend.ExecEnv, and both now
 // arrive here, so the env-set case forwards to ExecEnv and the zero case to Exec.
 //

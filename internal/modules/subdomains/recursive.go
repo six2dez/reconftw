@@ -6,8 +6,6 @@
 // SEQUENTIAL MODEL: DependsOn() returns nil for both tasks. The command layer
 // (newSubsCmd) calls recursive RunStage after the permut MergeStage completes.
 // No barrier Tasks needed.
-//
-// Source: .planning/phases/04-subdomains-e2e-axiom-integration/04-04-PLAN.md Task 2.
 package subdomains
 
 import (
@@ -33,7 +31,7 @@ import (
 // writeRecursiveStagingFile writes hostnames to inputs/recursive.<name>.txt, or
 // REMOVES that file when lines is empty. Returns the staging path in both cases.
 //
-// F3 (phase 15): write-or-REMOVE via output.StageLines. Calling it asserts
+// Write-or-REMOVE via output.StageLines. Calling it asserts
 // "this recursive source RAN and found exactly these hostnames", so a
 // zero-result run clears the previous run's file instead of leaving it for
 // MergeAllSubdomains (which globs inputs/recursive.*.txt) to republish.
@@ -82,7 +80,7 @@ func readLines(fpath string) ([]string, error) {
 // with bash's frequency-ranked selection so recursion targets the right
 // high-value seeds instead of an arbitrary list prefix (PAR-01).
 //
-// Degrade (T-13-02-02): on a dsieve tool-execution error OR empty output it logs
+// Degrade: on a dsieve tool-execution error OR empty output it logs
 // a warning and falls back to the first-N slice of fallback — recursion is a
 // best-effort deep aux source, so a dsieve failure must never abort it.
 func dsieveTopN(ctx context.Context, app *appctx.AppContext, inputFile string, depth int, fallback []string) []string {
@@ -103,10 +101,8 @@ func dsieveTopN(ctx context.Context, app *appctx.AppContext, inputFile string, d
 		"-top", strconv.Itoa(depth),
 	})
 	if err != nil {
-		if app.Log != nil {
-			app.Log.Warn("recursive.passive: dsieve failed — falling back to first-N slice",
-				"tool", "dsieve", "error", err.Error())
-		}
+		app.Log.Warn("recursive.passive: dsieve failed — falling back to first-N slice",
+			"tool", "dsieve", "error", err.Error())
 		return firstN()
 	}
 
@@ -124,10 +120,8 @@ func dsieveTopN(ctx context.Context, app *appctx.AppContext, inputFile string, d
 		seeds = append(seeds, line)
 	}
 	if len(seeds) == 0 {
-		if app.Log != nil {
-			app.Log.Warn("recursive.passive: dsieve returned no seeds — falling back to first-N slice",
-				"tool", "dsieve")
-		}
+		app.Log.Warn("recursive.passive: dsieve returned no seeds — falling back to first-N slice",
+			"tool", "dsieve")
 		return firstN()
 	}
 	return seeds
@@ -190,7 +184,7 @@ func (SubRecursivePassiveTask) Run(ctx context.Context, app *appctx.AppContext) 
 	seen := make(map[string]struct{})
 	var allFound []string
 
-	// CR-07: MINUTES, the unit subfinder's -max-time documents. This call site
+	// MINUTES, the unit subfinder's -max-time documents. This call site
 	// carried its own copy of the same minutes-times-sixty arithmetic as
 	// passive.go, which is why the shared helper exists — a duplicated
 	// conversion is a fix that lands in one place and not the other.
@@ -209,12 +203,10 @@ func (SubRecursivePassiveTask) Run(ctx context.Context, app *appctx.AppContext) 
 		res, runErr := app.Tools.Run(ctx, "subfinder", args)
 		if runErr != nil {
 			// Subfinder failure on one target is non-fatal — log and continue.
-			if app.Log != nil {
-				app.Log.Info("recursive_passive_skip_subfinder",
-					"subdomain", sub,
-					"error", runErr.Error(),
-				)
-			}
+			app.Log.Info("recursive_passive_skip_subfinder",
+				"subdomain", sub,
+				"error", runErr.Error(),
+			)
 			continue
 		}
 
@@ -251,7 +243,7 @@ func (SubRecursivePassiveTask) Run(ctx context.Context, app *appctx.AppContext) 
 // This mirrors v1 sub_recursive_brute, which brute-forces EVERY resolved sub
 // with a short wordlist via puredns — NOT a dsieve top-N subset (unlike
 // SubRecursivePassiveTask). That full-set behavior is intentional bash parity
-// and is deliberately left unchanged here (13-02 Task 2 scope note).
+// and is deliberately left unchanged here.
 // Writes staging file: inputs/recursive.brute.txt
 type SubRecursiveBruteTask struct{}
 
@@ -294,10 +286,8 @@ func (SubRecursiveBruteTask) Run(ctx context.Context, app *appctx.AppContext) (t
 	// Same gate as SubBruteTask: without a usable wordlist every per-subdomain
 	// puredns invocation fails instantly and the task still reports success.
 	if !wordlistReadable(wordlistPath) {
-		if app.Log != nil {
-			app.Log.Info("subdomains.recursive.brute: subs wordlist missing or unreadable — skipping",
-				"wordlist", wordlistPath)
-		}
+		app.Log.Info("subdomains.recursive.brute: subs wordlist missing or unreadable — skipping",
+			"wordlist", wordlistPath)
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
@@ -332,16 +322,14 @@ func (SubRecursiveBruteTask) Run(ctx context.Context, app *appctx.AppContext) (t
 		ch, streamErr := app.Tools.Stream(ctx, "puredns", args)
 		if streamErr != nil {
 			// Non-fatal: log and continue to next subdomain.
-			if app.Log != nil {
-				app.Log.Info("recursive_brute_skip_puredns",
-					"subdomain", sub,
-					"error", streamErr.Error(),
-				)
-			}
+			app.Log.Info("recursive_brute_skip_puredns",
+				"subdomain", sub,
+				"error", streamErr.Error(),
+			)
 			continue
 		}
 
-		// F6 (phase 15): ACCUMULATOR shape — latch the terminal Event.Err inside
+		// ACCUMULATOR shape — latch the terminal Event.Err inside
 		// the loop and check it immediately after. Note the variable above,
 		// streamErr, is the DISPATCH error ("puredns is not on PATH") and keeps
 		// its non-fatal log-and-continue handling verbatim; termErr is the

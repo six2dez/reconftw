@@ -7,7 +7,7 @@
 //
 // DEPENDENCY: DependsOn ["vulns.gf"] — reads inputs/gf/ssrf.txt bucket.
 //
-// COLLAB_SERVER PRECEDENCE (D-V6, §Claude's Discretion; interactsh RESTORED 13-07):
+// COLLAB_SERVER PRECEDENCE (§Claude's Discretion; interactsh RESTORED):
 //  1. cfg.APIKeys.CollabServer != "" → use it directly; no subprocess.
 //  2. CollabServer unset AND interactsh-client resolvable on PATH → auto-start it
 //     (BOUNDED) and read its registered callback domain, restoring OOB detection
@@ -26,16 +26,16 @@
 // overridable via cfg.Vulns.SSRF.TimeoutSeconds). This prevents the task
 // from running unbounded even when ffuf or OOB wait hangs.
 //
-// INTERACTSH SUBPROCESS SAFETY (FOUND-09, T-06-05-01) — SATISFIED BY THE SEAM
-// SINCE 18-05, NOT BY THIS FILE.
+// INTERACTSH SUBPROCESS SAFETY (FOUND-09) — SATISFIED BY THE SEAM
+// SINCE THE RUNNER MOVE, NOT BY THIS FILE.
 //
 // This file used to hand-roll the lifecycle: exec.CommandContext with
 // SysProcAttr{Setpgid:true}, a StdoutPipe held open for the task's life, and
 // syscall.Kill(-pgid, SIGTERM) + cmd.Wait() on cleanup. Its bypass reason was
-// `process_lifecycle`, and 18-03 recorded it as the ONE reason 18-01 did not make
+// `process_lifecycle`, and the Runner move recorded it as the ONE reason the ExecOptions seam did not make
 // obsolete, because ExecOptions has no caller-managed background-process mode.
 //
-// 18-05 TESTED THAT CLAIM INSTEAD OF INHERITING IT, and it did not hold. "No
+// THE RUNNER MOVE TESTED THAT CLAIM INSTEAD OF INHERITING IT, and it did not hold. "No
 // background-process MODE" is not "cannot serve this lifecycle":
 // Runner.StreamOpts returns a channel that outlives the call, and
 // LocalBackend.StreamOpts already sets Setpgid, SIGTERMs the whole group via
@@ -55,7 +55,7 @@
 // "SSRF finds no OOB callbacks" with nothing failing. The session is never
 // unbounded in practice: taskCtx bounds it, as it always did.
 //
-// PAYLOAD REDACTION (XCUT-07, T-06-05-02):
+// PAYLOAD REDACTION (XCUT-07):
 // interactsh callback URLs (which contain collaborator session IDs) MUST NEVER
 // appear in any log message at Info/Warn level. Only callback count is logged.
 // Raw callback lines are only accessible at Debug level with the host redacted.
@@ -72,10 +72,8 @@
 //	     -w tmp_ssrf_protocols.txt:FUZZ -u FUZZ
 //	     -mr <SSRF_ALT_MATCH_REGEX>
 //
-// DEEP LIMIT GATE (T-06-05-04, mirrors v1 vulns.sh:122):
+// DEEP LIMIT GATE (mirrors v1 vulns.sh:122):
 // If URL count > DeepLimit and !DeepMode → StatusSkipped.
-//
-// Source: .planning/phases/06-vulnerability-scanning-e2e/06-05-PLAN.md Task 1.
 package vulns
 
 import (
@@ -155,9 +153,7 @@ func (t *SSRFTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 	allURLs := append(ssrfURLs, redirectURLs...)
 
 	if len(allURLs) == 0 {
-		if app.Log != nil {
-			app.Log.Info("vulns.ssrf: gf/ssrf and gf/redirect buckets empty — SSRF skipped")
-		}
+		app.Log.Info("vulns.ssrf: gf/ssrf and gf/redirect buckets empty — SSRF skipped")
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
@@ -183,17 +179,13 @@ func (t *SSRFTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 		deepLimit = 500 // v1 DEEP_LIMIT default
 	}
 	if !cfg.Advanced.Deep && len(allURLs) > deepLimit {
-		if app.Log != nil {
-			app.Log.Info("vulns.ssrf: too many URLs — skipped (use --deep to override)",
-				"url_count", len(allURLs), "deep_limit", deepLimit)
-		}
+		app.Log.Info("vulns.ssrf: too many URLs — skipped (use --deep to override)",
+			"url_count", len(allURLs), "deep_limit", deepLimit)
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
-	if app.Log != nil {
-		app.Log.Info("vulns.ssrf: starting SSRF payload generation",
-			"url_count", len(allURLs))
-	}
+	app.Log.Info("vulns.ssrf: starting SSRF payload generation",
+		"url_count", len(allURLs))
 
 	// Resolve ffuf knobs.
 	threads := cfg.Advanced.Tools.FFUF.Threads
@@ -220,9 +212,7 @@ func (t *SSRFTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 		}
 	}
 	if len(tmpSSRFLines) == 0 {
-		if app.Log != nil {
-			app.Log.Info("vulns.ssrf: no qsreplace candidates generated — SSRF skipped")
-		}
+		app.Log.Info("vulns.ssrf: no qsreplace candidates generated — SSRF skipped")
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
@@ -237,14 +227,14 @@ func (t *SSRFTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 	var findings []VulnFindingRecord
 	// ffufRan records whether AT LEAST ONE probe was actually dispatched. If ffuf
 	// is absent every probe fails, the task observed nothing, and it must not
-	// clear a previous run's staging (F3 did-not-run — staging.go).
+	// clear a previous run's staging (did-not-run rule — staging.go).
 	ffufRan := false
 
 	// Step 6: ffuf classic probe — FUZZ position in URL (v1 vulns.sh:132).
 	//
 	// ffuf -v -H <header> -t <threads> -rate <rate>
 	//      -w tmp_ssrf.txt:FUZZ -u FUZZ -s
-	// F6 (phase 15): a TERMINAL ffuf failure means the probe ran and ended badly,
+	// Terminal error: a TERMINAL ffuf failure means the probe ran and ended badly,
 	// so its result is partial — escalate and discard. A DISPATCH error (ffuf
 	// absent) keeps its best-effort path and just leaves ffufRan false. The
 	// interactsh lifecycle is unaffected: `defer cleanup()` was registered before
@@ -306,9 +296,7 @@ func (t *SSRFTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 	// configured (interactsh subprocess or direct COLLAB_SERVER). In-band-only
 	// mode skips this wait entirely.
 	if usingInteractsh {
-		if app.Log != nil {
-			app.Log.Info("vulns.ssrf: waiting 5s for OOB callbacks")
-		}
+		app.Log.Info("vulns.ssrf: waiting 5s for OOB callbacks")
 		select {
 		case <-taskCtx.Done():
 			// Context cancelled during wait — still proceed to check already-received callbacks.
@@ -318,7 +306,7 @@ func (t *SSRFTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 
 	// Step 11: Write inputs/findings.ssrf.jsonl.
 	//
-	// F3 (phase 15): staged through stageVulnFindings so a run in which no probe
+	// Run isolation: staged through stageVulnFindings so a run in which no probe
 	// triggered a callback REMOVES the previous run's staging instead of
 	// republishing an SSRF that has since been fixed.
 	//
@@ -328,9 +316,7 @@ func (t *SSRFTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 	stageVulnFindings(app, "vulns.ssrf", stagingPath, ffufRan, findings)
 
 	// XCUT-07: log only count, never raw SSRF payload, callback URLs, or collab ID.
-	if app.Log != nil {
-		app.Log.Info("vulns.ssrf: completed", "findings", len(findings))
-	}
+	app.Log.Info("vulns.ssrf: completed", "findings", len(findings))
 
 	return task.Result{
 		Status: task.StatusDone,
@@ -348,7 +334,7 @@ func (t *SSRFTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result
 //   - cleanup: non-nil ONLY when interactsh-client was auto-started — the caller
 //     defers it to SIGTERM the process group and reap the subprocess
 //
-// COLLAB_SERVER precedence (D-V6; interactsh auto-start RESTORED in 13-07):
+// COLLAB_SERVER precedence (interactsh auto-start RESTORED):
 //  1. cfg.APIKeys.CollabServer non-empty → OOB mode: strip scheme, build
 //     FFUFHASH.<host> token. No subprocess (cleanup=nil).
 //  2. CollabServer unset AND interactsh-client on PATH → auto-start it (BOUNDED
@@ -383,19 +369,15 @@ func resolveSSRFCollabSession(
 	if sess, ok := startInteractshClient(ctx, app); ok {
 		collabToken = "FFUFHASH." + sess.callbackDomain
 		collabURL = "http://" + collabToken
-		if app.Log != nil {
-			// XCUT-07: log ONLY that OOB is enabled — NEVER the callback domain/URL.
-			app.Log.Info("vulns.ssrf: interactsh OOB session auto-started (bounded)", "oob_enabled", true)
-		}
+		// XCUT-07: log ONLY that OOB is enabled — NEVER the callback domain/URL.
+		app.Log.Info("vulns.ssrf: interactsh OOB session auto-started (bounded)", "oob_enabled", true)
 		return collabToken, collabURL, true, sess.cleanup
 	}
 
 	// Precedence 3: neither available → in-band checks only.
 	// The ffuf probes still run (they test for in-band reflections via
 	// SSRF_ALT_MATCH_REGEX). OOB callbacks are skipped.
-	if app.Log != nil {
-		app.Log.Info("vulns.ssrf: no COLLAB_SERVER and interactsh-client unavailable — in-band SSRF checks only (no OOB)")
-	}
+	app.Log.Info("vulns.ssrf: no COLLAB_SERVER and interactsh-client unavailable — in-band SSRF checks only (no OOB)")
 	return "SSRFCHECK", "http://SSRFCHECK", false, nil
 }
 
@@ -423,7 +405,7 @@ const ssrfInteractshTool = "interactsh-client"
 // then falls through to in-band-only SSRF. Overridable in tests via the package
 // var.
 //
-// 18-05: THE LIFECYCLE IS THE BACKEND'S NOW. There is no exec.CommandContext, no
+// SINCE THE RUNNER MOVE THE LIFECYCLE IS THE BACKEND'S NOW. There is no exec.CommandContext, no
 // SysProcAttr and no syscall.Kill here, because LocalBackend.StreamOpts already
 // owns every one of them (see this file's header for the evidence). `cleanup`
 // cancels the session context, which is what triggers the group SIGTERM and the
@@ -530,7 +512,7 @@ func stripURLScheme(s string) string {
 
 // ssrfReplaceAllParams replaces all query-parameter values in rawURL with
 // replacement. Returns the modified URL string, or "" on parse error or no params.
-// This is the inline qsreplace equivalent for SSRF (T-05-17 shell-injection
+// This is the inline qsreplace equivalent for SSRF (shell-injection
 // mitigation — no shell pipe).
 func ssrfReplaceAllParams(rawURL, replacement string) string {
 	parsed, err := url.Parse(rawURL)
@@ -620,16 +602,14 @@ func buildFFUFHeaderInjArgs(tmpSSRFFile, headersInjectFile, header, collabValue 
 //
 // The error return distinguishes the two ffuf failure channels. A DISPATCH
 // error (ffuf absent) is returned bare and means this probe never ran — the
-// caller must not count it as an observation (F3 did-not-run — staging.go).
+// caller must not count it as an observation (did-not-run rule — staging.go).
 func runSSRFFFUF(ctx context.Context, app *appctx.AppContext, args []string, label string) ([]VulnFindingRecord, error) {
 	const toolName = "ffuf"
 	eventCh, streamErr := app.Tools.Stream(ctx, toolName, args)
 	if streamErr != nil {
 		// DISPATCH failure — ffuf is not on PATH; this probe never ran.
-		if app.Log != nil {
-			app.Log.Debug("vulns.ssrf: ffuf stream error (best_effort)",
-				"label", label, "err", streamErr)
-		}
+		app.Log.Debug("vulns.ssrf: ffuf stream error (best_effort)",
+			"label", label, "err", streamErr)
 		return nil, fmt.Errorf("vulns.ssrf: ffuf stream %s: %w", label, streamErr)
 	}
 
@@ -637,7 +617,7 @@ func runSSRFFFUF(ctx context.Context, app *appctx.AppContext, args []string, lab
 	// XCUT-07: ffuf -v output may contain SSRF trigger URLs with collab IDs.
 	// NEVER log raw lines at Info/Warn.
 	//
-	// F6 (phase 15) accumulator shape: latch the TERMINAL error inside the loop
+	// Terminal-error accumulator shape: latch the TERMINAL error inside the loop
 	// and check it after.
 	var matchedHosts []string
 	var termErr error
@@ -653,14 +633,12 @@ func runSSRFFFUF(ctx context.Context, app *appctx.AppContext, args []string, lab
 			// Extract host for XCUT-07-safe record storage.
 			host := ssrfExtractHost(line)
 			matchedHosts = append(matchedHosts, host)
-			if app.Log != nil {
-				// XCUT-07: NEVER log the raw matched URL or collab token.
-				app.Log.Debug("vulns.ssrf: ffuf match indicator", "label", label)
-			}
+			// XCUT-07: NEVER log the raw matched URL or collab token.
+			app.Log.Debug("vulns.ssrf: ffuf match indicator", "label", label)
 		}
 	}
 
-	// F6: ffuf ended badly, so this probe covered only part of its wordlist.
+	// Terminal error: ffuf ended badly, so this probe covered only part of its wordlist.
 	// Report it rather than let a partial probe read as "no SSRF".
 	if termErr != nil {
 		return nil, terminalStreamError(toolName, termErr)
@@ -745,9 +723,7 @@ func runSSRFAltProtocols(
 	altFile := filepath.Join(inputsDir, "tmp_ssrf_protocols.txt")
 	if wErr := os.WriteFile(altFile,
 		[]byte(strings.Join(altURLs, "\n")+"\n"), 0o644); wErr != nil { //nolint:gosec
-		if app.Log != nil {
-			app.Log.Debug("vulns.ssrf: write tmp_ssrf_protocols.txt failed (best_effort)", "err", wErr)
-		}
+		app.Log.Debug("vulns.ssrf: write tmp_ssrf_protocols.txt failed (best_effort)", "err", wErr)
 		return nil, fmt.Errorf("vulns.ssrf: write tmp_ssrf_protocols.txt: %w", wErr)
 	}
 

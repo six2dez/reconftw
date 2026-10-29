@@ -3,7 +3,7 @@
 //
 // GitHubReposTask runs enumerepo over the company org (v1 osint.sh:68
 // github_repos), producing the repository list that feeds the leak scan
-// (GitHubLeaksTask, D-O10 fold: github_repos + github_leaks → OSINT-05).
+// (GitHubLeaksTask; github_repos + github_leaks together cover OSINT-05).
 //
 // It then performs the heavy bash github_repos secret pipeline (osint.sh:105-256,
 // PAR-03): clone every company repo into an isolated workspace tmp dir
@@ -14,21 +14,21 @@
 // OSINTFindingRecords. Previously only enumerepo ran — no clone, no secret scan, no
 // github_company_secrets.json.
 //
-// noseyparker is the sole non-default engine and is DEFERRED to Phase 14 (absent
+// noseyparker is the sole non-default engine and is DEFERRED (absent
 // from tools.lock this phase). SecretsEngine=="noseyparker" logs a "deferred — using
 // titus" note and falls back to the titus + trufflehog pair, which covers the ≥95%
 // recon/all path.
 //
 // The repo list is written to inputs/github_repos.txt as a SINGLE-WRITER
-// artefact (D-O5) — one URL per line — which GitHubLeaksTask reads via its
+// artefact — one URL per line — which GitHubLeaksTask reads via its
 // DependsOn edge. Discovered repos are emitted as informational OSINTFindingRecords.
 //
-// KEY GATE (D-O8): reads cfg.Paths.GitHubTokens (the v1 $GITHUB_TOKENS file).
+// KEY GATE: reads cfg.Paths.GitHubTokens (the v1 $GITHUB_TOKENS file).
 // Empty path / empty file → logged Info (naming the var, not the value) +
 // StatusSkipped (logged-never-silent). Without a token the whole task skips
 // cleanly, so a tokenless run is never broken.
 //
-// SECRET HANDLING (XCUT-07 / T-13-06-01/02): the GitHub token is written to a
+// SECRET HANDLING (XCUT-07): the GitHub token is written to a
 // 0600 temp file and passed via enumerepo's -token-file flag (v1 osint.sh:80-85)
 // so it is NEVER placed on argv or in a log line; the temp file is removed after
 // the run. Every leaked secret surfaced by titus/trufflehog is registered with
@@ -36,15 +36,15 @@
 // emitted to the findings stream ONLY as ValueRedacted="***" — the raw value
 // NEVER reaches the JSONL findings stream or a log.
 //
-// SEEDING (D-O1): company-org-seeded, no DependsOn edges.
-// FAILURE POLICY (D-O8): best_effort throughout — a missing tool / clone failure
+// SEEDING: company-org-seeded, no DependsOn edges.
+// FAILURE POLICY: best_effort throughout — a missing tool / clone failure
 // / scan error logs a warning and continues; the task returns StatusDone with the
 // count of secrets found. It never aborts the osint pipeline.
 //
 // FOUND-10: EVERY dispatch in this file now runs through app.Tools (the Runner
 // seam) — enumerepo, titus, trufflehog AND `git clone`.
 //
-// 18-05 VERDICT 2. This file's bypass reason was `non_recon_binary`, on the true
+// RUNNER-MOVE VERDICT. This file's bypass reason was `non_recon_binary`, on the true
 // premise that git had no tools.lock entry. The premise held; the RATIONALE ("the
 // registry runs the recon inventory, not the version-control system") did not,
 // because tools.lock already carries seven kind="system" rows — whois, nmap,
@@ -63,10 +63,6 @@
 // The INSTALLER's own git dispatch is untouched and remains a declared
 // `installer_toolchain` bypass: installing tools and cloning a scan target are
 // different operations at different trust boundaries.
-//
-// Source: .planning/phases/07-osint-e2e/07-03-PLAN.md Task 2;
-//
-//	.planning/phases/13-domain-parity/13-06-PLAN.md Task 1 (secret-scan restore).
 package osint
 
 import (
@@ -94,7 +90,7 @@ import (
 // githubReposCloneTimeout bounds a single `git clone` invocation. Company repos
 // can be large (bash does a full clone so titus --git can walk history), so the
 // ceiling is generous; a hung/auth-prompting clone is still killed.
-// 18-05: the bound MOVED to tools.lock's git row (timeout_seconds = 300), which
+// The bound MOVED to tools.lock's git row (timeout_seconds = 300), which
 // applyToolContract now derives inside the Runner. The constant is retained as
 // githubReposCloneFormerTimeout so the pin that keeps the two from drifting has
 // something to name, and so deleting it is a visible change rather than a silent
@@ -109,7 +105,7 @@ const githubReposGitTool = "git"
 // call routes through backend.Runner; it is no longer a FOUND-10 bypass. The var
 // remains overridable so hermetic tests can inject a fake clone.
 var githubReposGitClone = func(ctx context.Context, app *appctx.AppContext, url, dest string) error {
-	// WR-13-04: validate the clone target BEFORE doing any work. Reject anything
+	// Validate the clone target BEFORE doing any work. Reject anything
 	// that is not an http(s)/git clone URL so a value beginning with "-" (enumerepo
 	// schema drift or plaintext-fallback garbage) can never be consumed by git as
 	// an option (git option-injection, e.g. --upload-pack=…, or an "ext::"
@@ -124,7 +120,7 @@ var githubReposGitClone = func(ctx context.Context, app *appctx.AppContext, url,
 	}
 	// protocol.ext.allow=never disables git's ext:: transport; "--" ends option
 	// parsing so the validated URL is always treated as a positional argument.
-	// Both survive the move VERBATIM (T-18-05-02) and are now visible in the
+	// Both survive the move VERBATIM and are now visible in the
 	// invocation record.
 	args := []string{"-c", "protocol.ext.allow=never", "clone", "--", url, dest}
 	// GIT_TERMINAL_PROMPT=0 makes an auth-required clone fail fast instead of
@@ -132,7 +128,7 @@ var githubReposGitClone = func(ctx context.Context, app *appctx.AppContext, url,
 	// NOT on argv — the argv-free child-environment seam (ARCH-02).
 	_, err := app.Tools.RunOpts(ctx, githubReposGitTool, args,
 		backend.ExecOptions{Env: []string{"GIT_TERMINAL_PROMPT=0"}})
-	return err // absent git / clone failure — caller degrades best-effort (D-O8)
+	return err // absent git / clone failure — caller degrades best-effort
 }
 
 // GitHubReposTask runs enumerepo + the company-repo secret scan for OSINT-05 /
@@ -156,7 +152,7 @@ func (t *GitHubReposTask) Enabled(cfg *config.Config) bool {
 }
 
 // DependsOn returns nil — enumerepo is the DAG root for the leak scan; it is
-// company-org-seeded (D-O1) with no upstream edges of its own.
+// company-org-seeded with no upstream edges of its own.
 func (t *GitHubReposTask) DependsOn() []string { return nil }
 
 // Run executes enumerepo over the company org, writes the repo list, then runs
@@ -165,7 +161,7 @@ func (t *GitHubReposTask) DependsOn() []string { return nil }
 //
 // Steps:
 //  1. Derive + validate the root domain → company name.
-//  2. Key gate (D-O8): require a non-empty cfg.Paths.GitHubTokens file.
+//  2. Key gate: require a non-empty cfg.Paths.GitHubTokens file.
 //  3. Write a 0600 temp token file; run enumerepo -token-file -usernames -o.
 //  4. Parse the enumerepo output into a repo URL list.
 //  5. Write inputs/github_repos.txt (single-writer artefact, feeds leaks).
@@ -175,19 +171,15 @@ func (t *GitHubReposTask) DependsOn() []string { return nil }
 func (t *GitHubReposTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result, error) {
 	root := rootDomain(app)
 	if root == "" {
-		if app.Log != nil {
-			app.Log.Info("osint.github_repos: no valid root domain — skipping")
-		}
+		app.Log.Info("osint.github_repos: no valid root domain — skipping")
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 	company := companyName(root)
 
-	// Step 2: GITHUB_TOKEN key gate (D-O8, logged-never-silent).
+	// Step 2: GITHUB_TOKEN key gate (logged-never-silent).
 	token, ok := readGitHubToken(app)
 	if !ok {
-		if app.Log != nil {
-			app.Log.Info("osint.github_repos: no GITHUB_TOKEN (cfg.paths.github_tokens) — skipping")
-		}
+		app.Log.Info("osint.github_repos: no GITHUB_TOKEN (cfg.paths.github_tokens) — skipping")
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
@@ -197,12 +189,10 @@ func (t *GitHubReposTask) Run(ctx context.Context, app *appctx.AppContext) (task
 			fmt.Errorf("osint.github_repos: mkdir inputs/: %w", err)
 	}
 
-	// Step 3: write a 0600 temp token file (T-13-06-01 — token off argv).
+	// Step 3: write a 0600 temp token file (token off argv).
 	tokenFile, err := writeTokenFile(token)
 	if err != nil {
-		if app.Log != nil {
-			app.Log.Debug("osint.github_repos: write token file failed (best_effort)", "err", err)
-		}
+		app.Log.Debug("osint.github_repos: write token file failed (best_effort)", "err", err)
 		return task.Result{Status: task.StatusDone, Stats: map[string]int{"repos": 0}}, nil
 	}
 	defer os.Remove(tokenFile) //nolint:errcheck
@@ -218,13 +208,11 @@ func (t *GitHubReposTask) Run(ctx context.Context, app *appctx.AppContext) (task
 	args := []string{"-token-file", tokenFile, "-usernames", usernamesFile, "-o", enumOut}
 	// enumerepoRan records whether enumerepo was actually dispatched. An absent
 	// binary means this task observed nothing and must not clear a previous
-	// run's staging (F3 did-not-run — see writeOSINTStaging).
+	// run's staging (did-not-run rule — see writeOSINTStaging).
 	enumerepoRan := true
 	if _, err := app.Tools.Run(ctx, "enumerepo", args); err != nil {
 		enumerepoRan = false
-		if app.Log != nil {
-			app.Log.Debug("osint.github_repos: enumerepo run failed (best_effort)", "err", err)
-		}
+		app.Log.Debug("osint.github_repos: enumerepo run failed (best_effort)", "err", err)
 		// Fall through — enumerepo may have written partial output.
 	}
 
@@ -232,11 +220,11 @@ func (t *GitHubReposTask) Run(ctx context.Context, app *appctx.AppContext) (task
 	repos := parseEnumerepoOutput(enumOut)
 
 	// Step 5: write inputs/github_repos.txt — the SINGLE-WRITER artefact that
-	// GitHubLeaksTask consumes (D-O5 / D-O10 fold).
+	// GitHubLeaksTask consumes (single-writer).
 	reposListPath := filepath.Join(inputsDir, "github_repos.txt")
 	if len(repos) > 0 {
 		if wErr := os.WriteFile(reposListPath,
-			[]byte(strings.Join(repos, "\n")+"\n"), 0o644); wErr != nil && app.Log != nil { //nolint:gosec
+			[]byte(strings.Join(repos, "\n")+"\n"), 0o644); wErr != nil { //nolint:gosec
 			app.Log.Debug("osint.github_repos: write github_repos.txt failed", "err", wErr)
 		}
 	}
@@ -252,21 +240,19 @@ func (t *GitHubReposTask) Run(ctx context.Context, app *appctx.AppContext) (task
 			PoCRedacted: r,
 		})
 	}
-	// F3: a run that enumerated no repo REMOVES the staging file rather than
+	// Run isolation: a run that enumerated no repo REMOVES the staging file rather than
 	// republishing repos the org has since deleted or made private.
 	if enumerepoRan {
 		writeOSINTStaging(app, inputsDir, "findings.github_repos.jsonl", records)
-	} else if app.Log != nil {
-		app.Log.Debug("osint.github_repos: enumerepo did not run — staging preserved (F3 did-not-run)")
+	} else {
+		app.Log.Debug("osint.github_repos: enumerepo did not run — staging preserved (did-not-run rule)")
 	}
 
-	// Step 7: full company-repo secret scan (PAR-03 / 13-06). Best-effort — a
+	// Step 7: full company-repo secret scan (secret-scan parity). Best-effort — a
 	// missing tool / clone failure never breaks the osint pipeline.
 	secrets := t.scanCompanyRepos(ctx, app, repos)
 
-	if app.Log != nil {
-		app.Log.Info("osint.github_repos: completed", "repos", len(repos), "secrets", secrets)
-	}
+	app.Log.Info("osint.github_repos: completed", "repos", len(repos), "secrets", secrets)
 	return task.Result{
 		Status: task.StatusDone,
 		Stats:  map[string]int{"repos": len(repos), "secrets": secrets},
@@ -276,10 +262,10 @@ func (t *GitHubReposTask) Run(ctx context.Context, app *appctx.AppContext) (task
 // scanCompanyRepos performs the heavy bash github_repos secret pipeline
 // (osint.sh:105-256) over the enumerated repo URLs: clone each repo, run the titus +
 // trufflehog pair (the cfg SecretsEngine default "hybrid" — and any value other than
-// "noseyparker" — runs this pair; noseyparker is deferred to Phase 14), merge the
+// "noseyparker" — runs this pair; noseyparker is deferred), merge the
 // per-repo scan output into osint/github_company_secrets.json (bash-parity human
 // artefact), and emit REDACTED findings. Returns the count of secrets surfaced.
-// Every step is best-effort (D-O8).
+// Every step is best-effort.
 func (t *GitHubReposTask) scanCompanyRepos(ctx context.Context, app *appctx.AppContext, urls []string) int {
 	if len(urls) == 0 {
 		return 0
@@ -294,21 +280,17 @@ func (t *GitHubReposTask) scanCompanyRepos(ctx context.Context, app *appctx.AppC
 	cloneRoot := filepath.Join(tmpRoot, "github_repos")
 	githubDir := filepath.Join(tmpRoot, "github")
 	if err := os.MkdirAll(cloneRoot, 0o750); err != nil {
-		if app.Log != nil {
-			app.Log.Debug("osint.github_repos: mkdir clone tmp failed (best_effort)", "err", err)
-		}
+		app.Log.Debug("osint.github_repos: mkdir clone tmp failed (best_effort)", "err", err)
 		return 0
 	}
 	if err := os.MkdirAll(githubDir, 0o750); err != nil {
-		if app.Log != nil {
-			app.Log.Debug("osint.github_repos: mkdir scan tmp failed (best_effort)", "err", err)
-		}
+		app.Log.Debug("osint.github_repos: mkdir scan tmp failed (best_effort)", "err", err)
 		return 0
 	}
 	// Free the heavy clones after scanning (the small JSON scan outputs in
 	// githubDir are what the merge reads).
 	defer os.RemoveAll(cloneRoot) //nolint:errcheck
-	// IN-13-04: the per-repo titus/trufflehog scan outputs in githubDir hold RAW
+	// The per-repo titus/trufflehog scan outputs in githubDir hold RAW
 	// (unscrubbed) secret values at 0600. Remove the whole scan-tmp dir on return so
 	// they do not linger in .tmp/github after the run (the merged artefact scrubs
 	// values to "***", but these upstream files do not). Deferred → fires at function
@@ -321,9 +303,7 @@ func (t *GitHubReposTask) scanCompanyRepos(ctx context.Context, app *appctx.AppC
 	githubReposBounded(threads, len(urls), func(i int) {
 		dest := filepath.Join(cloneRoot, githubReposSHA256(urls[i]))
 		if err := githubReposGitClone(ctx, app, urls[i], dest); err != nil {
-			if app.Log != nil {
-				app.Log.Debug("osint.github_repos: git clone failed (best_effort)", "err", err)
-			}
+			app.Log.Debug("osint.github_repos: git clone failed (best_effort)", "err", err)
 			return
 		}
 		cloned[i] = dest
@@ -331,10 +311,10 @@ func (t *GitHubReposTask) scanCompanyRepos(ctx context.Context, app *appctx.AppC
 
 	// Step B: secrets-engine selection. The cfg SecretsEngine default is "hybrid",
 	// which — like every value other than "noseyparker" — runs the titus + trufflehog
-	// pair below. noseyparker is DEFERRED to Phase 14 (not in tools.lock); a
+	// pair below. noseyparker is DEFERRED (not in tools.lock); a
 	// "noseyparker" selection logs a deferral note and falls back to that pair.
-	if cfg != nil && strings.EqualFold(strings.TrimSpace(cfg.OSINT.GitHub.SecretsEngine), "noseyparker") && app.Log != nil {
-		app.Log.Info("osint.github_repos: noseyparker deferred to Phase 14 — using titus")
+	if cfg != nil && strings.EqualFold(strings.TrimSpace(cfg.OSINT.GitHub.SecretsEngine), "noseyparker") {
+		app.Log.Info("osint.github_repos: noseyparker not installed yet — using titus")
 	}
 
 	// Step C: titus scan over each cloned repo dir (best-effort).
@@ -344,7 +324,7 @@ func (t *GitHubReposTask) scanCompanyRepos(ctx context.Context, app *appctx.AppC
 	trufflehogRan := t.runTrufflehogScan(ctx, app, urls, githubDir)
 
 	// Step E: merge per-repo scan outputs → github_company_secrets.json + findings.
-	// scannerRan carries the F3 did-not-run decision down to the staging write:
+	// scannerRan carries the did-not-run decision down to the staging write:
 	// when NEITHER engine was dispatched the task observed nothing and must not
 	// delete a previously reported secret exposure (see writeOSINTStaging).
 	return t.mergeSecretOutputs(app, githubDir, titusRan || trufflehogRan)
@@ -356,9 +336,7 @@ func (t *GitHubReposTask) scanCompanyRepos(ctx context.Context, app *appctx.AppC
 // binary logs a single warning; a per-repo error is skipped.
 func (t *GitHubReposTask) runTitusScan(ctx context.Context, app *appctx.AppContext, urls, cloned []string, githubDir string) bool {
 	if !githubReposToolAvailable(app, "titus") {
-		if app.Log != nil {
-			app.Log.Warn("osint.github_repos: titus not found — skipping secret scan (best_effort)")
-		}
+		app.Log.Warn("osint.github_repos: titus not found — skipping secret scan (best_effort)")
 		return false
 	}
 	base := []string{"scan", "--format", "json"}
@@ -380,9 +358,7 @@ func (t *GitHubReposTask) runTitusScan(ctx context.Context, app *appctx.AppConte
 		scanArgs := append(append([]string(nil), base...), dir)
 		res, err := app.Tools.Run(ctx, "titus", scanArgs)
 		if err != nil || res == nil {
-			if app.Log != nil {
-				app.Log.Debug("osint.github_repos: titus scan failed (best_effort)", "err", err)
-			}
+			app.Log.Debug("osint.github_repos: titus scan failed (best_effort)", "err", err)
 			return
 		}
 		dispatched.Store(true)
@@ -390,7 +366,7 @@ func (t *GitHubReposTask) runTitusScan(ctx context.Context, app *appctx.AppConte
 			return
 		}
 		out := filepath.Join(githubDir, "titus_"+githubReposSHA256(urls[i])+".json")
-		if wErr := os.WriteFile(out, res.Stdout, 0o600); wErr != nil && app.Log != nil {
+		if wErr := os.WriteFile(out, res.Stdout, 0o600); wErr != nil {
 			app.Log.Debug("osint.github_repos: write titus output failed", "err", wErr)
 		}
 	})
@@ -411,9 +387,7 @@ func (t *GitHubReposTask) runTrufflehogScan(ctx context.Context, app *appctx.App
 	githubReposBounded(threads, len(urls), func(i int) {
 		res, err := app.Tools.Run(ctx, "trufflehog", []string{"git", urls[i], "-j"})
 		if err != nil || res == nil {
-			if app.Log != nil {
-				app.Log.Debug("osint.github_repos: trufflehog failed (best_effort)", "err", err)
-			}
+			app.Log.Debug("osint.github_repos: trufflehog failed (best_effort)", "err", err)
 			return
 		}
 		dispatched.Store(true)
@@ -421,7 +395,7 @@ func (t *GitHubReposTask) runTrufflehogScan(ctx context.Context, app *appctx.App
 			return
 		}
 		out := filepath.Join(githubDir, "th_"+githubReposSHA256(urls[i]))
-		if wErr := os.WriteFile(out, res.Stdout, 0o600); wErr != nil && app.Log != nil {
+		if wErr := os.WriteFile(out, res.Stdout, 0o600); wErr != nil {
 			app.Log.Debug("osint.github_repos: write trufflehog output failed", "err", wErr)
 		}
 	})
@@ -436,7 +410,7 @@ func (t *GitHubReposTask) runTrufflehogScan(ctx context.Context, app *appctx.App
 // with the log Redactor BEFORE any log line or file write (XCUT-07 L2). Returns
 // the number of secret findings.
 func (t *GitHubReposTask) mergeSecretOutputs(app *appctx.AppContext, githubDir string, scannerRan bool) int {
-	// F3 (phase 15): each of the three "nothing to merge" paths below used to
+	// Run isolation: each of the three "nothing to merge" paths below used to
 	// `return 0` WITHOUT touching the staging file — the same run-isolation bug
 	// as an unconditional write, and invisible to any AST guard that looks for
 	// raw WRITES. When a scanner RAN and surfaced no secret, that is a real
@@ -447,8 +421,8 @@ func (t *GitHubReposTask) mergeSecretOutputs(app *appctx.AppContext, githubDir s
 		if scannerRan {
 			writeOSINTStaging(app, filepath.Join(app.Target.WorkDir, "inputs"),
 				"findings.github_secrets.jsonl", nil)
-		} else if app.Log != nil {
-			app.Log.Debug("osint.github_repos: no secret scanner ran — staging preserved (F3 did-not-run)")
+		} else {
+			app.Log.Debug("osint.github_repos: no secret scanner ran — staging preserved (did-not-run rule)")
 		}
 		return 0
 	}
@@ -505,9 +479,9 @@ func (t *GitHubReposTask) mergeSecretOutputs(app *appctx.AppContext, githubDir s
 	// titus/trufflehog JSON with raw secret VALUES scrubbed to "***" (the
 	// locators/structure a hunter reads are preserved). 0600 — the file still
 	// names findings. The JSONL findings stream below is fully redacted
-	// (XCUT-07 / T-13-06-02).
+	// (XCUT-07).
 	osintDir := filepath.Join(app.Target.WorkDir, "osint")
-	if mErr := os.MkdirAll(osintDir, 0o755); mErr != nil && app.Log != nil {
+	if mErr := os.MkdirAll(osintDir, 0o755); mErr != nil {
 		app.Log.Debug("osint.github_repos: mkdir osint/ failed (best_effort)", "err", mErr)
 	}
 	body := bytes.Join(merged, []byte("\n"))
@@ -516,7 +490,7 @@ func (t *GitHubReposTask) mergeSecretOutputs(app *appctx.AppContext, githubDir s
 	}
 	body = append(body, '\n')
 	outPath := filepath.Join(osintDir, "github_company_secrets.json")
-	if wErr := os.WriteFile(outPath, body, 0o600); wErr != nil && app.Log != nil {
+	if wErr := os.WriteFile(outPath, body, 0o600); wErr != nil {
 		app.Log.Debug("osint.github_repos: write github_company_secrets.json failed", "err", wErr)
 	}
 
@@ -725,11 +699,11 @@ func parseEnumerepoOutput(path string) []string {
 		out = append(out, u)
 	}
 
-	// WR-13-05: only fall back to plain-text parsing when the payload is NOT valid
+	// Only fall back to plain-text parsing when the payload is NOT valid
 	// JSON. enumerepo emits JSON; if it parses but collectRepoURLs recognizes no
 	// repo keys (schema drift), an empty list is the correct result — shredding the
 	// pretty-printed JSON into per-line "{"/"}" garbage would pollute the repo list,
-	// the informational findings, and the git-clone seam (WR-13-04).
+	// the informational findings, and the git-clone seam (clone-target validation).
 	var generic interface{}
 	if jErr := json.Unmarshal(data, &generic); jErr == nil {
 		collectRepoURLs(generic, add)

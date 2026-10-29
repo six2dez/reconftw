@@ -6,20 +6,29 @@
 //
 // DEPENDENCY: DependsOn ["vulns.gf"] — reads inputs/gf/xss.txt bucket.
 //
-// ARG VECTOR (v1 vulns.sh:27 + dalfox:50 verbatim):
+// ARG VECTOR (reflection pre-pass is v1 vulns.sh:27 verbatim):
 //
 //	qsreplace FUZZ < gf/xss.txt | sed '/FUZZ/!d' | Gxss -c 100 -p Xss |
 //	  qsreplace FUZZ | sed '/FUZZ/!d'
-//	dalfox pipe --silence --no-color --no-spinner --only-poc r
-//	            --ignore-return 302,404,403 --skip-bav [-b XSS_SERVER]
-//	            -w <threads> -d <depth>
+//	dalfox pipe --silence --no-color --only-poc r
+//	            --ignore-return 302,404,403 [-b XSS_SERVER]
+//
+// DALFOX VECTOR (21-07a): restricted to the flags BOTH dalfox majors accept.
+// v1 (vulns.sh:50) sent `--no-spinner --skip-bav -w <threads> -d <depth>`,
+// checked against dalfox v2.9.2 (Go, cmd/root.go) and v3.2.3 (Rust, clap):
+//
+//   - --no-spinner, --skip-bav, -w/--worker: v2 only; v3 rejects each with
+//     "unexpected argument" (exit 2), so the whole scan never read a URL.
+//   - -d <depth>: `-d` is --data (the POST BODY) in BOTH majors. There was never
+//     a depth flag; v1 has been sending the string "2" as a request body.
+//   - common to both: pipe, --silence, --no-color, --only-poc, --ignore-return,
+//     -b/--blind, --delay. The worker cap is NOT common (v2 --worker, v3
+//     --workers), so cfg.Vulns.XSS.Threads is no longer placed on argv; the
+//     D-V6 intent is noted in the Reason-free Debug line below.
 //
 // BLIND XSS GATING (D-V6, T-06-02-03):
 // XSS_SERVER empty → log.Warn "No XSS_SERVER defined, blind XSS skipped";
 // -b flag is NOT added.
-//
-// WAF-FRIENDLY THREAD CAP (D-V6, T-06-02-04):
-// Default cfg.Vulns.XSS.Threads == 5 (reduced from v1's AVAILABLE_CORES*15).
 //
 // PAYLOAD REDACTION (XCUT-07, T-06-02-01):
 // dalfox stdout lines (PoC URLs) are NEVER logged at Info/Warn level.
@@ -68,7 +77,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
@@ -113,27 +121,13 @@ func (t *XSSTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result,
 	const toolName = "dalfox"
 	cfg := app.Cfg
 
-	// Resolve thread count; fall back to WAF-friendly default (D-V6).
-	threads := cfg.Vulns.XSS.Threads
-	if threads <= 0 {
-		threads = 5 // D-V6: WAF-friendly cap; reduced from v1 AVAILABLE_CORES*15
-	}
-
-	// Depth: 3 in DEEP mode, 2 otherwise (v1 DEPTH default).
-	depth := 2
-	if cfg.Advanced.Deep {
-		depth = 3
-	}
-
 	// Step 1: Read gf/xss.txt bucket.
 	gfBucket := filepath.Join(app.Target.WorkDir, "inputs", "gf", "xss.txt")
 	bucketData, err := os.ReadFile(gfBucket) //nolint:gosec // path within WorkDir
 	if err != nil || len(bytes.TrimSpace(bucketData)) == 0 {
-		if app.Log != nil {
-			app.Log.Info("vulns.xss: gf/xss bucket empty — XSS skipped",
-				"bucket", gfBucket)
-		}
-		return task.Result{Status: task.StatusSkipped}, nil
+		app.Log.Info("vulns.xss: gf/xss bucket empty — XSS skipped",
+			"bucket", gfBucket)
+		return task.NothingProduced("gf/xss bucket empty"), nil
 	}
 
 	inputsDir := filepath.Join(app.Target.WorkDir, "inputs")
@@ -144,7 +138,7 @@ func (t *XSSTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result,
 
 	// Step 2: qsreplace FUZZ → Gxss → qsreplace FUZZ pipeline.
 	reflected, pipeErr := runGxssReflectionPipeline(ctx, bucketData, app)
-	if pipeErr != nil && app.Log != nil {
+	if pipeErr != nil {
 		app.Log.Debug("vulns.xss: Gxss pipeline error (best_effort)", "err", pipeErr)
 	}
 	// Filter lines containing FUZZ (v1: sed '/FUZZ/!d').
@@ -168,21 +162,17 @@ func (t *XSSTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result,
 				fmt.Errorf("vulns.xss: write xss_reflected.txt: %w", wErr)
 		}
 	} else {
-		if app.Log != nil {
-			app.Log.Info("vulns.xss: no reflected candidates after Gxss filter — XSS skipped")
-		}
-		return task.Result{Status: task.StatusSkipped}, nil
+		app.Log.Info("vulns.xss: no reflected candidates after Gxss filter — XSS skipped")
+		return task.NothingProduced("no reflected candidates after Gxss filter"), nil
 	}
 
-	// Step 3: Build dalfox pipe args.
+	// Step 3: Build dalfox pipe args — the v2/v3 common subset (file header).
 	args := []string{
 		"pipe",
 		"--silence",
 		"--no-color",
-		"--no-spinner",
 		"--only-poc", "r",
 		"--ignore-return", "302,404,403",
-		"--skip-bav",
 	}
 
 	// D-V6 / T-06-02-03: blind-XSS gate — skip -b when XSS_SERVER empty.
@@ -190,15 +180,12 @@ func (t *XSSTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result,
 	if blindServer != "" {
 		args = append(args, "-b", blindServer)
 	} else {
-		if app.Log != nil {
-			app.Log.Warn("vulns.xss: No XSS_SERVER defined, blind XSS skipped")
-		}
+		app.Log.Warn("vulns.xss: No XSS_SERVER defined, blind XSS skipped")
 	}
-
-	args = append(args,
-		"-w", strconv.Itoa(threads),
-		"-d", strconv.Itoa(depth),
-	)
+	if cfg.Vulns.XSS.Threads > 0 {
+		app.Log.Debug("vulns.xss: worker cap not placed on argv (v2 --worker vs v3 --workers differ)",
+			"configured_threads", cfg.Vulns.XSS.Threads)
+	}
 
 	// Step 4+5: stream dalfox through backend.Runner with the reflected
 	// candidates on stdin (XCUT-09 heartbeat: each line is consumed as it
@@ -212,14 +199,13 @@ func (t *XSSTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result,
 		Stdin: []byte(strings.Join(reflectedLines, "\n") + "\n"),
 	})
 	if streamErr != nil {
-		if coreerrors.IsDispatchFailure(streamErr) {
-			if app.Log != nil {
-				app.Log.Info("vulns.xss: dalfox unavailable — skipping")
-			}
-			return task.Result{Status: task.StatusSkipped}, nil
-		}
-		return task.Result{Status: task.StatusErrored},
-			fmt.Errorf("vulns.xss: start dalfox: %w", streamErr)
+		// Absent-vs-failed policy (task.ClassifyToolErr): a dalfox that never
+		// started is "tool absent"; a dalfox that could not be opened for any
+		// other reason is degraded with its own account of why. Neither fails
+		// the scan (best_effort).
+		status, reason := task.ClassifyToolErr(streamErr)
+		app.Log.Info("vulns.xss: dalfox not run — skipping", "reason", reason)
+		return task.Result{Status: status, Reason: reason}, nil
 	}
 
 	var pocLines []string
@@ -236,11 +222,9 @@ func (t *XSSTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result,
 			return
 		}
 		// XCUT-07 / T-06-02-01: raw PoC line is NEVER logged at Info/Warn.
-		if app.Log != nil {
-			app.Log.Debug("vulns.xss: dalfox PoC line received")
-		}
+		app.Log.Debug("vulns.xss: dalfox PoC line received")
 		pocLines = append(pocLines, line)
-	}); collectErr != nil && app.Log != nil {
+	}); collectErr != nil {
 		app.Log.Debug("vulns.xss: dalfox exited non-zero (may be normal)", "err", collectErr)
 	}
 
@@ -274,9 +258,7 @@ func (t *XSSTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result,
 	stagingPath := filepath.Join(inputsDir, "findings.xss.jsonl")
 	stageVulnFindings(app, "vulns.xss", stagingPath, true, records)
 
-	if app.Log != nil {
-		app.Log.Info("vulns.xss: completed", "findings", len(records))
-	}
+	app.Log.Info("vulns.xss: completed", "findings", len(records))
 
 	return task.Result{
 		Status: task.StatusDone,
@@ -310,9 +292,7 @@ func runGxssReflectionPipeline(ctx context.Context, bucketData []byte, app *appc
 		backend.ExecOptions{Stdin: fuzzed})
 	if gxssErr != nil {
 		if coreerrors.IsDispatchFailure(gxssErr) {
-			if app.Log != nil {
-				app.Log.Info("vulns.xss: Gxss unavailable — reflection filter skipped")
-			}
+			app.Log.Info("vulns.xss: Gxss unavailable — reflection filter skipped")
 			// Fall back to the FUZZ-replaced URLs directly (best_effort) —
 			// byte-for-byte the old exec.LookPath fallback.
 			return fuzzed, nil
@@ -330,11 +310,9 @@ func runGxssReflectionPipeline(ctx context.Context, bucketData []byte, app *appc
 		// Gxss is a best-effort NARROWING pre-pass. Failing to narrow means testing
 		// the unfiltered corpus — more work, same coverage. It never means testing
 		// nothing.
-		if app.Log != nil {
-			app.Log.Warn("vulns.xss: Gxss did not complete — proceeding with the UNFILTERED "+
-				"corpus rather than skipping the scan (WR-05)",
-				"candidates", len(fuzzed), "err", gxssErr)
-		}
+		app.Log.Warn("vulns.xss: Gxss did not complete — proceeding with the UNFILTERED "+
+			"corpus rather than skipping the scan (WR-05)",
+			"candidates", len(fuzzed), "err", gxssErr)
 		return fuzzed, nil
 	}
 	var gxssOut []byte

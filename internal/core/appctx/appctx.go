@@ -101,6 +101,10 @@ type SecretRegistrar interface {
 }
 
 type AppContext struct {
+	// Log is NEVER nil on an AppContext built by Boot: a nil logger argument is
+	// replaced by slog.Default() there, so module code may call app.Log.Info
+	// without a guard. Test literals that build an AppContext by hand should
+	// set Log to NopLogger() rather than leaving it nil.
 	Log *slog.Logger
 	// Secrets registers runtime-loaded secrets (token files) with the redactor.
 	// May be nil — callers MUST nil-check; a nil registrar means no redaction,
@@ -127,3 +131,9 @@ type Target struct {
 	Scope   []string // wildcard patterns from scope file (e.g. "*.example.com")
 	WorkDir string   // absolute path to workspaces/<target-id>/
 }
+
+// NopLogger returns a logger that discards every record. It is the value Boot
+// substitutes for a nil logger when there is no default handler worth using,
+// and the value test literals should give AppContext.Log so module code can
+// treat the field as always set.
+func NopLogger() *slog.Logger { return slog.New(slog.DiscardHandler) }

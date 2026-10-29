@@ -193,6 +193,14 @@ type SubScope struct {
 	ExcludeSensitive   bool `koanf:"exclude_sensitive"`
 	DeepWildcardFilter bool `koanf:"deep_wildcard_filter"`
 	NoErrorCheck       bool `koanf:"no_error_check"`
+	// IncludeFile / ExcludeFile are the v1 `-i <file>` / `-x <file>` scope
+	// lists: one entry per line (exact host, `*.sub.example.com` wildcard, IP
+	// or CIDR; `#` comments allowed). ExcludeFile entries are dropped at the
+	// OutputTree write boundary; a non-empty IncludeFile restricts writes to
+	// hosts matching one of its entries (within the target's own scope).
+	// Both must be readable when set — Validate/ValidateScopeFiles enforce it.
+	IncludeFile string `koanf:"include_file" validate:"omitempty,nopath_traversal"`
+	ExcludeFile string `koanf:"exclude_file" validate:"omitempty,nopath_traversal"`
 }
 
 type SubDNSResolve struct {
@@ -788,6 +796,8 @@ type OutputConfig struct {
 	StructuredLogging bool              `koanf:"structured_logging"`
 	MinDiskSpaceGB    int               `koanf:"min_disk_space_gb"  validate:"min=0,max=10000"`
 	LogRotation       OutputLogRotation `koanf:"log_rotation"`
+	// Compat tunes the v1 bash-shape compat tree (CUT-08, MIGRATION §2.2).
+	Compat OutputCompat `koanf:"compat"`
 
 	// LogLevel / LogFormat support the logger factory (§10.3 build order).
 	// These are not strictly listed in ADR §2.2 but are required by the
@@ -797,6 +807,17 @@ type OutputConfig struct {
 	// LogOutput is the runtime io.Writer; not loaded from TOML. Tests inject
 	// a *bytes.Buffer; production code leaves nil → os.Stderr.
 	LogOutput io.Writer `koanf:"-"`
+}
+
+// OutputCompat is the [output.compat] table: knobs for the v1 bash-shape
+// _compat/ tree the compat writer emits at end-of-scan (CUT-08).
+type OutputCompat struct {
+	// ReconSymlink creates the top-level v1 contract symlink
+	// Recon/<domain> → workspaces/<target-id>/_compat/ (a sibling of the
+	// workspaces root, i.e. relative to the directory you run from) after every
+	// scan. Default true for the 6-month compat window (MIGRATION §2.2);
+	// `recon_symlink = false` is the opt-out.
+	ReconSymlink bool `koanf:"recon_symlink"`
 }
 
 type OutputLogRotation struct {
@@ -955,19 +976,21 @@ type AdvancedConfig struct {
 
 // AdvancedTools holds per-tool overrides. Each sub-struct mirrors one
 // [advanced.tools.<tool>] section in ADR §2.2.
+//
+// Every leaf field here MUST be read by production code (TestAdvToolFieldsAreWired
+// walks this struct by reflection and fails on an unreferenced field). Knobs that
+// duplicate a first-class section (nuclei → web.nuclei, httpx rate/threads/timeout
+// → web.probe, puredns resolvers → paths.resolvers, gf patterns → paths.patterns_dir,
+// dalfox threads → vulns.xss.threads) and knobs for tools v2 does not dispatch
+// (xnLinkFinder, interlace, axiom post-start hook) were removed rather than left
+// as inert config — the migrator marks their v1 keys superseded.
 type AdvancedTools struct {
 	Subfinder    AdvToolSubfinder    `koanf:"subfinder"`
-	Nuclei       AdvToolNuclei       `koanf:"nuclei"`
 	FFUF         AdvToolFFUF         `koanf:"ffuf"`
 	HTTPX        AdvToolHTTPX        `koanf:"httpx"`
-	Puredns      AdvToolPuredns      `koanf:"puredns"`
-	GF           AdvToolGF           `koanf:"gf"`
-	Dalfox       AdvToolDalfox       `koanf:"dalfox"`
 	Dnstake      AdvToolDnstake      `koanf:"dnstake"`
 	TLSX         AdvToolTLSX         `koanf:"tlsx"`
-	XnLinkFinder AdvToolXnLinkFinder `koanf:"xnlinkfinder"`
 	DNSValidator AdvToolDNSValidator `koanf:"dnsvalidator"`
-	Interlace    AdvToolInterlace    `koanf:"interlace"`
 	Brutespray   AdvToolBrutespray   `koanf:"brutespray"`
 	Gotator      AdvToolGotator      `koanf:"gotator"`
 	TInjA        AdvToolTInjA        `koanf:"tinja"`
@@ -983,12 +1006,6 @@ type AdvToolSubfinder struct {
 	TimeoutMinutes int `koanf:"timeout_minutes" validate:"min=0,max=86400"`
 }
 
-type AdvToolNuclei struct {
-	RateLimit int    `koanf:"rate_limit" validate:"min=0,max=10000"`
-	Severity  string `koanf:"severity"   validate:"omitempty,nuclei_severity"`
-	Flags     string `koanf:"flags"`
-}
-
 type AdvToolFFUF struct {
 	RateLimit      int    `koanf:"rate_limit"        validate:"min=0,max=10000"`
 	Threads        int    `koanf:"threads"           validate:"min=0,max=500"`
@@ -996,42 +1013,25 @@ type AdvToolFFUF struct {
 	Flags          string `koanf:"flags"`
 }
 
+// AdvToolHTTPX carries only the free-form extra flags: rate limit, threads and
+// timeout live in web.probe (the v1 HTTPX_RATELIMIT/HTTPX_THREADS/HTTPX_TIMEOUT
+// aliases map there). Flags is split with strings.Fields and appended to the
+// web.httpx probe argv.
 type AdvToolHTTPX struct {
-	RateLimit      int    `koanf:"rate_limit"       validate:"min=0,max=10000"`
-	TimeoutSeconds int    `koanf:"timeout_seconds"  validate:"min=0,max=300"`
-	Threads        int    `koanf:"threads"          validate:"min=0,max=10000"`
-	Flags          string `koanf:"flags"`
+	Flags string `koanf:"flags"`
 }
 
-type AdvToolPuredns struct {
-	ResolversFile string `koanf:"resolvers_file" validate:"omitempty,nopath_traversal"`
-}
-
-type AdvToolGF struct {
-	PatternsDir string `koanf:"patterns_dir" validate:"omitempty,nopath_traversal"`
-}
-
-type AdvToolDalfox struct {
-	Threads int `koanf:"threads" validate:"min=0,max=10000"`
-}
-
+// AdvToolDnstake.Threads → `dnstake -c N` (0 = tool default).
 type AdvToolDnstake struct {
 	Threads int `koanf:"threads" validate:"min=0,max=10000"`
 }
 
+// AdvToolTLSX.Threads → `tlsx -c N` (0 = tool default).
 type AdvToolTLSX struct {
 	Threads int `koanf:"threads" validate:"min=0,max=100000"`
 }
 
-type AdvToolXnLinkFinder struct {
-	Depth int `koanf:"depth" validate:"min=0,max=100"`
-}
-
 type AdvToolDNSValidator struct {
-	Threads int `koanf:"threads" validate:"min=0,max=10000"`
-}
-
-type AdvToolInterlace struct {
 	Threads int `koanf:"threads" validate:"min=0,max=10000"`
 }
 
@@ -1039,6 +1039,9 @@ type AdvToolBrutespray struct {
 	Concurrence int `koanf:"concurrence" validate:"min=0,max=10000"`
 }
 
+// AdvToolGotator.Flags is the v1 GOTATOR_FLAGS string: split with strings.Fields
+// and placed after the fixed `-sub/-perm` pair and before `-silent` in the
+// subdomains.permut argv. Empty → the v1 default " -depth 1 -numbers 3 -mindup -adv -md".
 type AdvToolGotator struct {
 	Flags string `koanf:"flags"`
 }
@@ -1080,7 +1083,6 @@ type AdvToolArjun struct {
 type AdvToolAxiom struct {
 	ResolversPath        string `koanf:"resolvers_path"         validate:"omitempty,nopath_traversal"`
 	ResolversTrustedPath string `koanf:"resolvers_trusted_path" validate:"omitempty,nopath_traversal"`
-	PostStart            string `koanf:"post_start"             validate:"omitempty,nopath_traversal"`
 }
 
 // AdvancedTimingEstimates mirrors [advanced.timing_estimates].

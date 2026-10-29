@@ -1,7 +1,7 @@
 // Source:
 //   - ADR §4.1 lines 1376-1411 (AtomicSymlink — BINDING, lifted verbatim).
 //   - ADR §4.3 lines 1443-1467 (representative V1→V2 mapping table).
-//   - ADR §4.4 lines 1469-1489 (compat writer lifecycle — LifecycleAware.OnEnd, error isolation).
+//   - ADR §4.4 lines 1469-1489 (compat writer lifecycle at end-of-scan finalization, error isolation).
 //   - .planning/phases/14-cutover-and-migration §D-04 (subset, content-transformed).
 //
 // The compat layer bridges the v2 JSONL output tree back to the v1 bash-shape
@@ -74,7 +74,7 @@ func AtomicSymlink(target, link string) error {
 }
 
 // CompatWriter produces the v1 bash-shape _compat/ tree from a completed v2
-// workspace. It is invoked at end-of-scan finalization (the LifecycleAware.OnEnd
+// workspace. It is invoked at end-of-scan finalization (the handlers' finalization
 // hook point, ADR §4.4) once artefacts/ holds the final merged records.
 //
 // Contract:
@@ -92,9 +92,12 @@ type CompatWriter struct {
 	// WorkspaceRoot is the absolute path to workspaces/<target-id>/. Used as
 	// the fallback root when WriteCompat is called without an OutputTree.
 	WorkspaceRoot string
-	// ReconDir is the absolute path to Recon/<domain>/. When non-empty,
-	// WriteCompat idempotently (re)points it at the _compat/ tree — the
-	// top-level v1 contract symlink. Empty = created elsewhere (workspace init).
+	// ReconDir is the path of the top-level v1 contract symlink Recon/<domain>
+	// (see ReconLinkPath). When non-empty, WriteCompat idempotently (re)points
+	// it at the _compat/ tree as a RELATIVE symlink, replacing a stale symlink
+	// atomically and never clobbering a real directory or file. Empty = the
+	// symlink is disabled (output.compat.recon_symlink = false) or created
+	// elsewhere.
 	ReconDir string
 }
 
@@ -198,14 +201,96 @@ func (c *CompatWriter) WriteCompat(tree *OutputTree) error {
 	// 3. Top-level Recon/<domain> → _compat/ contract symlink (ADR §4.2),
 	//    created idempotently at the OnEnd hook when ReconDir is wired.
 	if c.ReconDir != "" {
-		if err := os.MkdirAll(filepath.Dir(c.ReconDir), 0o755); err != nil {
-			slog.Warn("compat_recon_parent_mkdir_failed", "recon_dir", c.ReconDir, "err", err)
-		} else if err := AtomicSymlink(compatRoot, c.ReconDir); err != nil {
-			slog.Warn("compat_recon_symlink_failed", "recon_dir", c.ReconDir, "err", err)
-		}
+		c.linkReconDir(compatRoot)
 	}
 
 	return nil
+}
+
+// linkReconDir (re)points c.ReconDir at compatRoot (CUT-08, MIGRATION §2.2):
+//
+//	Recon/example.com → ../workspaces/<target-id>/_compat
+//
+// The symlink target is RELATIVE to the link's parent so the tree stays valid
+// when the engagement directory is moved or mounted elsewhere. A stale symlink
+// (previous slug, previous layout) is swapped atomically via AtomicSymlink. A
+// pre-existing REAL directory or file at the link path — typically a genuine v1
+// Recon/<domain>/ tree the operator still has — is never overwritten: it is
+// logged at WARN and the symlink is skipped. Best-effort like the rest of the
+// writer: every failure is a WARN, never an error.
+func (c *CompatWriter) linkReconDir(compatRoot string) {
+	link := c.ReconDir
+	if fi, err := os.Lstat(link); err == nil && fi.Mode()&os.ModeSymlink == 0 {
+		slog.Warn("compat_recon_dir_exists_not_symlink",
+			"recon_dir", link,
+			"note", "a real directory/file is already there; leaving it untouched and skipping the Recon/<domain> symlink")
+		return
+	}
+	if err := os.MkdirAll(filepath.Dir(link), 0o755); err != nil {
+		slog.Warn("compat_recon_parent_mkdir_failed", "recon_dir", link, "err", err)
+		return
+	}
+	if err := AtomicSymlink(relativeSymlinkTarget(link, compatRoot), link); err != nil {
+		slog.Warn("compat_recon_symlink_failed", "recon_dir", link, "target", compatRoot, "err", err)
+	}
+}
+
+// relativeSymlinkTarget returns target expressed relative to link's parent
+// directory (what os.Symlink resolves a relative target against). Falls back to
+// the absolute target when either path cannot be made absolute or no relative
+// form exists (different volumes), so the link is still correct, just absolute.
+func relativeSymlinkTarget(link, target string) string {
+	absLink, err := filepath.Abs(link)
+	if err != nil {
+		return target
+	}
+	absTarget, err := filepath.Abs(target)
+	if err != nil {
+		return target
+	}
+	rel, err := filepath.Rel(filepath.Dir(absLink), absTarget)
+	if err != nil {
+		return absTarget
+	}
+	return rel
+}
+
+// ReconLinkPath computes where the top-level v1 contract symlink for the
+// workspace at workdir lives: <parent of the workspaces root>/Recon/<name>,
+// i.e. a sibling of workspaces/ (MIGRATION §2.2: Recon/example.com →
+// workspaces/<target-id>/_compat/). The name is derived from the workspace's
+// own identity marker (.target-identity.json) so it can never disagree with
+// the directory the scan actually wrote to:
+//
+//   - domain targets use the canonical hostname (Recon/example.com — the v1
+//     contract every `Recon/$domain/...` script relies on);
+//   - IP and CIDR targets use the workspace slug, the same target-id the
+//     workspace directory is named with (a CIDR's '/' can never be a path
+//     component, and v1 had no stable name for these anyway).
+//
+// workdir may be relative (it is resolved against the cwd); the result is
+// absolute. A workspace without a readable identity marker is an error — the
+// caller skips the symlink rather than guessing a name.
+func ReconLinkPath(workdir string) (string, error) {
+	absWorkdir, err := filepath.Abs(workdir)
+	if err != nil {
+		return "", fmt.Errorf("output: ReconLinkPath: abs %q: %w", workdir, err)
+	}
+	marker, err := readIdentityMarker(absWorkdir)
+	if err != nil {
+		return "", fmt.Errorf("output: ReconLinkPath: identity marker: %w", err)
+	}
+	name := marker.Slug
+	if marker.Kind == KindDomain && marker.Canonical != "" {
+		name = marker.Canonical
+	}
+	// Defense-in-depth: a name must be exactly one path component. Canonical
+	// hostnames and slugs are, but a hand-edited marker must not escape Recon/.
+	if name == "" || name == "." || name == ".." || strings.ContainsAny(name, `/\`) {
+		return "", fmt.Errorf("output: ReconLinkPath: unusable target name %q in %s", name, IdentityMarkerName)
+	}
+	// absWorkdir = <workspaces root>/<slug>; Recon/ is a sibling of the root.
+	return filepath.Join(filepath.Dir(filepath.Dir(absWorkdir)), "Recon", name), nil
 }
 
 // ruleKind selects how a JSONL record is rendered into a bash .txt line.

@@ -46,6 +46,7 @@ func TestCompositePassiveMergeProducesMergedTxt(t *testing.T) {
 		t.Fatalf("NewTree: %v", err)
 	}
 	app := &appctx.AppContext{
+		Log:  appctx.NopLogger(),
 		Tree: tree,
 		Target: &appctx.Target{
 			Domain:  "example.com",

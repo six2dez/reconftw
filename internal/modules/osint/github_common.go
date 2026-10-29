@@ -1,6 +1,6 @@
 // github_common.go — shared helpers for the GitHub OSINT cluster (OSINT-04/05/06).
 //
-// These helpers centralize the D-O8 key gate and XCUT-07 token handling used by
+// These helpers centralize the key gate and XCUT-07 token handling used by
 // github_dorks.go, gitdorks.go, github_repos.go, github_leaks.go, and
 // github_actions.go:
 //
@@ -8,14 +8,12 @@
 //     validated to exist and be non-empty. "" means "no token configured".
 //   - readGitHubToken  → the FIRST token line read from that file (v1
 //     `head -n 1 "$GITHUB_TOKENS"`). The raw value is returned ONLY for passing
-//     into a subprocess env/arg — callers MUST NEVER log it (XCUT-07 / T-07-03-02).
+//     into a subprocess env/arg — callers MUST NEVER log it (XCUT-07).
 //   - companyName      → the registrable label of the root domain (the
 //     `unfurl format %r` analog) used to seed org-scoped GitHub tools.
 //   - writeTokenFile   → writes a token to a 0600 temp file for tools that take
 //     a -token-file argument (enumerepo), avoiding the process-listing exposure
 //     of putting the token on argv (v1 osint.sh:80-85).
-//
-// Source: .planning/phases/07-osint-e2e/07-03-PLAN.md (Tasks 1 + 2).
 package osint
 
 import (
@@ -26,7 +24,7 @@ import (
 )
 
 // gitHubTokenFile returns the configured GitHub-tokens file path when it exists
-// and is non-empty; otherwise "". This is the D-O8 key gate that callers use to
+// and is non-empty; otherwise "". This is the key gate that callers use to
 // decide whether to run or emit a logged StatusSkipped.
 func gitHubTokenFile(app *appctx.AppContext) string {
 	if app == nil || app.Cfg == nil {
@@ -45,9 +43,9 @@ func gitHubTokenFile(app *appctx.AppContext) string {
 
 // readGitHubToken returns the first non-empty token from the configured tokens
 // file (v1 `head -n 1 "$GITHUB_TOKENS"`). The boolean reports whether a usable
-// token was found (the D-O8 gate). The returned string is a LIVE SECRET — it
+// token was found (the gate). The returned string is a LIVE SECRET — it
 // MUST only be passed into a subprocess env/arg and MUST NEVER be logged
-// (XCUT-07 / T-07-03-02).
+// (XCUT-07).
 func readGitHubToken(app *appctx.AppContext) (string, bool) {
 	path := gitHubTokenFile(app)
 	if path == "" {

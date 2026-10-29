@@ -1,7 +1,5 @@
 // permut_test.go — TDD RED tests for SubPermutTask, SubRegexPermutTask,
 // SubDNSCewlTask, SubIAPermutTask permutation Tasks.
-//
-// Source: .planning/phases/04-subdomains-e2e-axiom-integration/04-04-PLAN.md Task 2.
 package subdomains_test
 
 import (
@@ -109,7 +107,7 @@ func TestPermutProceedsWithSufficientMemory(t *testing.T) {
 	app := buildPermutApp(workDir, runner, 1 /* MinFreeMemGB=1 */)
 	// Inject a memory provider that returns 2GB (> 1GB threshold).
 	app.Cfg.Subdomains.Permut.MinFreeMemGB = 1
-	// CR-03: the task now requires a readable permutation wordlist before it will
+	// The task now requires a readable permutation wordlist before it will
 	// dispatch gotator (gotator v1.1 PANICS on an unreadable -perm). Without this
 	// the task skips for a reason that has nothing to do with the memory gate,
 	// and this test would be asserting the wrong skip.
@@ -160,7 +158,7 @@ func TestPermutWritesStagingFile(t *testing.T) {
 	mockTree := &mockTree{}
 	app := buildPermutApp(workDir, runner, 0 /* MinFreeMemGB=0: gate disabled */)
 	app.Tree = mockTree
-	// CR-03: a readable permutation wordlist is now a precondition for dispatch.
+	// A readable permutation wordlist is now a precondition for dispatch.
 	app.Cfg.Paths.WordlistsDir = permutWordlistsDir(t)
 
 	tsk, ok := task.Default.Lookup("subdomains.permut")
@@ -367,6 +365,7 @@ func buildPermutApp(workDir string, runner *backend.Runner, minFreeMemGB int) *a
 	cfg.Paths.SubsWordlist = ""
 
 	return &appctx.AppContext{
+		Log:    appctx.NopLogger(),
 		Tools:  runner,
 		Tree:   &mockTree{},
 		Target: &appctx.Target{Domain: "example.com", WorkDir: workDir},
@@ -451,7 +450,7 @@ func permutSplitLines(s string) []string {
 }
 
 // -------------------------------------------------------------------------
-// CR-03 — the permutation wordlist v2 declared in config and never passed
+// The permutation wordlist v2 declared in config and never passed
 // -------------------------------------------------------------------------
 //
 // WHAT WAS ACTUALLY OBSERVED, before a line of this was written (gotator v1.1,
@@ -465,7 +464,7 @@ func permutSplitLines(s string) []string {
 //	panic: open /nonexistent.txt: no such file or directory   (exit 2)
 //
 // Two of the review's stated mechanisms are therefore WRONG and are recorded as
-// wrong in 17-06-TRIAGE.md: gotator does NOT error without -perm (it permutes
+// wrong in the review that found it: gotator does NOT error without -perm (it permutes
 // with words it derives from the -sub list itself), and its banner goes to
 // STDERR, which the collector already drops. What IS true is the defect the fix
 // addresses: v1's wordlist-driven permutation was ported into config only.
@@ -740,7 +739,7 @@ func TestPermutCollectorRejectsBannerLines(t *testing.T) {
 }
 
 // -------------------------------------------------------------------------
-// CR-04 — regulator: two bare positionals, results read from stdout
+// regulator: two bare positionals, results read from stdout
 // -------------------------------------------------------------------------
 //
 // PROVEN BEHAVIOURALLY, against the regulator installed on this box in v1's form
@@ -876,8 +875,8 @@ func TestRegexPermutSkipsWithReasonWhenNoOutput(t *testing.T) {
 	}
 }
 
-// ExecOpts satisfies the backend.Backend options seam added in 18-01. It
-// PRESERVES this fake's pre-18-01 dispatch exactly: Runner.Run used to call
+// ExecOpts satisfies the backend.Backend options seam. It PRESERVES this
+// fake's original dispatch exactly: Runner.Run used to call
 // Backend.Exec and Runner.RunEnv used to call Backend.ExecEnv, and both now
 // arrive here, so the env-set case forwards to ExecEnv and the zero case to Exec.
 //

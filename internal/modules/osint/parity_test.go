@@ -1,30 +1,28 @@
-// parity_test.go — Frozen-replay parity harness for the OSINT pipeline (D-O6, OSINT-16).
+// parity_test.go — Frozen-replay parity harness for the OSINT pipeline (OSINT-16).
 //
 // Purpose: detect porting bugs by replaying recorded (or synthetic) tool output
 // through v2 osint parse/classify/REDACT logic and asserting per-source behaviour
-// matches v1. This is the D-O6 HARD CI gate (~0% tolerance for the deterministic
+// matches v1. This is the HARD CI gate (~0% tolerance for the deterministic
 // parse/redact logic; the soft real-target category-presence gate lives in the
-// DoD-2 E2E run, NOT here). Finding COUNTS are explicitly NOT gated (D-O6) —
+// DoD-2 E2E run, NOT here). Finding COUNTS are explicitly NOT gated —
 // external-API results are non-deterministic — but the deterministic parse path
 // is pinned exactly.
 //
 // FIXTURE NOTES:
 //   - Stub fixtures (domain_info/whois, ip_info/asnmap): header starts
 //     "# TODO: capture from: ..." → osintParitySkip() t.Skip()s cleanly.
-//     Populate via an osint E2E lab run (D-O7).
+//     Populate via an osint E2E lab run.
 //   - Synthetic FAKE-secret fixtures (github_leaks, github_actions, postman,
 //     swagger): committed right now. Tests backed by these MUST PASS (no t.Skip).
 //   - Every secret-emitting fixture uses the clearly-FAKE marker
 //     "FAKE_SECRET_MARKER_AAAA" to verify XCUT-07 redaction WITHOUT committing
-//     real credentials (T-07-06-01). Each parity test asserts the marker is
+//     real credentials. Each parity test asserts the marker is
 //     ABSENT from every parsed record AND ValueRedacted=="***" (L3 redaction).
 //
 // NOTE ON PACKAGE: this file uses package osint (not osint_test) to reach the
 // unexported parse functions (parseTrufflehogOutput, parseGhleaksReport,
 // parseGatoOutput, parsePorchPirateOutput, parseSwaggerOutput, parsePostleaksJSON).
 // The package-external DAG test is in dag_test.go (package osint_test).
-//
-// Source: .planning/phases/07-osint-e2e/07-06-PLAN.md Task 1.
 package osint
 
 import (
@@ -59,7 +57,7 @@ func osintParitySkip(t *testing.T, fixtureBytes []byte, fixturePath string) {
 			continue
 		}
 		if strings.HasPrefix(line, "# TODO:") {
-			t.Skipf("fixture not captured yet (stub header): %s — populate via osint E2E lab run", fixturePath)
+			osintParityStub(t, fixturePath, line)
 		}
 		return
 	}
@@ -68,6 +66,33 @@ func osintParitySkip(t *testing.T, fixtureBytes []byte, fixturePath string) {
 
 // osintFixturesBase returns the testdata/fixtures dir relative to this package.
 func osintFixturesBase() string { return filepath.Join("testdata", "fixtures") }
+
+// osintParityStub is the one place a "# TODO: capture from: <cmd>" stub decides
+// between skip and failure.
+//
+// These stubs have made the parity subtests skip for a long time, and a skip is
+// not a pass. By default the subtest still skips — but the skip message now
+// names the exact capture command from the stub header, so the remedy is in the
+// test output rather than in a plan file. With PARITY_FIXTURES_REQUIRED=1 (the
+// provisioned-box / sign-off setting) the same stub is a FAILURE: a sign-off run
+// must not be able to report green over fixtures nobody captured.
+func osintParityStub(t *testing.T, fixturePath, headerLine string) {
+	t.Helper()
+	cmd := strings.TrimSpace(strings.TrimPrefix(headerLine, "# TODO:"))
+	cmd = strings.TrimSpace(strings.TrimPrefix(cmd, "capture from:"))
+	if cmd == "" {
+		cmd = "(the stub header names no capture command — write one)"
+	}
+	if os.Getenv("PARITY_FIXTURES_REQUIRED") == "1" {
+		t.Fatalf("fixture NOT captured: %s\n"+
+			"  PARITY_FIXTURES_REQUIRED=1 forbids skipping over a stub. Capture it with:\n"+
+			"    %s\n"+
+			"  then replace the stub header with `# captured-from: <argv> | date: <YYYY-MM-DD> | version: <v>`.",
+			fixturePath, cmd)
+	}
+	t.Skipf("fixture not captured yet (stub header): %s — NOT a pass; capture with: %s "+
+		"(set PARITY_FIXTURES_REQUIRED=1 to make this a failure)", fixturePath, cmd)
+}
 
 // readOSINTTestFixture reads a fixture file and fatals if missing.
 func readOSINTTestFixture(t *testing.T, relPath string) []byte {
@@ -111,52 +136,52 @@ func assertRedacted(t *testing.T, testName string, records []OSINTFindingRecord,
 }
 
 // -------------------------------------------------------------------------
-// TestOSINTConfigDefaults — asserts REAL field names from config.go (D-O8/D-O9).
+// TestOSINTConfigDefaults — asserts REAL field names from config.go.
 // Uses config.Defaults() — NOT a zero-value Config{} which has no defaults.
 // Wrong field names here are COMPILE ERRORS (these are real struct fields).
 // -------------------------------------------------------------------------
 
-// TestOSINTConfigDefaults asserts the D-O9 default-ON master gate (the DELIBERATE
-// inversion of vulns' default-OFF) plus the D-O8 conservative per-source defaults.
+// TestOSINTConfigDefaults asserts the default-ON master gate (the DELIBERATE
+// inversion of vulns' default-OFF) plus the conservative per-source defaults.
 func TestOSINTConfigDefaults(t *testing.T) {
 	cfg := config.Defaults()
 
-	// D-O9: master gate default ON — OSINT is passive recon (map attack surface),
-	// so composite `recon`/`all` (Phase 9) INCLUDES it. Matches v1 OSINT=true.
-	// This is the deliberate inversion of vulns D-V7 (default off).
+	// master gate default ON — OSINT is passive recon (map attack surface),
+	// so composite `recon`/`all` INCLUDES it. Matches v1 OSINT=true.
+	// This is the deliberate inversion of vulns (default off).
 	if cfg.OSINT.Enabled != true {
-		t.Errorf("OSINT.Enabled: got %v, want true (D-O9 master gate default ON — inverts vulns default off)", cfg.OSINT.Enabled)
+		t.Errorf("OSINT.Enabled: got %v, want true (master gate default ON — inverts vulns default off)", cfg.OSINT.Enabled)
 	}
 
-	// D-O8: secret-emitting GitHub leak scan on by default (key-gated at runtime).
+	// secret-emitting GitHub leak scan on by default (key-gated at runtime).
 	if cfg.OSINT.GitHub.LeaksEnabled != true {
-		t.Errorf("OSINT.GitHub.LeaksEnabled: got %v, want true (D-O8 default-on, key-gated)", cfg.OSINT.GitHub.LeaksEnabled)
+		t.Errorf("OSINT.GitHub.LeaksEnabled: got %v, want true (default-on, key-gated)", cfg.OSINT.GitHub.LeaksEnabled)
 	}
 
-	// D-O8: GitHub threads conservative cap (v1 GITHUB_REPOS thread default).
+	// GitHub threads conservative cap (v1 GITHUB_REPOS thread default).
 	if cfg.OSINT.GitHub.Threads != 5 {
-		t.Errorf("OSINT.GitHub.Threads: got %v, want 5 (D-O8 conservative cap)", cfg.OSINT.GitHub.Threads)
+		t.Errorf("OSINT.GitHub.Threads: got %v, want 5 (conservative cap)", cfg.OSINT.GitHub.Threads)
 	}
 
-	// D-O8: Postman conservative thread cap (v1 POSTLEAKS_THREADS=10).
+	// Postman conservative thread cap (v1 POSTLEAKS_THREADS=10).
 	if cfg.OSINT.Postman.Threads != 10 {
-		t.Errorf("OSINT.Postman.Threads: got %v, want 10 (D-O8 conservative cap, v1 POSTLEAKS_THREADS=10)", cfg.OSINT.Postman.Threads)
+		t.Errorf("OSINT.Postman.Threads: got %v, want 10 (conservative cap, v1 POSTLEAKS_THREADS=10)", cfg.OSINT.Postman.Threads)
 	}
 
-	// D-O8: secret-emitting sources default-on (key/best-effort gated).
+	// secret-emitting sources default-on (key/best-effort gated).
 	if cfg.OSINT.Swagger.Enabled != true {
-		t.Errorf("OSINT.Swagger.Enabled: got %v, want true (D-O8 default-on)", cfg.OSINT.Swagger.Enabled)
+		t.Errorf("OSINT.Swagger.Enabled: got %v, want true (default-on)", cfg.OSINT.Swagger.Enabled)
 	}
 	if cfg.OSINT.Cloud.Enabled != true {
-		t.Errorf("OSINT.Cloud.Enabled: got %v, want true (D-O8 default-on)", cfg.OSINT.Cloud.Enabled)
+		t.Errorf("OSINT.Cloud.Enabled: got %v, want true (default-on)", cfg.OSINT.Cloud.Enabled)
 	}
 	if cfg.OSINT.GitHub.ActionsAudit.Enabled != true {
-		t.Errorf("OSINT.GitHub.ActionsAudit.Enabled: got %v, want true (D-O8 default-on)", cfg.OSINT.GitHub.ActionsAudit.Enabled)
+		t.Errorf("OSINT.GitHub.ActionsAudit.Enabled: got %v, want true (default-on)", cfg.OSINT.GitHub.ActionsAudit.Enabled)
 	}
 
-	// D-O8: MSFT tenant recon OFF by default (opt-in; noisier/less universal).
+	// MSFT tenant recon OFF by default (opt-in; noisier/less universal).
 	if cfg.OSINT.MSFT.Enabled != false {
-		t.Errorf("OSINT.MSFT.Enabled: got %v, want false (D-O8 opt-in default off)", cfg.OSINT.MSFT.Enabled)
+		t.Errorf("OSINT.MSFT.Enabled: got %v, want false (opt-in default off)", cfg.OSINT.MSFT.Enabled)
 	}
 
 	// Failure policy: the whole osint module group is best_effort (ARCH-09).
@@ -164,7 +189,7 @@ func TestOSINTConfigDefaults(t *testing.T) {
 		t.Errorf("Scheduler.Overrides.OSINT: got %q, want \"best_effort\" (ARCH-09 binding)", cfg.Scheduler.Overrides.OSINT)
 	}
 
-	t.Logf("TestOSINTConfigDefaults: PASS — D-O9 default-ON + D-O8 conservative caps verified")
+	t.Logf("TestOSINTConfigDefaults: PASS — default-ON + conservative caps verified")
 }
 
 // -------------------------------------------------------------------------
@@ -294,7 +319,7 @@ func TestOSINTParitySwaggerRedact(t *testing.T) {
 }
 
 // -------------------------------------------------------------------------
-// TestOSINTParityWhois — stub-backed: skips until lab fixture captured (D-O7).
+// TestOSINTParityWhois — stub-backed: skips until lab fixture captured.
 // Demonstrates the logged-clean-skip path for a non-secret source.
 // -------------------------------------------------------------------------
 

@@ -1,5 +1,5 @@
 // wordlistgen_seam_test.go — the proof that the ROBOXTRACTOR LEG of
-// web.wordlistgen came home to backend.Runner (18-05) without changing the
+// web.wordlistgen came home to backend.Runner without changing the
 // command line, and that the GETJSWORDS LEG deliberately did not.
 //
 // THE CONTROL IS THE PRE-MOVE ARG VECTOR, captured from wordlistgen.go as it
@@ -39,6 +39,7 @@ func newRoboxtractorTestApp(t *testing.T, toolPath string) *appctx.AppContext {
 	cfg := config.Defaults()
 	cfg.Web.Wordlist.Enabled = true
 	return &appctx.AppContext{
+		Log:    appctx.NopLogger(),
 		Tools:  backend.NewRunner(&backend.LocalBackend{}, reg, nil),
 		Cfg:    cfg,
 		Target: &appctx.Target{Domain: "example.com", WorkDir: t.TempDir()},
@@ -90,7 +91,7 @@ func TestWordlistgenRoboxtractorArgvUnchangedAcrossTheMove(t *testing.T) {
 
 // TestWordlistgenRoboxtractorIsRecorded asserts the invocation lands in
 // logs/tools.jsonl — PRESENCE first, then content — and that the target URL
-// corpus on stdin does NOT (XCUT-07, re-asserted at this call site).
+// corpus on stdin does NOT (re-asserted at this call site).
 func TestWordlistgenRoboxtractorIsRecorded(t *testing.T) {
 	recDir := t.TempDir()
 	script := writeArgvRecorderScript(t, recDir, "admin\n")
@@ -128,7 +129,7 @@ func TestWordlistgenRoboxtractorIsRecorded(t *testing.T) {
 // TestWordlistgenRoboxtractorSkipsWhenUnresolvable pins the failure policy: the
 // runner returned (nil, nil) for a roboxtractor absent from PATH, and it must
 // still return (nil, nil) for one the registry cannot resolve. wordlistgen's
-// whole contract is that each generator degrades INDEPENDENTLY (T-13-04-02); an
+// whole contract is that each generator degrades INDEPENDENTLY; an
 // error here would take the other generator down with it.
 func TestWordlistgenRoboxtractorSkipsWhenUnresolvable(t *testing.T) {
 	reg := backend.NewToolRegistry()
@@ -136,6 +137,7 @@ func TestWordlistgenRoboxtractorSkipsWhenUnresolvable(t *testing.T) {
 	cfg := config.Defaults()
 	cfg.Web.Wordlist.Enabled = true
 	app := &appctx.AppContext{
+		Log:    appctx.NopLogger(),
 		Tools:  backend.NewRunner(&backend.LocalBackend{}, reg, nil),
 		Cfg:    cfg,
 		Target: &appctx.Target{Domain: "example.com", WorkDir: t.TempDir()},
@@ -159,7 +161,7 @@ func TestWordlistgenRoboxtractorSkipsWhenUnresolvable(t *testing.T) {
 // The leg stays a declared bypass (see the file header for the adjudication),
 // but the thing that made it one of THREE opinions about where the tools live is
 // gone: it no longer calls a module-local resolveToolsDir over cfg.Paths.DataDir.
-// It reads config.Config.ToolsRoot() over paths.tools_dir — the single name 18-02
+// It reads config.Config.ToolsRoot() over paths.tools_dir — the single name the seam work
 // established. This test proves the script path follows paths.tools_dir, which is
 // what "collapsed onto one root" has to MEAN to be worth asserting.
 func TestGetJSWordsStillResolvesItsScriptFromTheNamedToolsRoot(t *testing.T) {
@@ -183,6 +185,7 @@ func TestGetJSWordsStillResolvesItsScriptFromTheNamedToolsRoot(t *testing.T) {
 	cfg.Web.JS.GetJSWordsPython = python
 
 	app := &appctx.AppContext{
+		Log:    appctx.NopLogger(),
 		Cfg:    cfg,
 		Target: &appctx.Target{Domain: "example.com", WorkDir: t.TempDir()},
 	}

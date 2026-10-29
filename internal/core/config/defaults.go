@@ -73,6 +73,8 @@ func Defaults() *Config {
 				ExcludeSensitive:   false,
 				DeepWildcardFilter: false,
 				NoErrorCheck:       false,
+				IncludeFile:        "",
+				ExcludeFile:        "",
 			},
 			DNSResolve: SubDNSResolve{
 				Resolver:                  "auto",
@@ -316,6 +318,7 @@ func Defaults() *Config {
 			StructuredLogging: false,
 			MinDiskSpaceGB:    2,
 			LogRotation:       OutputLogRotation{MaxFiles: 10, MaxAgeDays: 30},
+			Compat:            OutputCompat{ReconSymlink: true},
 			LogLevel:          "info",
 			LogFormat:         "json",
 			LogOutput:         nil,
@@ -394,29 +397,16 @@ func Defaults() *Config {
 			PerfProfile:      "balanced",
 			Tools: AdvancedTools{
 				Subfinder: AdvToolSubfinder{TimeoutMinutes: 180},
-				Nuclei: AdvToolNuclei{
-					RateLimit: 150,
-					Severity:  "info,low,medium,high,critical",
-					Flags:     "",
-				},
 				FFUF: AdvToolFFUF{
 					RateLimit:      0,
 					Threads:        0,
 					MaxTimeSeconds: 900,
 					Flags:          " -mc all -fc 404 -ac -sf -noninteractive -of json",
 				},
-				HTTPX: AdvToolHTTPX{
-					RateLimit:      150,
-					TimeoutSeconds: 10,
-					Threads:        0,
-					Flags:          "",
-				},
-				Dalfox:       AdvToolDalfox{Threads: 0},
+				HTTPX:        AdvToolHTTPX{Flags: ""},
 				Dnstake:      AdvToolDnstake{Threads: 0},
 				TLSX:         AdvToolTLSX{Threads: 1000},
-				XnLinkFinder: AdvToolXnLinkFinder{Depth: 3},
 				DNSValidator: AdvToolDNSValidator{Threads: 200},
-				Interlace:    AdvToolInterlace{Threads: 10},
 				Brutespray:   AdvToolBrutespray{Concurrence: 0},
 				Gotator: AdvToolGotator{
 					Flags: " -depth 1 -numbers 3 -mindup -adv -md",
@@ -436,7 +426,6 @@ func Defaults() *Config {
 				Axiom: AdvToolAxiom{
 					ResolversPath:        "/home/op/lists/resolvers.txt",
 					ResolversTrustedPath: "/home/op/lists/resolvers_trusted.txt",
-					PostStart:            "",
 				},
 			},
 			TimingEstimates: AdvancedTimingEstimates{

@@ -136,6 +136,12 @@ type RunOptions struct {
 	// re-feed path (D-04/D-05 fix — checkpoint hash alone does not change between
 	// monitor cycles with identical opts).
 	TargetListPath string
+	// IncludeFile / ExcludeFile are the --include-file / --exclude-file scope
+	// lists (v1 -i / -x). Applied over cfg.Subdomains.Scope.{Include,Exclude}File
+	// after ConfigTransform so the flag beats the config file, then re-validated
+	// with config.ValidateScopeFiles because config.Load's validation already ran.
+	IncludeFile string
+	ExcludeFile string
 	// Force is the --force / checkpoint-bypass flag. When true, BootReconApp
 	// ORs it into cfg.Advanced.Diff, which then drives Scheduler.ForceRerun so
 	// completed tasks re-execute while still recording fresh checkpoints
@@ -265,11 +271,18 @@ func persistScanToStore(ctx context.Context, boot AppBoot, opts RunOptions, mode
 // workdir is the workspace root (boot.WorkDir == the *output.OutputTree Root);
 // it is the authoritative fallback root. app.Tree is passed through when it is a
 // concrete *output.OutputTree so WriteCompat reads tree.Root directly; a mock or
-// nil tree degrades to WorkspaceRoot. ReconDir is intentionally left empty: the
-// _compat/ subtree under the workspace root IS the bash-shape tree (the store's
-// per-target ReconDir is likewise the workspace root, ingest.ensureTarget), and
-// no top-level Recon/<domain> symlink convention is established elsewhere.
-func writeCompatTree(app *appctx.AppContext, workdir string) {
+// nil tree degrades to WorkspaceRoot.
+//
+// reconSymlink is cfg.Output.Compat.ReconSymlink (default true, MIGRATION §2.2).
+// When set, the top-level v1 contract symlink is (re)pointed at the compat tree:
+//
+//	<parent of workspaces/>/Recon/<domain> → ../workspaces/<target-id>/_compat
+//
+// output.ReconLinkPath derives the link name from the workspace's own identity
+// marker, so the link always names the directory this scan wrote to. A workspace
+// without a marker (never WorkspaceInit'd, e.g. a bare test dir) just skips the
+// symlink with a WARN — the _compat/ tree is still written.
+func writeCompatTree(app *appctx.AppContext, workdir string, reconSymlink bool) {
 	var tree *output.OutputTree
 	if app != nil {
 		if ot, ok := app.Tree.(*output.OutputTree); ok {
@@ -277,6 +290,15 @@ func writeCompatTree(app *appctx.AppContext, workdir string) {
 		}
 	}
 	cw := &output.CompatWriter{WorkspaceRoot: workdir}
+	if reconSymlink {
+		if link, err := output.ReconLinkPath(workdir); err != nil {
+			if app != nil && app.Log != nil {
+				app.Log.Warn("compat: Recon/<domain> symlink skipped (non-fatal)", "workdir", workdir, "err", err)
+			}
+		} else {
+			cw.ReconDir = link
+		}
+	}
 	if err := cw.WriteCompat(tree); err != nil {
 		// Defensive: WriteCompat returns nil today, but never let a future
 		// non-nil return abort the scan.
@@ -368,6 +390,21 @@ func ResolveRunPlan(opts RunOptions) (RunPlan, error) {
 	// -o/--output consumption. Same precedence rule: the flag beats the config file.
 	if opts.OutputDir != "" {
 		cfg.Paths.DataDir = opts.OutputDir
+	}
+
+	// --include-file / --exclude-file consumption. These bypass config.Load's
+	// validation, so an unreadable list is rejected HERE — before any workspace
+	// or scan exists — rather than discovered as "the exclusions did nothing".
+	if opts.IncludeFile != "" {
+		cfg.Subdomains.Scope.IncludeFile = opts.IncludeFile
+	}
+	if opts.ExcludeFile != "" {
+		cfg.Subdomains.Scope.ExcludeFile = opts.ExcludeFile
+	}
+	if opts.IncludeFile != "" || opts.ExcludeFile != "" {
+		if err := config.ValidateScopeFiles(cfg); err != nil {
+			return RunPlan{}, fmt.Errorf("handlers: scope list: %w", err)
+		}
 	}
 
 	// The app logger. Explicit beats implicit: everything downstream (AppContext.Log,
@@ -632,7 +669,7 @@ func BootReconApp(ctx context.Context, opts RunOptions) (AppBoot, error) {
 	wordlistsLock := wordlistsLockContent(cfg)
 	tgtDomain := tgt.Domain
 	opts.Scheduler.Hash = func(taskName, _ string) string {
-		// Ignore the passed-in target arg (scheduler.targetFor() returns "");
+		// Ignore the passed-in target arg (the scheduler always passes the empty checkpoint target);
 		// the closure uses the captured tgt.Domain so the hash covers the real
 		// target even though the Scheduler holds no AppContext reference.
 		return checkpoint.InputHash(taskName, tgtDomain, hashSlice, wordlistsLock)

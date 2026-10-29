@@ -1,4 +1,4 @@
-// stream_terminal_test.go — F6 (phase 15, plan 15-13 Task 2) acceptance gate 5
+// stream_terminal_test.go — the terminal-error acceptance gate
 // for the web package, asserted in BOTH directions.
 //
 // The two directions are not symmetric and confusing them is the whole risk:

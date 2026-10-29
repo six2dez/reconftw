@@ -13,29 +13,25 @@
 //     REJECTED IP-shaped targets (rootDomain reject) and lost the reverse-IP
 //     relations entirely.
 //
-// Each CIDR/ASN/geo/relation datum becomes an OSINTFindingRecord (D-O4) written
+// Each CIDR/ASN/geo/relation datum becomes an OSINTFindingRecord written
 // to inputs/findings.ip_info.jsonl per the multi-writer staging contract
-// (doc.go — D-O3). Per-IP human files are preserved single-writer (D-O5): the
+// (doc.go). Per-IP human files are preserved single-writer: the
 // domain path writes osint/ip_<ip>_whois.txt; the IP path writes the v1 trio
 // osint/ip_<ip>_relations.txt / _whois.txt / _location.txt (osint.sh:755-768).
 //
-// SEEDING (D-O1): root-domain / IP-seeded, no DependsOn edges.
-// FAILURE POLICY (D-O8): best_effort — every step logs Debug + continues.
-// PD TOOLS (D-O7): dnsx + asnmap args include -duc.
+// SEEDING: root-domain / IP-seeded, no DependsOn edges.
+// FAILURE POLICY: best_effort — every step logs Debug + continues.
+// PD TOOLS: dnsx + asnmap args include -duc.
 //
 // SECRET HANDLING (XCUT-07): the PDCP key (cfg.APIKeys.PDCP) is cast to a raw
 // string ONLY into the ipinfo.io Authorization header (mirrors subdomains/geo.go:97).
 // The WHOISXML key (cfg.APIKeys.WhoisXML) travels ONLY in the outbound HTTPS
 // query string of a NATIVE http.Get (never argv / never a subprocess) and is
-// registered with the log Redactor so an accidental URL log is scrubbed
-// (T-13-05-01); key unset → the WHOISXML path skips with a warning (D-O2).
+// registered with the log Redactor so an accidental URL log is scrubbed;
+// key unset → the WHOISXML path skips with a warning.
 //
-// THREAT MODEL (T-07-02-01): domain/IP strings cross into dnsx/mapcidr/asnmap
+// THREAT MODEL: domain/IP strings cross into dnsx/mapcidr/asnmap
 // argv via Backend.Run's []string arg-vector (never a shell string).
-//
-// Source: .planning/phases/07-osint-e2e/07-02-PLAN.md Task 1;
-//
-//	.planning/phases/13-domain-parity/13-05-PLAN.md Task 3 (WHOISXML restore).
 package osint
 
 import (
@@ -83,7 +79,7 @@ func (t *IPInfoTask) Enabled(cfg *config.Config) bool {
 	return cfg.OSINT.IPInfo.Enabled
 }
 
-// DependsOn returns nil — OSINT is root-domain-seeded (D-O1), no DAG edges.
+// DependsOn returns nil — OSINT is root-domain-seeded, no DAG edges.
 func (t *IPInfoTask) DependsOn() []string { return nil }
 
 // Run executes the IP info pipeline, branching on the target shape.
@@ -93,7 +89,7 @@ func (t *IPInfoTask) DependsOn() []string { return nil }
 //  1. Resolve the root domain → A-record IPs via dnsx (-duc).
 //  2. mapcidr per IP → CIDR records (CIDREnabled gate).
 //  3. asnmap per IP (-duc) → ASN org records (ASNEnabled gate).
-//  4. ipinfo.io geo per IP → geo records; preserve osint/ip_<ip>_whois.txt (D-O5).
+//  4. ipinfo.io geo per IP → geo records; preserve osint/ip_<ip>_whois.txt.
 //  5. Write inputs/findings.ip_info.jsonl (multi-writer staging).
 func (t *IPInfoTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result, error) {
 	if app == nil || app.Target == nil {
@@ -107,9 +103,7 @@ func (t *IPInfoTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resu
 	}
 	osintDir := filepath.Join(app.Target.WorkDir, "osint")
 	if err := os.MkdirAll(osintDir, 0o755); err != nil {
-		if app.Log != nil {
-			app.Log.Debug("osint.ip_info: mkdir osint/ failed (best_effort)", "err", err)
-		}
+		app.Log.Debug("osint.ip_info: mkdir osint/ failed (best_effort)", "err", err)
 	}
 
 	// IP-target path: WHOISXML reverse-IP relations + WHOIS + geolocation
@@ -125,26 +119,22 @@ func (t *IPInfoTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resu
 	// restores the IP-target path bash had.
 	root := rootDomain(app)
 	if root == "" {
-		if app.Log != nil {
-			app.Log.Info("osint.ip_info: no valid root domain or IP target — skipping")
-		}
+		app.Log.Info("osint.ip_info: no valid root domain or IP target — skipping")
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
 	cfg := app.Cfg
 
-	// Step 1: resolve domain → A-record IPs via dnsx (-duc, D-O7).
+	// Step 1: resolve domain → A-record IPs via dnsx (-duc).
 	ips := t.resolveIPs(ctx, app, root)
 	if len(ips) == 0 {
-		if app.Log != nil {
-			app.Log.Info("osint.ip_info: no resolved IPs — completed", "findings", 0)
-		}
+		app.Log.Info("osint.ip_info: no resolved IPs — completed", "findings", 0)
 		return task.Result{Status: task.StatusDone, Stats: map[string]int{"findings": 0}}, nil
 	}
 
 	var records []OSINTFindingRecord
 
-	// Step 2: mapcidr per IP (CIDREnabled gate, D-O8).
+	// Step 2: mapcidr per IP (CIDREnabled gate).
 	if cfg.OSINT.IPInfo.CIDREnabled {
 		for _, ip := range ips {
 			if ctx.Err() != nil {
@@ -153,9 +143,7 @@ func (t *IPInfoTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resu
 			// v1 arg vector: mapcidr -silent -cidr <ip>/24 (aggregate /24 around the host).
 			res, err := app.Tools.Run(ctx, "mapcidr", []string{"-silent", "-aggregate", "-cidr", ip + "/24"})
 			if err != nil {
-				if app.Log != nil {
-					app.Log.Debug("osint.ip_info: mapcidr run failed (best_effort)", "err", err)
-				}
+				app.Log.Debug("osint.ip_info: mapcidr run failed (best_effort)", "err", err)
 				continue
 			}
 			for _, cidr := range splitNonEmptyLines(res.Stdout) {
@@ -170,7 +158,7 @@ func (t *IPInfoTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resu
 		}
 	}
 
-	// Step 3: asnmap per IP (-duc, ASNEnabled gate, D-O8).
+	// Step 3: asnmap per IP (-duc, ASNEnabled gate).
 	if cfg.OSINT.IPInfo.ASNEnabled {
 		for _, ip := range ips {
 			if ctx.Err() != nil {
@@ -179,9 +167,7 @@ func (t *IPInfoTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resu
 			// v1 arg vector: asnmap -duc -silent -i <ip>
 			res, err := app.Tools.Run(ctx, "asnmap", []string{"-duc", "-silent", "-i", ip})
 			if err != nil {
-				if app.Log != nil {
-					app.Log.Debug("osint.ip_info: asnmap run failed (best_effort)", "err", err)
-				}
+				app.Log.Debug("osint.ip_info: asnmap run failed (best_effort)", "err", err)
 				continue
 			}
 			for _, org := range splitNonEmptyLines(res.Stdout) {
@@ -196,10 +182,10 @@ func (t *IPInfoTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resu
 		}
 	}
 
-	// Step 4: ipinfo.io geo per IP + preserve osint/ip_<ip>_whois.txt (D-O5).
+	// Step 4: ipinfo.io geo per IP + preserve osint/ip_<ip>_whois.txt.
 	// XCUT-07: PDCP key used only in the Authorization header, never logged.
 	pdcpKey := string(cfg.APIKeys.PDCP)
-	// XCUT-07 L2 (IN-13-01): register the PDCP key with the Redactor ONCE before the
+	// XCUT-07 L2: register the PDCP key with the Redactor ONCE before the
 	// per-IP loop — mirroring the WHOISXML-key registration in runWhoisXML — so any
 	// accidental header/URL log line is scrubbed. Defense-in-depth consistency with
 	// the WHOISXML path in this same file.
@@ -210,7 +196,7 @@ func (t *IPInfoTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resu
 	base := ipInfoBaseURL()
 	// cancelled records an interrupted loop: a run that only probed part of the
 	// IP list did not observe the corpus and must not clear a previous run's
-	// staging (F3 did-not-run — see writeOSINTStaging). ipinfo.io is an HTTP API
+	// staging (did-not-run rule — see writeOSINTStaging). ipinfo.io is an HTTP API
 	// rather than a local binary, so there is no "tool absent" case here.
 	cancelled := false
 	for _, ip := range ips {
@@ -228,27 +214,25 @@ func (t *IPInfoTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resu
 				PoCRedacted: geoStr,
 			})
 		}
-		// D-O5 single-writer human file: osint/ip_<ip>_whois.txt (raw geo JSON).
+		// single-writer human file: osint/ip_<ip>_whois.txt (raw geo JSON).
 		if len(strings.TrimSpace(body)) > 0 {
 			whoisFile := filepath.Join(osintDir, "ip_"+sanitizeIPForFilename(ip)+"_whois.txt")
-			if wErr := os.WriteFile(whoisFile, []byte(body), 0o644); wErr != nil && app.Log != nil { //nolint:gosec
+			if wErr := os.WriteFile(whoisFile, []byte(body), 0o644); wErr != nil { //nolint:gosec
 				app.Log.Debug("osint.ip_info: write ip whois.txt failed", "err", wErr)
 			}
 		}
 	}
 
 	// Step 5: write staging JSONL (multi-writer contract).
-	// F3: a completed run that geolocated nothing REMOVES the staging file
+	// Run isolation: a completed run that geolocated nothing REMOVES the staging file
 	// rather than republishing the previous run's geo records.
 	if !cancelled {
 		writeOSINTStaging(app, inputsDir, "findings.ip_info.jsonl", records)
-	} else if app.Log != nil {
-		app.Log.Debug("osint.ip_info: cancelled before probing every IP — staging preserved (F3 did-not-run)")
+	} else {
+		app.Log.Debug("osint.ip_info: cancelled before probing every IP — staging preserved (did-not-run rule)")
 	}
 
-	if app.Log != nil {
-		app.Log.Info("osint.ip_info: completed", "findings", len(records), "ips", len(ips))
-	}
+	app.Log.Info("osint.ip_info: completed", "findings", len(records), "ips", len(ips))
 	return task.Result{
 		Status: task.StatusDone,
 		Stats:  map[string]int{"findings": len(records), "ips": len(ips)},
@@ -261,19 +245,15 @@ func (t *IPInfoTask) resolveIPs(ctx context.Context, app *appctx.AppContext, roo
 	// THE LIST INPUT, not the bruteforce-domain input — see
 	// domain_info.go's writeDNSXListInput for the tool output that proves it.
 	// `-d` without `-w` is a fatal error, so this A-record resolve was dead and
-	// every geo finding downstream of it was empty (16-06 §6.3).
+	// every geo finding downstream of it was empty (a live-run finding).
 	listFile, lErr := writeDNSXListInput(app, root)
 	if lErr != nil {
-		if app.Log != nil {
-			app.Log.Debug("osint.ip_info: dnsx list input write failed", "err", lErr)
-		}
+		app.Log.Debug("osint.ip_info: dnsx list input write failed", "err", lErr)
 		return nil
 	}
 	res, err := app.Tools.Run(ctx, "dnsx", []string{"-duc", "-silent", "-a", "-resp-only", "-l", listFile})
 	if err != nil {
-		if app.Log != nil {
-			app.Log.Debug("osint.ip_info: dnsx resolve failed (best_effort)", "err", err)
-		}
+		app.Log.Debug("osint.ip_info: dnsx resolve failed (best_effort)", "err", err)
 		return nil
 	}
 	seen := make(map[string]struct{})
@@ -294,9 +274,7 @@ func lookupIPInfoGeo(ctx context.Context, client *http.Client, baseURL, pdcpKey,
 	url := fmt.Sprintf("%s/%s/json", baseURL, ip)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		if app.Log != nil {
-			app.Log.Debug("osint.ip_info: geo request build failed", "ip", ip, "err", err)
-		}
+		app.Log.Debug("osint.ip_info: geo request build failed", "ip", ip, "err", err)
 		return "", ""
 	}
 	// PDCP key only in header, never logged (XCUT-07).
@@ -305,22 +283,16 @@ func lookupIPInfoGeo(ctx context.Context, client *http.Client, baseURL, pdcpKey,
 	}
 	resp, err := client.Do(req)
 	if err != nil {
-		if app.Log != nil {
-			app.Log.Debug("osint.ip_info: geo request failed", "ip", ip, "err", err)
-		}
+		app.Log.Debug("osint.ip_info: geo request failed", "ip", ip, "err", err)
 		return "", ""
 	}
 	defer resp.Body.Close() //nolint:errcheck
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 4096))
 	if err != nil {
-		if app.Log != nil {
-			app.Log.Debug("osint.ip_info: geo read failed", "ip", ip, "err", err)
-		}
+		app.Log.Debug("osint.ip_info: geo read failed", "ip", ip, "err", err)
 		return "", ""
 	}
-	if app.Log != nil {
-		app.Log.Debug("osint.ip_info: geo response", "ip", ip, "status", resp.StatusCode)
-	}
+	app.Log.Debug("osint.ip_info: geo response", "ip", ip, "status", resp.StatusCode)
 	var data struct {
 		Org     string `json:"org"`
 		Country string `json:"country"`
@@ -381,8 +353,8 @@ func whoisXMLEndpointsFor() whoisXMLEndpoints {
 // runWhoisXML restores the v1 ip_info() IP-target path (osint.sh:741-775):
 // WHOISXML reverse-IP relations + WHOIS + geolocation on an IP target.
 //
-// Key-gated on cfg.APIKeys.WhoisXML (D-O2: unset → warning + StatusSkipped).
-// XCUT-07 / T-13-05-01: the apiKey travels ONLY in the outbound HTTPS query
+// Key-gated on cfg.APIKeys.WhoisXML (unset → warning + StatusSkipped).
+// XCUT-07: the apiKey travels ONLY in the outbound HTTPS query
 // string of a NATIVE http.Get (never argv / never a subprocess), and is
 // registered with the Redactor BEFORE any request so an accidental URL log is
 // scrubbed; the full URL is never logged. Writes the v1 trio
@@ -398,9 +370,7 @@ func (t *IPInfoTask) runWhoisXML(ctx context.Context, app *appctx.AppContext, ip
 		key = strings.TrimSpace(string(app.Cfg.APIKeys.WhoisXML))
 	}
 	if key == "" {
-		if app.Log != nil {
-			app.Log.Warn("osint.ip_info: WHOISXML_API (cfg.api_keys.whoisxml) not set — skipping IP-target lookups")
-		}
+		app.Log.Warn("osint.ip_info: WHOISXML_API (cfg.api_keys.whoisxml) not set — skipping IP-target lookups")
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 	// XCUT-07 L2: register the key BEFORE any request/log so any accidental URL
@@ -452,10 +422,8 @@ func (t *IPInfoTask) runWhoisXML(ctx context.Context, app *appctx.AppContext, ip
 	}
 
 	writeOSINTStaging(app, inputsDir, "findings.ip_info.jsonl", records)
-	if app.Log != nil {
-		app.Log.Info("osint.ip_info: completed (WHOISXML IP-target)",
-			"ip", ip, "relations", len(relations), "findings", len(records))
-	}
+	app.Log.Info("osint.ip_info: completed (WHOISXML IP-target)",
+		"ip", ip, "relations", len(relations), "findings", len(records))
 	return task.Result{
 		Status: task.StatusDone,
 		Stats:  map[string]int{"findings": len(records), "relations": len(relations)},
@@ -476,9 +444,7 @@ func (t *IPInfoTask) whoisXMLReverseIP(ctx context.Context, client *http.Client,
 		} `json:"result"`
 	}
 	if err := json.Unmarshal(body, &data); err != nil {
-		if app.Log != nil {
-			app.Log.Debug("osint.ip_info: reverse-ip parse failed (best_effort)", "err", err)
-		}
+		app.Log.Debug("osint.ip_info: reverse-ip parse failed (best_effort)", "err", err)
 		return nil
 	}
 	seen := make(map[string]struct{})
@@ -506,30 +472,22 @@ func (t *IPInfoTask) whoisXMLGet(ctx context.Context, client *http.Client, base 
 	full := base + "?" + q.Encode()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, full, nil)
 	if err != nil {
-		if app.Log != nil {
-			app.Log.Debug("osint.ip_info: whoisxml request build failed", "endpoint", label, "err", err)
-		}
+		app.Log.Debug("osint.ip_info: whoisxml request build failed", "endpoint", label, "err", err)
 		return nil
 	}
 	resp, err := client.Do(req)
 	if err != nil {
-		if app.Log != nil {
-			app.Log.Debug("osint.ip_info: whoisxml request failed", "endpoint", label, "err", err)
-		}
+		app.Log.Debug("osint.ip_info: whoisxml request failed", "endpoint", label, "err", err)
 		return nil
 	}
 	defer resp.Body.Close() //nolint:errcheck
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if err != nil {
-		if app.Log != nil {
-			app.Log.Debug("osint.ip_info: whoisxml read failed", "endpoint", label, "err", err)
-		}
+		app.Log.Debug("osint.ip_info: whoisxml read failed", "endpoint", label, "err", err)
 		return nil
 	}
-	if app.Log != nil {
-		// XCUT-07: log ONLY the endpoint label + status, NEVER the full URL (carries the key).
-		app.Log.Debug("osint.ip_info: whoisxml response", "endpoint", label, "status", resp.StatusCode)
-	}
+	// XCUT-07: log ONLY the endpoint label + status, NEVER the full URL (carries the key).
+	app.Log.Debug("osint.ip_info: whoisxml response", "endpoint", label, "status", resp.StatusCode)
 	return body
 }
 
@@ -568,13 +526,13 @@ func whoisXMLFormatGeo(body []byte) string {
 	return b.String()
 }
 
-// writeIPInfoTextFile writes a single-writer human file (D-O5) under osint/,
+// writeIPInfoTextFile writes a single-writer human file under osint/,
 // logging at Debug on error (best_effort). A no-op for empty content.
 func writeIPInfoTextFile(app *appctx.AppContext, path, content string) {
 	if strings.TrimSpace(content) == "" {
 		return
 	}
-	if wErr := os.WriteFile(path, []byte(content), 0o644); wErr != nil && app.Log != nil { //nolint:gosec
+	if wErr := os.WriteFile(path, []byte(content), 0o644); wErr != nil { //nolint:gosec
 		app.Log.Debug("osint.ip_info: write human file failed", "file", filepath.Base(path), "err", wErr)
 	}
 }

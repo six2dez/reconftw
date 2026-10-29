@@ -1,11 +1,11 @@
-// graphql.go — GraphQLTask: gqlspection-based GraphQL introspection scanner (D-V3).
+// graphql.go — GraphQLTask: gqlspection-based GraphQL introspection scanner.
 //
-// GraphQLTask is a D-V3 fold-in from web.sh graphql_scan(), routed to the
-// vulns pipeline per plan 06-08 (VULN-14 parity completeness gate).
+// GraphQLTask is a fold-in from web.sh graphql_scan(), routed to the
+// vulns pipeline for parity completeness (VULN-14).
 //
-// INPUT: artefacts/urls.jsonl — URL corpus from Phase 5.
+// INPUT: artefacts/urls.jsonl — URL corpus from the web stage.
 //
-//	Empty → StatusSkipped (best_effort per D-V7).
+//	Empty → StatusSkipped (best_effort).
 //
 // ARG VECTOR (v1 web.sh graphql_scan verbatim, gqlspection variant):
 //
@@ -20,13 +20,10 @@
 // PAYLOAD REDACTION (XCUT-07):
 // GraphQL schema (field names, types) is the recon OUTPUT — no redaction needed
 // for schema structure. No secret values in the introspection output path.
-// (T-06-08-01: accept disposition — GraphQL introspection data is not a secret.)
-//
-// Source: .planning/phases/06-vulnerability-scanning-e2e/06-08-PLAN.md Task 1.
+// (accept disposition — GraphQL introspection data is not a secret.)
 package vulns
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -37,11 +34,12 @@ import (
 
 	"github.com/six2dez/reconftw/internal/core/appctx"
 	"github.com/six2dez/reconftw/internal/core/config"
+	"github.com/six2dez/reconftw/internal/core/output"
 	"github.com/six2dez/reconftw/internal/core/task"
 )
 
 // GraphQLTask runs gqlspection against each URL in the corpus to discover
-// GraphQL introspection endpoints (D-V3, VULN-14 parity completeness).
+// GraphQL introspection endpoints (VULN-14 parity completeness).
 type GraphQLTask struct{}
 
 // Name returns the globally unique dot-namespaced task identifier.
@@ -74,15 +72,13 @@ func (t *GraphQLTask) DependsOn() []string { return []string{"vulns.gf"} }
 func (t *GraphQLTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result, error) {
 	const toolName = "gqlspection"
 
-	// Step 1: Resolve URL corpus via D-V5 precedence (--urls ctx > artefacts/urls.jsonl).
+	// Step 1: Resolve URL corpus via precedence (--urls ctx > artefacts/urls.jsonl).
 	urls, err := readURLsWithCtx(ctx, app)
-	if err != nil && app.Log != nil {
+	if err != nil {
 		app.Log.Debug("vulns.graphql: read URL corpus error (best_effort)", "err", err)
 	}
 	if len(urls) == 0 {
-		if app.Log != nil {
-			app.Log.Info("vulns.graphql: no URLs in URL corpus — skipping")
-		}
+		app.Log.Info("vulns.graphql: no URLs in URL corpus — skipping")
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
@@ -113,10 +109,8 @@ func (t *GraphQLTask) Run(ctx context.Context, app *appctx.AppContext) (task.Res
 
 		res, runErr := app.Tools.Run(ctx, toolName, args)
 		if runErr != nil {
-			if app.Log != nil {
-				app.Log.Debug("vulns.graphql: gqlspection error (best_effort — continuing)",
-					"url", u, "err", runErr)
-			}
+			app.Log.Debug("vulns.graphql: gqlspection error (best_effort — continuing)",
+				"url", u, "err", runErr)
 			continue
 		}
 
@@ -137,16 +131,14 @@ func (t *GraphQLTask) Run(ctx context.Context, app *appctx.AppContext) (task.Res
 			lines = append(lines, b)
 		}
 		if len(lines) > 0 {
-			if wErr := app.Tree.Append("graphql", lines); wErr != nil && app.Log != nil {
+			if wErr := app.Tree.Append("graphql", lines); wErr != nil {
 				app.Log.Debug("vulns.graphql: Tree.Append failed",
 					"records", len(lines), "err", wErr)
 			}
 		}
 	}
 
-	if app.Log != nil {
-		app.Log.Info("vulns.graphql: completed", "endpoints", found)
-	}
+	app.Log.Info("vulns.graphql: completed", "endpoints", found)
 
 	return task.Result{
 		Status: task.StatusDone,
@@ -155,7 +147,7 @@ func (t *GraphQLTask) Run(ctx context.Context, app *appctx.AppContext) (task.Res
 }
 
 // graphqlRecord is the artefacts/graphql.jsonl schema for a discovered
-// GraphQL introspection endpoint (T-06-08-01: schema structure is the recon
+// GraphQL introspection endpoint (schema structure is the recon
 // output; no redaction needed).
 type graphqlRecord struct {
 	URL    string `json:"url"`
@@ -205,47 +197,35 @@ func parseGQLSpectionOutput(tmpFile string, stdout []byte, srcURL string) []grap
 // Returns nil when absent or empty (non-fatal for Task).
 //
 // The argument is the ALREADY-RESOLVED corpus path from resolveURLInput (which
-// honors the D-V5 precedence: --urls flag > artefacts/urls.jsonl). Read it
+// honors the precedence: --urls flag > artefacts/urls.jsonl). Read it
 // DIRECTLY: the previous filepath.Join(arg, "artefacts/urls.jsonl") double-joined
 // the resolved path (…/artefacts/urls.jsonl/artefacts/urls.jsonl → ENOENT), so the
 // entire vulns URL corpus silently resolved empty and every URL-consuming vulns
 // task skipped "no URL corpus" despite a populated urls.jsonl (live all-mode
 // regression, 2026-08).
 func readURLsJSONL(path string) ([]string, error) {
-	data, err := os.ReadFile(path) //nolint:gosec // path resolved within WorkDir or via --urls
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, nil
-		}
-		return nil, err
-	}
-	if len(data) == 0 {
-		return nil, nil
-	}
-
 	var urls []string
-	sc := bufio.NewScanner(bytes.NewReader(data))
-	sc.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
-	for sc.Scan() {
-		line := bytes.TrimSpace(sc.Bytes())
-		if len(line) == 0 {
-			continue
-		}
+	err := output.ForEachJSONLLine(path, 0, func(line []byte) error {
+		line = bytes.TrimSpace(line)
 		// Try JSON object with "url" field first.
 		var rec struct {
 			URL string `json:"url"`
 		}
 		if err := json.Unmarshal(line, &rec); err == nil && rec.URL != "" {
 			urls = append(urls, rec.URL)
-			continue
+			return nil
 		}
 		// Fall back to treating the line itself as a URL string.
-		u := strings.TrimSpace(string(line))
-		if u != "" && (strings.HasPrefix(u, "http://") || strings.HasPrefix(u, "https://")) {
+		u := string(line)
+		if strings.HasPrefix(u, "http://") || strings.HasPrefix(u, "https://") {
 			urls = append(urls, u)
 		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
-	return urls, sc.Err()
+	return urls, nil
 }
 
 // extractHostFromURL extracts the hostname from a URL string.

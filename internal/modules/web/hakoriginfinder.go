@@ -5,24 +5,24 @@
 // HakoriginfinderTask runs hakoriginfinder per host, feeding each host's IP
 // via stdin and parsing the tool's output for origin IP attribution.
 //
-// Per-host run strategy (CR-06 fix): feeding all IPs in a single batch
+// Per-host run strategy: feeding all IPs in a single batch
 // and attributing by line index produces wrong host↔IP mappings.
 // Instead, we run hakoriginfinder once per host using that host's specific IP,
 // so every OriginRecord has unambiguous host attribution.
 //
-// D-W11 origins.jsonl schema: {host, origin_ip, method, confidence}
+// origins.jsonl schema: {host, origin_ip, method, confidence}
 //
-// ARG VECTOR (RESEARCH §hakoriginfinder):
+// ARG VECTOR:
 //
 //	hakoriginfinder -h https://<hostname>  (stdin: one IP)
 //
-// T-05-10: tool stdout routed to run.log only (never INFO terminal, GAP-3).
+// Tool stdout routed to run.log only (never INFO terminal).
 //
-// hakoriginfinder is a LocalBackend tool only (D-W13).
+// hakoriginfinder is a LocalBackend tool only.
 //
-// 18-04: THIS FILE NO LONGER BYPASSES THE SEAM. Its only manifest reason was
-// `stdin`, and backend.Runner.RunOpts has carried stdin since 18-01. Its sibling
-// hakip2host came home in 18-01 through exactly this seam.
+// THIS FILE NO LONGER BYPASSES THE SEAM. Its only manifest reason was
+// `stdin`, and backend.Runner.RunOpts carries stdin. Its sibling
+// hakip2host came home through exactly this seam.
 //
 // TIMEOUT: the per-invocation 120s context.WithTimeout is GONE. tools.lock OWNS
 // the bound — the hakoriginfinder row carries timeout_seconds = 120, precisely
@@ -33,10 +33,10 @@
 // is byte-for-byte the pre-move `-h https://<host>`.
 //
 // ONE RECORDER ENTRY PER HOST, and that is intended. The per-host run strategy
-// (CR-06) means N invocations for N hosts, so logs/tools.jsonl now carries N
+// means N invocations for N hosts, so logs/tools.jsonl now carries N
 // start/end pairs instead of nothing at all. This is the FIRST time per-host
 // origin attribution is visible in the invocation record; the recorder already
-// rotates on size, which is the accepted cost (T-18-04-06).
+// rotates on size, which is the accepted cost.
 //
 // BEHAVIOUR CHANGE, STATED RATHER THAN HIDDEN: on a NON-ZERO EXIT with output,
 // the old code fell through and parsed that partial output; LocalBackend returns
@@ -45,13 +45,9 @@
 // against the real binary), so the non-zero arm is a genuine failure, and an
 // origin IP scraped from a failed run is exactly the kind of low-confidence
 // attribution that should not be published.
-//
-// Source: .planning/phases/05-web-pipeline-e2e/05-03-PLAN.md Task 2.
 package web
 
 import (
-	"bufio"
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -69,7 +65,7 @@ import (
 	"github.com/six2dez/reconftw/internal/core/task"
 )
 
-// OriginRecord is the D-W11 origins.jsonl schema row.
+// OriginRecord is the origins.jsonl schema row.
 type OriginRecord struct {
 	Host       string `json:"host"`
 	OriginIP   string `json:"origin_ip"`
@@ -78,7 +74,7 @@ type OriginRecord struct {
 }
 
 // ipv4RE matches IPv4 addresses in hakoriginfinder output.
-// RESEARCH §hakoriginfinder: grep -aoE '\b([0-9]{1,3}\.){3}[0-9]{1,3}\b'
+// v1 form: grep -aoE '\b([0-9]{1,3}\.){3}[0-9]{1,3}\b'
 var ipv4RE = regexp.MustCompile(`\b(?:\d{1,3}\.){3}\d{1,3}\b`)
 
 // hostIPPair holds the per-record host and IP fields from hosts.jsonl.
@@ -104,12 +100,10 @@ func (t *HakoriginfinderTask) DependsOn() []string { return []string{"web.httpx"
 
 // Run executes hakoriginfinder per host and writes origin records to origins.jsonl.
 func (t *HakoriginfinderTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result, error) {
-	// CR-06: read host+IP pairs together so per-host attribution is unambiguous.
+	// Read host+IP pairs together so per-host attribution is unambiguous.
 	pairs, err := readHostIPPairsFromJSONL(app)
 	if err != nil || len(pairs) == 0 {
-		if app.Log != nil {
-			app.Log.Info("web.hakoriginfinder: no host/IP pairs in hosts.jsonl — skipping")
-		}
+		app.Log.Info("web.hakoriginfinder: no host/IP pairs in hosts.jsonl — skipping")
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
@@ -124,19 +118,20 @@ func (t *HakoriginfinderTask) Run(ctx context.Context, app *appctx.AppContext) (
 	// than vanishing silently. THE TASK'S STATUS IS UNCHANGED: the first host
 	// whose dispatch never started returns StatusSkipped exactly as the old gate
 	// did — including NOT publishing origins, so a run in which the tool never
-	// ran cannot empty a previous run's artefact (F3 did-not-run).
+	// ran cannot empty a previous run's artefact (did-not-run).
 	var origins []OriginRecord
 	unresolvable := false
+	var dispatchErr error // the failure that set unresolvable
 	for _, pair := range pairs {
 		if pair.ip == "" || pair.host == "" {
 			continue
 		}
 		originIP, runErr := runHakoriginfinderForHost(ctx, app, pair.host, pair.ip)
 		if runErr != nil {
-			// WR-06: LATCH, do not return from inside the loop.
+			// LATCH, do not return from inside the loop.
 			//
 			// Returning here threw away every result the earlier iterations had already
-			// collected. With CR-04 fixed, a rate-limiter or context error mid-loop IS a
+			// collected. A rate-limiter or context error mid-loop IS a
 			// dispatch failure, so a Ctrl-C or a task deadline part-way through now
 			// reaches this arm and silently discarded a partial but perfectly valid set.
 			// The decision belongs after the loop, where "the tool never ran" and "the
@@ -144,34 +139,34 @@ func (t *HakoriginfinderTask) Run(ctx context.Context, app *appctx.AppContext) (
 			// the pattern web/jsa.go already uses.
 			if coreerrors.IsDispatchFailure(runErr) {
 				unresolvable = true
+				dispatchErr = runErr
 				break
 			}
-			if app.Log != nil {
-				app.Log.Debug("web.hakoriginfinder: per-host run error",
-					"host", pair.host, "err", runErr)
-			}
+			app.Log.Debug("web.hakoriginfinder: per-host run error",
+				"host", pair.host, "err", runErr)
 		}
 		if originIP != "" {
 			origins = append(origins, OriginRecord{
 				Host:       pair.host,
 				OriginIP:   originIP,
 				Method:     "hakoriginfinder",
-				Confidence: "low", // CR-06: unambiguous attribution but tool output is uncertain
+				Confidence: "low", // Unambiguous attribution but tool output is uncertain
 			})
 		}
 	}
 
-	// WR-06: only a run that collected NOTHING is a skip. If earlier hosts produced
+	// Only a run that collected NOTHING is a skip. If earlier hosts produced
 	// origins before the dispatch failure, they are a real observation and are
-	// published; publishing them is also what keeps the F3 contract below honest,
+	// published; publishing them is also what keeps the empty-run contract below honest,
 	// since reaching it means the tool genuinely ran.
 	if unresolvable && len(origins) == 0 {
-		if app.Log != nil {
-			app.Log.Info("web.hakoriginfinder: tool unavailable — skipping")
-		}
-		return task.Result{Status: task.StatusSkipped}, nil
+		// Absent-vs-failed policy (task.ClassifyToolErr): the latched dispatch
+		// error names whether the tool was never installed or was cancelled.
+		status, reason := task.ClassifyToolErr(dispatchErr)
+		app.Log.Info("web.hakoriginfinder: tool unavailable — skipping", "reason", reason)
+		return task.Result{Status: status, Reason: reason}, nil
 	}
-	if unresolvable && app.Log != nil {
+	if unresolvable {
 		app.Log.Warn("web.hakoriginfinder: dispatch stopped part-way — publishing the origins "+
 			"collected before it (WR-06)", "origins", len(origins))
 	}
@@ -182,11 +177,11 @@ func (t *HakoriginfinderTask) Run(ctx context.Context, app *appctx.AppContext) (
 			fmt.Errorf("web.hakoriginfinder: mkdir artefacts/: %w", err)
 	}
 
-	// F3 (phase 15): publish artefacts/origins.jsonl UNCONDITIONALLY.
+	// Publish artefacts/origins.jsonl UNCONDITIONALLY.
 	//
 	// hakoriginfinder is the sole direct writer of "origins" and there is no
 	// staging producer for that stage, so web.MergeStage is barred from touching
-	// it (15-03's directArtefactWriterStages). This is therefore the ONLY place
+	// it ( directArtefactWriterStages). This is therefore the ONLY place
 	// the artefact can be emptied — and it must be. The old
 	// `if len(origins) == 0 { return StatusDone }` short-circuit here meant a run
 	// that probed every host and found no origin republished the PREVIOUS run's
@@ -207,21 +202,15 @@ func (t *HakoriginfinderTask) Run(ctx context.Context, app *appctx.AppContext) (
 	if len(lines) > 0 {
 		// Tree.Append stays the scope-enforcement boundary for non-empty batches.
 		if appendErr := app.Tree.Append("origins", lines); appendErr != nil {
-			if app.Log != nil {
-				app.Log.Debug("web.hakoriginfinder: Tree.Append failed", "err", appendErr)
-			}
+			app.Log.Debug("web.hakoriginfinder: Tree.Append failed", "err", appendErr)
 		}
 	} else if pubErr := output.PublishArtefact(app.Target.WorkDir, "origins", nil); pubErr != nil {
 		// Append short-circuits on an empty batch and cannot express "this run
 		// found nothing", so the empty case goes through PublishArtefact.
-		if app.Log != nil {
-			app.Log.Debug("web.hakoriginfinder: empty origins publish failed", "err", pubErr)
-		}
+		app.Log.Debug("web.hakoriginfinder: empty origins publish failed", "err", pubErr)
 	}
 
-	if app.Log != nil {
-		app.Log.Debug("web.hakoriginfinder: completed", "origins_found", len(origins))
-	}
+	app.Log.Debug("web.hakoriginfinder: completed", "origins_found", len(origins))
 	return task.Result{
 		Status:     task.StatusDone,
 		Stats:      map[string]int{"origins_found": len(origins)},
@@ -230,7 +219,7 @@ func (t *HakoriginfinderTask) Run(ctx context.Context, app *appctx.AppContext) (
 }
 
 // hakoriginfinderArgs returns the arg vector for one host, VERBATIM as it stood
-// before 18-04 moved this dispatch onto the Runner:
+// before this dispatch moved onto the Runner:
 //
 //	hakoriginfinder -h https://<hostname>   (stdin: the host's IP)
 //
@@ -244,7 +233,7 @@ func hakoriginfinderArgs(targetHost string) []string {
 // runHakoriginfinderForHost runs hakoriginfinder for a single host/IP pair
 // through backend.Runner, with that host's IP on standard input.
 // Returns the first origin IP found in the output, or "" if none.
-// Each call has an unambiguous host↔IP relationship (CR-06 fix).
+// Each call has an unambiguous host↔IP relationship.
 //
 // The returned error is the Runner's, unwrapped: the caller distinguishes a
 // dispatch failure (tool absent — a task-level skip) from a per-host run error
@@ -269,7 +258,7 @@ func runHakoriginfinderForHost(ctx context.Context, app *appctx.AppContext,
 // for context in the attribution — it is NOT used for index-based selection.
 // Returns "" if no valid IPv4 is found in the output.
 //
-// IN-02: the ipv4RE regex matches octets up to 999 (e.g. "999.999.999.999").
+// The ipv4RE regex matches octets up to 999 (e.g. "999.999.999.999").
 // Validate each regex match with net.ParseIP and require a 4-octet (non-IPv6)
 // result so an out-of-range string can never land in OriginRecord.OriginIP.
 func parseHakoriginOutput(output, _ string) string {
@@ -286,84 +275,68 @@ func parseHakoriginOutput(output, _ string) string {
 }
 
 // readHostIPPairsFromJSONL reads artefacts/hosts.jsonl and returns host+IP pairs.
-// WR-06: uses bufio.Scanner with 4MiB buffer (not os.ReadFile+strings.Split).
+// Uses bufio.Scanner with 4MiB buffer (not os.ReadFile+strings.Split).
 // Pairs with empty host or empty IP are not filtered here; callers skip them.
+
 func readHostIPPairsFromJSONL(app *appctx.AppContext) ([]hostIPPair, error) {
 	hostsPath := filepath.Join(app.Target.WorkDir, "artefacts", "hosts.jsonl")
-	f, err := os.Open(hostsPath) //nolint:gosec // path within WorkDir
-	if err != nil {
-		return nil, fmt.Errorf("read hosts.jsonl for host/IP pairs: %w", err)
-	}
-	defer f.Close() //nolint:errcheck
-
 	seen := make(map[string]bool)
 	var pairs []hostIPPair
-
-	scanner := bufio.NewScanner(f)
-	scanner.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
-	for scanner.Scan() {
-		line := bytes.TrimSpace(scanner.Bytes())
-		if len(line) == 0 {
-			continue
-		}
+	err := output.ForEachJSONLLine(hostsPath, 0, func(line []byte) error {
 		var rec struct {
 			Host string `json:"host"`
 			IP   string `json:"ip"`
 		}
 		if err := json.Unmarshal(line, &rec); err != nil {
-			continue
+			return nil // malformed record: skipped, as before
 		}
 		host := strings.TrimSpace(rec.Host)
 		ip := strings.TrimSpace(rec.IP)
 		if host == "" || seen[host] {
-			continue
+			return nil
 		}
 		seen[host] = true
 		pairs = append(pairs, hostIPPair{host: host, ip: ip})
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("read hosts.jsonl for host/IP pairs: %w", err)
 	}
-	return pairs, scanner.Err()
+	return pairs, nil
 }
 
-// IN-01: readIPsFromJSONL was removed — after the CR-06 per-host rewrite, Run
+// readIPsFromJSONL was removed — after the per-host rewrite, Run
 // uses only readHostIPPairsFromJSONL. It had no production or test callers, so
 // it was dead code. readHostnamesFromJSONL below is KEPT: it is still called by
 // vhostfinder.go (VhostFinderTask reads bare hostnames from hosts.jsonl).
 
 // readHostnamesFromJSONL reads artefacts/hosts.jsonl and returns the list of
 // host field values (bare hostnames, not URLs). Used by vhostfinder.go.
-// WR-06: uses bufio.Scanner with 4MiB buffer (not os.ReadFile+strings.Split).
+// Uses bufio.Scanner with 4MiB buffer (not os.ReadFile+strings.Split).
+
 func readHostnamesFromJSONL(app *appctx.AppContext) ([]string, error) {
 	hostsPath := filepath.Join(app.Target.WorkDir, "artefacts", "hosts.jsonl")
-	f, err := os.Open(hostsPath) //nolint:gosec // path within WorkDir
-	if err != nil {
-		return nil, fmt.Errorf("read hosts.jsonl: %w", err)
-	}
-	defer f.Close() //nolint:errcheck
-
 	seen := make(map[string]bool)
 	var hostnames []string
-
-	scanner := bufio.NewScanner(f)
-	scanner.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
-	for scanner.Scan() {
-		line := bytes.TrimSpace(scanner.Bytes())
-		if len(line) == 0 {
-			continue
-		}
+	err := output.ForEachJSONLLine(hostsPath, 0, func(line []byte) error {
 		var rec struct {
 			Host string `json:"host"`
 		}
 		if err := json.Unmarshal(line, &rec); err != nil {
-			continue
+			return nil // malformed record: skipped, as before
 		}
 		h := strings.TrimSpace(rec.Host)
 		if h == "" || seen[h] {
-			continue
+			return nil
 		}
 		seen[h] = true
 		hostnames = append(hostnames, h)
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("read hosts.jsonl: %w", err)
 	}
-	return hostnames, scanner.Err()
+	return hostnames, nil
 }
 
 func init() { task.Register(&HakoriginfinderTask{}) }

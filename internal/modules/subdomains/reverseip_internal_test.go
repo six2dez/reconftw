@@ -1,5 +1,5 @@
 // reverseip_internal_test.go — INTERNAL tests (package subdomains) for the
-// hakip2host reverse-IP fold (13-01 Task 1). Internal because they override the
+// hakip2host reverse-IP fold. Internal because they override the
 // unexported hakip2hostRunner package var to inject canned tool output without a
 // real binary, and exercise the unexported parse/scope helpers.
 package subdomains
@@ -60,7 +60,7 @@ func (b *stubBackend) HealthCheck(_ context.Context) error { return nil }
 func (b *stubBackend) Capacity() int                       { return 1 }
 
 // scopeTree is an output.Interface double applying a real DefaultScopeFilter so
-// in-scope filtering (T-13-01-01) can be exercised.
+// in-scope filtering can be exercised.
 type scopeTree struct{ patterns []string }
 
 func (s *scopeTree) Append(_ string, _ [][]byte) error { return nil }
@@ -75,6 +75,7 @@ func internalTestApp(workDir string, be backend.Backend, tree output.Interface) 
 	reg.Register(&backend.Tool{Name: "dnsx"})
 	reg.Register(&backend.Tool{Name: "testtool"})
 	return &appctx.AppContext{
+		Log:    appctx.NopLogger(),
 		Tools:  backend.NewRunner(be, reg, nil),
 		Tree:   tree,
 		Target: &appctx.Target{Domain: "example.com", WorkDir: workDir},
@@ -87,10 +88,10 @@ func internalTestApp(workDir string, be backend.Backend, tree output.Interface) 
 // -------------------------------------------------------------------------
 
 func TestParseHakip2hostHostsFiltersScope(t *testing.T) {
-	app := &appctx.AppContext{Tree: &scopeTree{patterns: []string{"*.example.com"}}}
+	app := &appctx.AppContext{Log: appctx.NopLogger(), Tree: &scopeTree{patterns: []string{"*.example.com"}}}
 	// bash awk '{print $3}': the 3rd whitespace field is the hostname.
 	out := "[PTR] 1.2.3.4 sub.example.com\n" +
-		"[SSLCERT] 1.2.3.4 evil.com\n" + // off-scope — must be dropped (T-13-01-01)
+		"[SSLCERT] 1.2.3.4 evil.com\n" + // off-scope — must be dropped
 		"[PTR] 1.2.3.4 sub.example.com\n" // duplicate — must dedup
 	got := parseHakip2hostHosts(out, app)
 	if len(got) != 1 || got[0] != "sub.example.com" {
@@ -160,8 +161,8 @@ func TestSubDNSReverseIPGate(t *testing.T) {
 	})
 }
 
-// ExecOpts satisfies the backend.Backend options seam added in 18-01. It
-// PRESERVES this fake's pre-18-01 dispatch exactly: Runner.Run used to call
+// ExecOpts satisfies the backend.Backend options seam. It PRESERVES this
+// fake's original dispatch exactly: Runner.Run used to call
 // Backend.Exec and Runner.RunEnv used to call Backend.ExecEnv, and both now
 // arrive here, so the env-set case forwards to ExecEnv and the zero case to Exec.
 //
@@ -185,7 +186,7 @@ func (b *stubBackend) StreamOpts(ctx context.Context, t *backend.Tool, args []st
 }
 
 // -------------------------------------------------------------------------
-// 18-01: hakip2host through the Runner seam (the plan's module leg)
+// hakip2host through the Runner seam
 // -------------------------------------------------------------------------
 
 // TestReverseIPHostsDispatchesThroughTheRunnerSeam drives the DEFAULT
@@ -224,6 +225,7 @@ func TestReverseIPHostsDispatchesThroughTheRunnerSeam(t *testing.T) {
 	runner.Recorder = backend.NewToolRecorder(recPath, nil)
 
 	app := &appctx.AppContext{
+		Log:    appctx.NopLogger(),
 		Tools:  runner,
 		Tree:   &scopeTree{patterns: []string{"*.example.com"}},
 		Target: &appctx.Target{Domain: "example.com", WorkDir: dir},

@@ -2,7 +2,7 @@
 //
 // LFITask reads inputs/gf/lfi.txt produced by GFTask, generates single-param
 // candidate URLs (one FUZZ slot per query parameter, other params preserved),
-// caps candidates at LFI_MAX_URLS (default 150, D-V6 WAF-friendly posture),
+// caps candidates at LFI_MAX_URLS (default 150, WAF-friendly posture),
 // runs ffuf -w lfi_wordlist:LFI per candidate, and stores findings in
 // inputs/findings.lfi.jsonl per the multi-writer staging contract (doc.go).
 //
@@ -21,7 +21,7 @@
 //	     -H <header> -w lfi_wordlist:LFI
 //	     -mr "root:x:" -u <candidateURL-with-LFI-slot>
 //
-// PAYLOAD REDACTION (XCUT-07, T-06-04-01):
+// PAYLOAD REDACTION (XCUT-07):
 // ffuf verbose output may contain file contents (e.g., /etc/passwd lines).
 // Raw ffuf output lines MUST NEVER appear in logs at Info/Warn.
 // Only status code + response count logged at Debug. PayloadRedacted="***".
@@ -29,8 +29,6 @@
 // DEEP LIMIT GATE (mirrors v1 vulns.sh:337 DEEP/DEEP_LIMIT check):
 // If cfg.Advanced.Deep is false AND candidate count > cfg.Advanced.DeepLimit,
 // the scan is skipped with an Info log suggesting --deep.
-//
-// Source: .planning/phases/06-vulnerability-scanning-e2e/06-04-PLAN.md Task 1.
 package vulns
 
 import (
@@ -88,16 +86,12 @@ func (t *LFITask) Run(ctx context.Context, app *appctx.AppContext) (task.Result,
 	// Step 1: Resolve lfi_wordlist path.
 	lfiWordlist := cfg.Paths.LFIWordlist
 	if lfiWordlist == "" {
-		if app.Log != nil {
-			app.Log.Info("vulns.lfi: lfi_wordlist not configured — skipping")
-		}
+		app.Log.Info("vulns.lfi: lfi_wordlist not configured — skipping")
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 	if _, err := os.Stat(lfiWordlist); err != nil {
-		if app.Log != nil {
-			app.Log.Info("vulns.lfi: lfi_wordlist not accessible — skipping",
-				"path", lfiWordlist, "err", err)
-		}
+		app.Log.Info("vulns.lfi: lfi_wordlist not accessible — skipping",
+			"path", lfiWordlist, "err", err)
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
@@ -105,9 +99,7 @@ func (t *LFITask) Run(ctx context.Context, app *appctx.AppContext) (task.Result,
 	gfBucket := filepath.Join(app.Target.WorkDir, "inputs", "gf", "lfi.txt")
 	bucketData, err := os.ReadFile(gfBucket) //nolint:gosec // path within WorkDir
 	if err != nil || len(bytes.TrimSpace(bucketData)) == 0 {
-		if app.Log != nil {
-			app.Log.Info("vulns.lfi: gf/lfi bucket empty — LFI skipped", "bucket", gfBucket)
-		}
+		app.Log.Info("vulns.lfi: gf/lfi bucket empty — LFI skipped", "bucket", gfBucket)
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
@@ -118,16 +110,14 @@ func (t *LFITask) Run(ctx context.Context, app *appctx.AppContext) (task.Result,
 			fmt.Errorf("vulns.lfi: mkdir inputs/: %w", err)
 	}
 
-	// Step 3: Generate single-param FUZZ candidates (D-V6 cap at LFI_MAX_URLS).
+	// Step 3: Generate single-param FUZZ candidates (cap at LFI_MAX_URLS).
 	maxURLs := cfg.Vulns.LFI.MaxURLs
 	if maxURLs <= 0 {
 		maxURLs = 150 // v1 LFI_MAX_URLS default
 	}
 	candidates := prepareLFICandidates(bucketData, maxURLs)
 	if len(candidates) == 0 {
-		if app.Log != nil {
-			app.Log.Info("vulns.lfi: no per-parameter LFI candidates generated — skipping")
-		}
+		app.Log.Info("vulns.lfi: no per-parameter LFI candidates generated — skipping")
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
@@ -135,16 +125,12 @@ func (t *LFITask) Run(ctx context.Context, app *appctx.AppContext) (task.Result,
 	candidatesFile := filepath.Join(inputsDir, "tmp_lfi_candidates.txt")
 	if wErr := os.WriteFile(candidatesFile,
 		[]byte(strings.Join(candidates, "\n")+"\n"), 0o644); wErr != nil { //nolint:gosec
-		if app.Log != nil {
-			app.Log.Debug("vulns.lfi: write candidates file failed (continuing)",
-				"path", candidatesFile, "err", wErr)
-		}
+		app.Log.Debug("vulns.lfi: write candidates file failed (continuing)",
+			"path", candidatesFile, "err", wErr)
 	}
 
-	if app.Log != nil {
-		app.Log.Info("vulns.lfi: candidate URLs prepared",
-			"count", len(candidates), "cap", maxURLs)
-	}
+	app.Log.Info("vulns.lfi: candidate URLs prepared",
+		"count", len(candidates), "cap", maxURLs)
 
 	// Step 4: Deep-limit gate (mirrors v1 vulns.sh:337).
 	deepLimit := cfg.Advanced.DeepLimit
@@ -152,10 +138,8 @@ func (t *LFITask) Run(ctx context.Context, app *appctx.AppContext) (task.Result,
 		deepLimit = 500 // v1 DEEP_LIMIT default
 	}
 	if !cfg.Advanced.Deep && len(candidates) > deepLimit {
-		if app.Log != nil {
-			app.Log.Info("vulns.lfi: too many candidates — skipped (use --deep to override)",
-				"candidate_count", len(candidates), "deep_limit", deepLimit)
-		}
+		app.Log.Info("vulns.lfi: too many candidates — skipped (use --deep to override)",
+			"candidate_count", len(candidates), "deep_limit", deepLimit)
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
@@ -173,7 +157,7 @@ func (t *LFITask) Run(ctx context.Context, app *appctx.AppContext) (task.Result,
 	var findings []VulnFindingRecord
 	// ffufRan records whether AT LEAST ONE candidate was actually probed. If
 	// ffuf is absent every dispatch fails, the task observed nothing, and it
-	// must not clear a previous run's staging (F3 did-not-run — staging.go).
+	// must not clear a previous run's staging (did-not-run rule — staging.go).
 	ffufRan := false
 	// cancelled records that the loop stopped early on context cancellation, so
 	// a partially-probed corpus is not mistaken for a completed clean run.
@@ -183,16 +167,14 @@ func (t *LFITask) Run(ctx context.Context, app *appctx.AppContext) (task.Result,
 		// Stop early on context cancellation (SA4011: a bare break inside a
 		// select would only exit the select, not this loop).
 		if ctx.Err() != nil {
-			if app.Log != nil {
-				app.Log.Debug("vulns.lfi: cancelled", "processed", i, "total", len(candidates))
-			}
+			app.Log.Debug("vulns.lfi: cancelled", "processed", i, "total", len(candidates))
 			cancelled = true
 			break
 		}
 
 		hits, ffufErr := runLFIFFUF(ctx, app, toolName, candidate, lfiWordlist,
 			threads, rateLimit, timeoutSeconds, maxTimeSeconds, header)
-		// F6 (phase 15): ffuf RAN and ended badly on this candidate. The corpus is
+		// Terminal error: ffuf RAN and ended badly on this candidate. The corpus is
 		// only partly probed, so escalate and discard rather than let the
 		// remaining candidates read as clean. A DISPATCH error (ffuf absent) keeps
 		// its best-effort path and simply leaves ffufRan false.
@@ -207,7 +189,7 @@ func (t *LFITask) Run(ctx context.Context, app *appctx.AppContext) (task.Result,
 
 	// Step 6: Write inputs/findings.lfi.jsonl.
 	//
-	// F3 (phase 15): staged through stageVulnFindings so a run in which ffuf
+	// Run isolation: staged through stageVulnFindings so a run in which ffuf
 	// matched nothing REMOVES the previous run's staging. A CANCELLED run only
 	// probed part of the corpus, so it is treated as did-not-run: an interrupted
 	// scan must never be the reason a finding disappears.
@@ -218,9 +200,7 @@ func (t *LFITask) Run(ctx context.Context, app *appctx.AppContext) (task.Result,
 	stageVulnFindings(app, "vulns.lfi", stagingPath, ffufRan && !cancelled, findings)
 
 	// XCUT-07: log only count, never raw LFI payload or file contents.
-	if app.Log != nil {
-		app.Log.Info("vulns.lfi: completed", "findings", len(findings))
-	}
+	app.Log.Info("vulns.lfi: completed", "findings", len(findings))
 
 	return task.Result{
 		Status: task.StatusDone,
@@ -236,7 +216,7 @@ func (t *LFITask) Run(ctx context.Context, app *appctx.AppContext) (task.Result,
 //     is set to "LFI" and all other parameters are left unchanged.
 //
 // The resulting slice is deduplicated. If maxURLs > 0 and len > maxURLs,
-// the slice is truncated to maxURLs (D-V6 WAF-friendly cap, T-06-04-03).
+// the slice is truncated to maxURLs (WAF-friendly cap).
 //
 // NOTE: The placeholder is "LFI" (used as the ffuf keyword -w wordlist:LFI).
 // This mirrors v1's qsreplace pattern where ffuf receives the wordlist as
@@ -302,7 +282,7 @@ func prepareLFICandidates(data []byte, maxURLs int) []string {
 //
 // The error return distinguishes the two ffuf failure channels. A DISPATCH
 // error (ffuf absent) is returned bare and means this candidate was never
-// probed — the caller must not count it as an observation (F3 did-not-run).
+// probed — the caller must not count it as an observation (did-not-run rule).
 //
 // v1 arg vector (modules/vulns.sh:355-366):
 //
@@ -310,7 +290,7 @@ func prepareLFICandidates(data []byte, maxURLs int) []string {
 //	     -timeout <timeout> -maxtime <maxtime>
 //	     -H <header> -w <lfi_wordlist>:LFI -mr "root:x:" -u <candidateURL>
 //
-// XCUT-07 (T-06-04-01): ffuf verbose output may contain raw file content lines.
+// XCUT-07: ffuf verbose output may contain raw file content lines.
 // Raw output MUST NOT be logged at Info/Warn. Only status count at Debug.
 // The LFI keyword in the candidate URL and wordlist entries are NEVER written
 // to any VulnFindingRecord field.
@@ -351,18 +331,16 @@ func runLFIFFUF(ctx context.Context, app *appctx.AppContext,
 	eventCh, streamErr := app.Tools.Stream(ctx, toolName, args)
 	if streamErr != nil {
 		// DISPATCH failure — ffuf is not on PATH; this candidate never ran.
-		if app.Log != nil {
-			app.Log.Debug("vulns.lfi: ffuf stream error (best_effort, continuing)",
-				"err", streamErr)
-		}
+		app.Log.Debug("vulns.lfi: ffuf stream error (best_effort, continuing)",
+			"err", streamErr)
 		return nil, fmt.Errorf("vulns.lfi: ffuf stream: %w", streamErr)
 	}
 
 	// Drain stream — Backend contract requires full drain.
-	// XCUT-07 (T-06-04-01): raw ffuf output may contain file contents (e.g.,
+	// XCUT-07: raw ffuf output may contain file contents (e.g.,
 	// /etc/passwd lines). NEVER log at Info/Warn. Count matches only at Debug.
 	//
-	// F6 (phase 15) accumulator shape: latch the TERMINAL error inside the loop
+	// Terminal-error accumulator shape: latch the TERMINAL error inside the loop
 	// and check it after.
 	var matchCount int
 	var termErr error
@@ -375,14 +353,12 @@ func runLFIFFUF(ctx context.Context, app *appctx.AppContext,
 		// lines matching "root:x:" are printed at all. Count presence.
 		if strings.Contains(line, "url") && strings.Contains(line, "lfi") {
 			matchCount++
-			if app.Log != nil {
-				// XCUT-07: NEVER log the matched URL or payload content.
-				app.Log.Debug("vulns.lfi: ffuf match indicator detected")
-			}
+			// XCUT-07: NEVER log the matched URL or payload content.
+			app.Log.Debug("vulns.lfi: ffuf match indicator detected")
 		}
 	}
 
-	// F6: ffuf ended badly, so this candidate was only partially probed. Report
+	// Terminal error: ffuf ended badly, so this candidate was only partially probed. Report
 	// it rather than let a partial probe read as "no LFI on this URL".
 	if termErr != nil {
 		return nil, terminalStreamError(toolName, termErr)
@@ -399,10 +375,10 @@ func runLFIFFUF(ctx context.Context, app *appctx.AppContext,
 	for i := 0; i < matchCount; i++ {
 		records = append(records, VulnFindingRecord{
 			Host: host, // scope-gate locator (findings:host|url)
-			// Phase 4/5 inherited SARIF-compatible fields.
+			// Inherited SARIF-compatible fields.
 			Severity:   "high",
 			Confidence: "medium",
-			// Phase 6 vuln-class fields.
+			// Vuln-class fields.
 			VulnClass:       "lfi",
 			MatchedParam:    host,  // hostname only — no raw payload (XCUT-07)
 			PayloadRedacted: "***", // XCUT-07: raw LFI path never written

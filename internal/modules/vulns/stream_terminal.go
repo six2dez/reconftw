@@ -1,5 +1,5 @@
-// stream_terminal.go — the vulns package's half of the F6 terminal-error
-// contract (plan 15-14 Task 2). Mirrors internal/modules/web/stream_terminal.go.
+// stream_terminal.go — the vulns package's half of the terminal-error
+// contract. Mirrors internal/modules/web/stream_terminal.go.
 //
 // Backend.Stream has TWO independent failure channels and they mean opposite
 // things (see the package comment on internal/core/backend/stream.go):
@@ -36,8 +36,6 @@
 // before, so the ratchet would go green with no behavioural change.
 // errToolStreamEnded is the marker that prevents that: helpers wrap terminal
 // failures with terminalStreamError, and Run escalates only those.
-//
-// Source: .planning/phases/15-release-gates-run-isolation-store-integrity/15-14-PLAN.md
 package vulns
 
 import (

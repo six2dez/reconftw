@@ -1,4 +1,4 @@
-// merge_test.go — F3 (15-03) empty-union behaviour for the subdomains merger.
+// merge_test.go — empty-union behaviour for the subdomains merger.
 //
 // subdomains is CASE C + CASE D and behaves differently from the web/vulns/osint
 // mergers on purpose:
@@ -33,6 +33,7 @@ func newSubsMergeApp(t *testing.T) *appctx.AppContext {
 		t.Fatalf("output.NewTree: %v", err)
 	}
 	return &appctx.AppContext{
+		Log:    appctx.NopLogger(),
 		Tree:   tree,
 		Target: &appctx.Target{Domain: "example.com", WorkDir: workdir},
 	}

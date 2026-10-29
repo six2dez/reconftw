@@ -1,7 +1,4 @@
 // brute_test.go — TDD tests for SubBruteTask + SubResolversHealthTask.
-//
-// Source: .planning/phases/04-subdomains-e2e-axiom-integration/04-02-PLAN.md
-// Task 2 behavior tests (SUBD-02 resolver health gate).
 package subdomains_test
 
 import (
@@ -54,6 +51,7 @@ func buildBruteApp(t *testing.T, resolverContent string) (*appctx.AppContext, st
 	runner := backend.NewRunner(mockBe, reg, nil)
 
 	app := &appctx.AppContext{
+		Log:   appctx.NopLogger(),
 		Tools: runner,
 		Tree:  &mockTree{},
 		Target: &appctx.Target{
@@ -234,6 +232,7 @@ func TestMergeStageWritesMergedTxt(t *testing.T) {
 
 	mockTr := &mockTree{}
 	app := &appctx.AppContext{
+		Log:  appctx.NopLogger(),
 		Tree: mockTr,
 		Target: &appctx.Target{
 			Domain:  "example.com",

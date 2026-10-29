@@ -1,4 +1,4 @@
-// gxss_test.go — the proof that web.gxss came home to backend.Runner (18-04)
+// gxss_test.go — the proof that web.gxss came home to backend.Runner
 // WITHOUT changing the command line Gxss receives.
 //
 // THE CONTROL IS THE PRE-MOVE ARG VECTOR, captured from gxss.go as it stood at
@@ -32,7 +32,7 @@ import (
 	"github.com/six2dez/reconftw/internal/core/task"
 )
 
-// gxssWantArgv is the PRE-MOVE arg vector, captured from gxss.go before 18-04
+// gxssWantArgv is the PRE-MOVE arg vector, captured from gxss.go before the move
 // touched it. It is deliberately a literal and not a call to gxssArgs().
 var gxssWantArgv = []string{"-c", "100", "-p", "Xss"}
 
@@ -120,6 +120,7 @@ func newGxssTestApp(t *testing.T, workDir, toolPath string, timeout ...time.Dura
 	cfg := config.Defaults()
 	cfg.Web.ParamDiscover.Enabled = true
 	return &appctx.AppContext{
+		Log:    appctx.NopLogger(),
 		Tools:  backend.NewRunner(&backend.LocalBackend{}, reg, nil),
 		Cfg:    cfg,
 		Target: &appctx.Target{Domain: "example.com", WorkDir: workDir},
@@ -259,7 +260,7 @@ func TestGxssIsRecorded(t *testing.T) {
 		}
 	}
 
-	// 3. XCUT: the stdin payload must NOT be in the record (18-01's guarantee,
+	// 3. XCUT: the stdin payload must NOT be in the record (the Runner's guarantee,
 	//    re-asserted at this call site rather than assumed to survive the move).
 	if strings.Contains(string(data), "q=FUZZ") {
 		t.Errorf("STDIN CONTENT LEAKED INTO logs/tools.jsonl — the FUZZ-replaced URL corpus is "+
@@ -267,7 +268,7 @@ func TestGxssIsRecorded(t *testing.T) {
 	}
 }
 
-// TestGxssTimeoutDoesNotWipePreviousStaging pins the CR-03 fix.
+// TestGxssTimeoutDoesNotWipePreviousStaging pins the deadline-arm fix.
 //
 // Bringing web.gxss onto backend.Runner removed its local context.WithTimeout —
 // the tools.lock row now owns the deadline — and with it the partial-stdout path.
@@ -317,7 +318,7 @@ func TestGxssTimeoutDoesNotWipePreviousStaging(t *testing.T) {
 }
 
 // TestNomore403TimeoutDoesNotWipePreviousStaging and its bypass4xx sibling pin the
-// two CR-03 legs that had no test of their own.
+// two deadline-arm legs that had no test of their own.
 //
 // The phase's verifier proved both by writing temporary deadline tests, observing
 // them pass, removing each `res == nil` guard to watch them fail, and then deleting
@@ -328,7 +329,7 @@ func TestNomore403TimeoutDoesNotWipePreviousStaging(t *testing.T) {
 	recDir := t.TempDir()
 
 	// A clone whose entry point never returns, so the tools.lock deadline is what
-	// ends the run — the exact shape CR-03 is about.
+	// ends the run — the exact shape the deadline arm is about.
 	toolsRoot := plantNomore403Clone(t, recDir, "")
 	if err := os.WriteFile(filepath.Join(toolsRoot, "nomore403", "nomore403"),
 		[]byte("#!/bin/sh\nsleep 30\n"), 0o700); err != nil { //nolint:gosec // test fixture must be executable

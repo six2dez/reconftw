@@ -5,16 +5,14 @@
 // UrlfinderTask runs urlfinder against the target domain, reads its plain-text
 // URL output, and writes URLRecord entries to artefacts/urls.jsonl.
 //
-// ARG VECTOR (RESEARCH §urlfinder — verbatim v1 form, web.sh:1875):
+// ARG VECTOR (verbatim v1 form, web.sh:1875):
 //
 //	urlfinder -d <domain> -all -o <stagingfile>
 //
 // The -all flag enables all passive sources. Output is a plain URL list.
-// Axiom: LocalBackend only (D-W13).
+// Axiom: LocalBackend only.
 //
-// T-05-15: out-of-scope URLs filtered by extract/urls.ExtractURLs domain check.
-//
-// Source: .planning/phases/05-web-pipeline-e2e/05-04-PLAN.md Task 2.
+// Out-of-scope URLs filtered by extract/urls.ExtractURLs domain check.
 package web
 
 import (
@@ -57,7 +55,7 @@ func (t *UrlfinderTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 	}
 	stagingFile := filepath.Join(inputsDir, "urlfinder_urls.txt.tmp")
 
-	// Build arg vector (RESEARCH §urlfinder verbatim v1 form web.sh:1875).
+	// Build arg vector (verbatim v1 form, web.sh:1875).
 	args := []string{
 		"-d", app.Target.Domain,
 		"-all",
@@ -66,11 +64,13 @@ func (t *UrlfinderTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 
 	res, execErr := app.Tools.Run(ctx, toolName, args)
 	if execErr != nil {
-		if app.Log != nil {
-			app.Log.Info("web.urlfinder: binary absent or failed — skipping",
-				"err", execErr)
-		}
-		return task.Result{Status: task.StatusSkipped}, nil
+		// Absent-vs-failed policy (task.ClassifyToolErr): a urlfinder that never
+		// started is "tool absent"; one that could not be run for any other
+		// reason is degraded with its own account of why. Neither fails the
+		// scan (best_effort).
+		status, reason := task.ClassifyToolErr(execErr)
+		app.Log.Info("web.urlfinder: urlfinder not run — skipping", "reason", reason)
+		return task.Result{Status: status, Reason: reason}, nil
 	}
 
 	// Read output file; fall back to stdout.
@@ -84,7 +84,7 @@ func (t *UrlfinderTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 	// Extract and scope-filter URLs.
 	records, _ := urlsextract.ExtractURLs(raw, "urlfinder", app.Target.Domain)
 
-	// F3 (phase 15): the old `if len(records) == 0 { return StatusDone }`
+	// The old `if len(records) == 0 { return StatusDone }`
 	// short-circuit here left a previous run's inputs/urls.urlfinder.jsonl on
 	// disk for the urls merge to republish. urlfinder RAN (the absent-binary
 	// case returned StatusSkipped above), so stage unconditionally and let
@@ -98,7 +98,7 @@ func (t *UrlfinderTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 		lines = append(lines, b)
 	}
 	stagingPath := filepath.Join(app.Target.WorkDir, "inputs", "urls.urlfinder.jsonl")
-	if wErr := output.StageJSONL(stagingPath, lines); wErr != nil && app.Log != nil {
+	if wErr := output.StageJSONL(stagingPath, lines); wErr != nil {
 		app.Log.Debug("web.urlfinder: staging write failed",
 			"path", stagingPath, "err", wErr)
 	}
@@ -106,10 +106,8 @@ func (t *UrlfinderTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 	// Clean up staging file.
 	os.Remove(stagingFile) //nolint:errcheck
 
-	if app.Log != nil {
-		app.Log.Debug("web.urlfinder: completed",
-			"urls_found", len(records))
-	}
+	app.Log.Debug("web.urlfinder: completed",
+		"urls_found", len(records))
 
 	return task.Result{
 		Status: task.StatusDone,

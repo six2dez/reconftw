@@ -5,19 +5,17 @@
 // WaymoreTask runs waymore against the target domain to collect historical
 // URLs from web archives, and writes URLRecord entries to artefacts/urls.jsonl.
 //
-// ARG VECTOR (RESEARCH §waymore — verbatim v1 form, web.sh:1882):
+// ARG VECTOR (verbatim v1 form, web.sh:1882):
 //
 //	waymore -i <domain> -mode U -oU <stagingfile>
 //
-// XCUT-09 (Pitfall 5): waymore can run 30m+; Backend.Stream is MANDATORY
+// waymore can run 30m+; Backend.Stream is MANDATORY
 // to deliver heartbeat events and avoid CI kill.
 //
-// [ASSUMED A4: waymore -mode U -oU flags are current — verify at install (DoD-1).]
+// [ASSUMED A4: waymore -mode U -oU flags are current — verify at install .]
 //
-// Axiom: LocalBackend only (D-W13).
-// T-05-15: out-of-scope URLs filtered by extract/urls.ExtractURLs domain check.
-//
-// Source: .planning/phases/05-web-pipeline-e2e/05-04-PLAN.md Task 2.
+// Axiom: LocalBackend only.
+// Out-of-scope URLs filtered by extract/urls.ExtractURLs domain check.
 package web
 
 import (
@@ -47,7 +45,7 @@ func (t *WaymoreTask) Enabled(cfg *config.Config) bool {
 func (t *WaymoreTask) DependsOn() []string { return []string{"web.httpx"} }
 
 // Run executes waymore and appends URL records to urls.jsonl.
-// Uses Backend.Stream for XCUT-09 heartbeat (30m+ runtime; Pitfall 5).
+// Uses Backend.Stream for the heartbeat (30m+ runtime).
 func (t *WaymoreTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result, error) {
 	const toolName = "waymore"
 
@@ -59,7 +57,7 @@ func (t *WaymoreTask) Run(ctx context.Context, app *appctx.AppContext) (task.Res
 	}
 	stagingFile := filepath.Join(inputsDir, "waymore_urls.txt.tmp")
 
-	// Build arg vector (RESEARCH §waymore verbatim v1 form web.sh:1882).
+	// Build arg vector (verbatim v1 form, web.sh:1882).
 	// [ASSUMED A4: -mode U -oU flags are current]
 	args := []string{
 		"-i", app.Target.Domain,
@@ -67,19 +65,21 @@ func (t *WaymoreTask) Run(ctx context.Context, app *appctx.AppContext) (task.Res
 		"-oU", stagingFile,
 	}
 
-	// XCUT-09: Backend.Stream is mandatory for waymore (30m timeout; Pitfall 5).
+	// Backend.Stream is mandatory for waymore (30m timeout).
 	eventCh, err := app.Tools.Stream(ctx, toolName, args)
 	if err != nil {
-		if app.Log != nil {
-			app.Log.Info("web.waymore: binary absent or failed — skipping",
-				"err", err)
-		}
-		return task.Result{Status: task.StatusSkipped}, nil
+		// Absent-vs-failed policy (task.ClassifyToolErr): a waymore that never
+		// started is "tool absent"; one that could not be run for any other
+		// reason is degraded with its own account of why. Neither fails the
+		// scan (best_effort).
+		status, reason := task.ClassifyToolErr(err)
+		app.Log.Info("web.waymore: waymore not run — skipping", "reason", reason)
+		return task.Result{Status: status, Reason: reason}, nil
 	}
 
 	// Drain stream (collect any stdout lines as fallback in case -oU not honored).
 	//
-	// F6 (phase 15): ACCUMULATOR shape — latch the terminal Event.Err inside the
+	// ACCUMULATOR shape — latch the terminal Event.Err inside the
 	// loop and check it after. Without this, a waymore that exits non-zero part
 	// way through the archive fetch was treated as a complete pass, and the
 	// -oU staging file read below could be truncated or left over from an
@@ -118,7 +118,7 @@ func (t *WaymoreTask) Run(ctx context.Context, app *appctx.AppContext) (task.Res
 	// Extract and scope-filter URLs.
 	records, _ := urlsextract.ExtractURLs(raw, "waymore", app.Target.Domain)
 
-	// F3 (phase 15): the old `if len(records) == 0 { return StatusDone }`
+	// The old `if len(records) == 0 { return StatusDone }`
 	// short-circuit left a previous run's inputs/urls.waymore.jsonl for the urls
 	// merge to republish. waymore RAN (absent binary returned StatusSkipped
 	// above), so stage unconditionally and let StageJSONL clear it.
@@ -131,7 +131,7 @@ func (t *WaymoreTask) Run(ctx context.Context, app *appctx.AppContext) (task.Res
 		lines = append(lines, b)
 	}
 	stagingPath := filepath.Join(app.Target.WorkDir, "inputs", "urls.waymore.jsonl")
-	if wErr := output.StageJSONL(stagingPath, lines); wErr != nil && app.Log != nil {
+	if wErr := output.StageJSONL(stagingPath, lines); wErr != nil {
 		app.Log.Debug("web.waymore: staging write failed",
 			"path", stagingPath, "err", wErr)
 	}
@@ -139,9 +139,7 @@ func (t *WaymoreTask) Run(ctx context.Context, app *appctx.AppContext) (task.Res
 	// Clean up staging file.
 	os.Remove(stagingFile) //nolint:errcheck
 
-	if app.Log != nil {
-		app.Log.Debug("web.waymore: completed", "urls_found", len(records))
-	}
+	app.Log.Debug("web.waymore: completed", "urls_found", len(records))
 
 	return task.Result{
 		Status: task.StatusDone,

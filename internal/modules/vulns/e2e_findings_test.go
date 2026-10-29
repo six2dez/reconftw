@@ -42,6 +42,7 @@ func newFindingsWorkspace(t *testing.T) (*appctx.AppContext, string) {
 		t.Fatalf("output.NewTree: %v", err)
 	}
 	return &appctx.AppContext{
+		Log:    appctx.NopLogger(),
 		Tree:   tree,
 		Target: &appctx.Target{WorkDir: workDir},
 	}, workDir

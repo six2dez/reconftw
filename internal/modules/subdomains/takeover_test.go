@@ -1,9 +1,6 @@
 // takeover_test.go — TDD RED tests for TakeoverSubzyTask, TakeoverDNSTakeTask,
 // SubBucketsTask, SubASNTask.
 //
-// Source: .planning/phases/04-subdomains-e2e-axiom-integration/04-05-PLAN.md
-// Task 1 behavior tests.
-//
 // Test infrastructure reuses mockBackend, mockTree from scope_crosscheck_test.go.
 package subdomains_test
 
@@ -55,6 +52,7 @@ func buildEnrichmentApp(t *testing.T, toolNames ...string) (*appctx.AppContext, 
 	cfg.Subdomains.ASN.Enabled = true
 
 	return &appctx.AppContext{
+		Log:    appctx.NopLogger(),
 		Tools:  runner,
 		Tree:   &mockTree{},
 		Target: &appctx.Target{Domain: "example.com", WorkDir: workDir},
@@ -83,19 +81,19 @@ func TestTakeoverSubzyWritesStagingFile(t *testing.T) {
 		t.Errorf("TakeoverSubzyTask.Run returned StatusErrored")
 	}
 
-	// F3 (phase 15): the mock produces NO takeovers, so the write-or-REMOVE
+	// Write-or-remove: the mock produces NO takeovers, so the write-or-REMOVE
 	// contract requires the staging file to be ABSENT. It used to be written as
 	// an empty file, which left "subzy found nothing" indistinguishable from
 	// "subzy did not run" and, on a stable workspace, let a previous run's
 	// takeover survive into this run's merge.
 	stagingPath := filepath.Join(workDir, "inputs", "takeover.subzy.jsonl")
 	if _, err := os.Stat(stagingPath); !os.IsNotExist(err) {
-		t.Errorf("zero-takeover run must REMOVE %s (write-or-remove, F3), stat err = %v",
+		t.Errorf("zero-takeover run must REMOVE %s (write-or-remove), stat err = %v",
 			stagingPath, err)
 	}
 }
 
-// TestTakeoverSubzyClearsStaleStagingFile is the other half of F3: a previous
+// TestTakeoverSubzyClearsStaleStagingFile is the other half of write-or-remove: a previous
 // run's staging file must not survive a run that found nothing.
 func TestTakeoverSubzyClearsStaleStagingFile(t *testing.T) {
 	app, workDir := buildEnrichmentApp(t, "subzy", "httpx")
@@ -116,7 +114,7 @@ func TestTakeoverSubzyClearsStaleStagingFile(t *testing.T) {
 
 	if _, err := os.Stat(stagingPath); !os.IsNotExist(err) {
 		t.Errorf("run B found nothing but run A's %s survived — mergeTakeoverFindings "+
-			"would republish a takeover this run never observed (F3); stat err = %v",
+			"would republish a takeover this run never observed (write-or-remove); stat err = %v",
 			stagingPath, err)
 	}
 }
@@ -141,11 +139,11 @@ func TestTakeoverDNSTakeWritesStagingFile(t *testing.T) {
 		t.Errorf("TakeoverDNSTakeTask.Run returned StatusErrored")
 	}
 
-	// F3 (phase 15): zero records ⇒ the staging file is REMOVED, not written
+	// Write-or-remove: zero records ⇒ the staging file is REMOVED, not written
 	// empty. See TestTakeoverSubzyWritesStagingFile for the rationale.
 	stagingPath := filepath.Join(workDir, "inputs", "takeover.dnstake.jsonl")
 	if _, err := os.Stat(stagingPath); !os.IsNotExist(err) {
-		t.Errorf("zero-takeover run must REMOVE %s (write-or-remove, F3), stat err = %v",
+		t.Errorf("zero-takeover run must REMOVE %s (write-or-remove), stat err = %v",
 			stagingPath, err)
 	}
 }
@@ -181,6 +179,7 @@ func TestSubBucketsTaskCallsTreeAppend(t *testing.T) {
 	cfg.Subdomains.S3Buckets.Enabled = true
 
 	app := &appctx.AppContext{
+		Log:    appctx.NopLogger(),
 		Tools:  runner,
 		Tree:   mockTr,
 		Target: &appctx.Target{Domain: "example.com", WorkDir: workDir},
@@ -232,6 +231,7 @@ func TestSubASNTaskCallsTreeAppend(t *testing.T) {
 	cfg.Subdomains.ASN.Enabled = true
 
 	app := &appctx.AppContext{
+		Log:    appctx.NopLogger(),
 		Tools:  runner,
 		Tree:   mockTr,
 		Target: &appctx.Target{Domain: "example.com", WorkDir: workDir},
@@ -324,7 +324,7 @@ func TestTakeoverSubzyDoesNotCallTreeAppend(t *testing.T) {
 
 	// Tree.Append must NOT be called — B2 fix: staging files, not direct Append.
 	if mockTr.appendCalled {
-		t.Errorf("TakeoverSubzyTask.Run called Tree.Append — B2 fix violation: staging file required (findings has two concurrent writers in plan-06)")
+		t.Errorf("TakeoverSubzyTask.Run called Tree.Append — B2 fix violation: staging file required (findings has two concurrent writers in the enrichment stage)")
 	}
 }
 

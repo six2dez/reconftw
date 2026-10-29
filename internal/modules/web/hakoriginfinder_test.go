@@ -1,13 +1,11 @@
-// hakoriginfinder_test.go — Behavioral tests for CR-06 and CR-03 gap-closure fixes.
+// hakoriginfinder_test.go — Behavioral tests for the per-host attribution and deadline-arm fixes.
 //
 // Tests:
 //   - TestHakoriginfinderPerHostAttribution: verifies that parseHakoriginOutput
 //     correctly extracts origin IPs and that OriginRecord.Host is the host from
-//     the per-host pair, not an index-based guess (CR-06).
+//     the per-host pair, not an index-based guess.
 //   - TestJsaDispatchesThroughTheRunnerNotDirectExec: verifies that jsa.go routes
-//     through backend.Runner and contains no direct subprocess dispatch (18-05).
-//
-// Source: .planning/phases/05-web-pipeline-e2e/05-11-PLAN.md Task 2.
+//     through backend.Runner and contains no direct subprocess dispatch.
 package web
 
 import (
@@ -19,7 +17,7 @@ import (
 // TestHakoriginfinderPerHostAttribution verifies that parseHakoriginOutput
 // correctly extracts origin IPs from hakoriginfinder output on a per-host basis.
 //
-// CR-06 fix: each host is run independently, so OriginRecord.Host comes from
+// each host is run independently, so OriginRecord.Host comes from
 // the input pair — NOT from a line-index guess. This table-driven test confirms:
 //   - a line containing a valid IPv4 returns that IP
 //   - a line with no IP returns ""
@@ -82,7 +80,7 @@ func TestHakoriginfinderPerHostAttribution(t *testing.T) {
 
 // TestHakoriginfinderAttributionIsIndependent verifies that swapping the
 // order of host-IP pairs does not cross-contaminate results. This is the
-// key property CR-06 was designed to guarantee: no index-based fabrication.
+// key property per-host dispatch was designed to guarantee: no index-based fabrication.
 func TestHakoriginfinderAttributionIsIndependent(t *testing.T) {
 	t.Parallel()
 
@@ -117,13 +115,13 @@ func TestHakoriginfinderAttributionIsIndependent(t *testing.T) {
 }
 
 // TestJsaDispatchesThroughTheRunnerNotDirectExec replaces TestJSAUsesDirectExec,
-// which was BOTH vacuous AND asserting the opposite of what is now true (WR-13).
+// which was BOTH vacuous AND asserting the opposite of what is now true.
 //
 // What it used to do: assert that `Name()` returned "web.jsa" and that
 // `Description()` was non-empty — nothing about dispatch at all — and then log
 // "structural verification passed". Its prose claimed jsa.go "does not import the
 // backend package" and cited "our static no_raw_subprocess_test.go allowlist",
-// both of which 18-05 and 18-03 respectively made false: jsa.go dispatches via
+// both of which the move made false: jsa.go dispatches via
 // app.Tools.Run, and that allowlist was deleted as data.
 //
 // A test that cannot fail, under a comment that is no longer true, inside the very
@@ -183,10 +181,10 @@ func TestParseHakoriginOutputIPv4Variants(t *testing.T) {
 		{"[+] 172.16.0.1 is the real IP", "172.16.0.1"},
 		{"no ip address here", ""},
 		{"", ""},
-		// IN-02: out-of-range octets are now rejected (net.ParseIP validation),
+		// Out-of-range octets are now rejected (net.ParseIP validation),
 		// so a 999.x string yields "" instead of leaking into OriginRecord.OriginIP.
 		{"partial 999.999.999.999 invalid", ""},
-		// IN-02: a valid IPv4 appearing after an invalid candidate is still found.
+		// A valid IPv4 appearing after an invalid candidate is still found.
 		{"bad 256.1.1.1 then good 10.20.30.40", "10.20.30.40"},
 	}
 

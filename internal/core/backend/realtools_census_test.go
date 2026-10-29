@@ -448,6 +448,17 @@ var fixedVectorKnownAbsent = knownUnavailable{}
 type probeCensus struct {
 	mu      sync.Mutex
 	present map[string]bool
+	// verified and presenceOnly partition `present` (21-04). A tool is VERIFIED
+	// when its probe executed the golden arg vector (with safe inputs) and the
+	// tool did not reject it; PRESENCE-ONLY when the probe could only run
+	// --help/-version, or nothing at all, because the golden would reach the
+	// network and the tool offers no loopback/proxy pin. Gate 13 used to count
+	// both as "present"; the census line now says which is which.
+	verified     map[string]bool
+	presenceOnly map[string]bool
+	// rejected: the golden vector was executed and the tool REFUSED it (or the
+	// run could not be shown hermetic). Executed, but not verified.
+	rejected map[string]bool
 	// absent is the UNION of the two unavailable states, kept under its original
 	// name because scripts/release-gates.sh's Gate 13 reads `skipped_tools=` off
 	// the census line and the union is what that field has always meant.
@@ -460,10 +471,42 @@ type probeCensus struct {
 
 func newProbeCensus() *probeCensus {
 	return &probeCensus{
-		present: map[string]bool{},
-		absent:  map[string]bool{},
-		state:   map[string]toolAvailability{},
-		reason:  map[string]string{},
+		present:      map[string]bool{},
+		verified:     map[string]bool{},
+		presenceOnly: map[string]bool{},
+		rejected:     map[string]bool{},
+		absent:       map[string]bool{},
+		state:        map[string]toolAvailability{},
+		reason:       map[string]string{},
+	}
+}
+
+// recordVerified notes that tool's GOLDEN arg vector was executed against the
+// real binary and accepted.
+func (c *probeCensus) recordVerified(tool string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.verified[tool] = true
+	delete(c.presenceOnly, tool)
+}
+
+// recordRejected notes that tool's golden vector ran and was refused.
+func (c *probeCensus) recordRejected(tool string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.rejected[tool] = true
+	delete(c.verified, tool)
+	delete(c.presenceOnly, tool)
+}
+
+// recordPresenceOnly notes that tool resolved but its golden arg vector was NOT
+// executed — only a help/version probe, or nothing. This is NOT verification
+// and the census line says so.
+func (c *probeCensus) recordPresenceOnly(tool string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if !c.verified[tool] {
+		c.presenceOnly[tool] = true
 	}
 }
 
@@ -561,6 +604,9 @@ func reportRealtoolsCensus(t *testing.T, testName string, c *probeCensus, knownA
 	mode, reason := realtoolsMode(c)
 	c.mu.Lock()
 	present := c.sorted(c.present)
+	verified := c.sorted(c.verified)
+	presenceOnly := c.sorted(c.presenceOnly)
+	rejected := c.sorted(c.rejected)
 	absentUnion := c.sorted(c.absent)
 	trulyAbsent := c.byState(toolAbsent)
 	unresolvable := c.byState(toolUnresolvable)
@@ -571,10 +617,22 @@ func reportRealtoolsCensus(t *testing.T, testName string, c *probeCensus, knownA
 	// silent parse failure that reads as an empty skip set. The two states are
 	// reported ALONGSIDE it, so a reader can tell "install it" from "repair that
 	// one clone" without the gate's parser changing meaning.
-	t.Logf("REALTOOLS_CENSUS test=%s mode=%s present=%d skipped=%d skipped_tools=%s absent=%d absent_tools=%s unresolvable=%d unresolvable_tools=%s",
+	//
+	// 21-04 appended argvector_verified= / presence_only= / argvector_rejected=
+	// (with their *_tools= lists) AFTER the existing fields, so every existing
+	// parser keeps reading the same tokens. "present" is their sum; before this
+	// split a --help probe and a golden-vector probe were the same number.
+	t.Logf("REALTOOLS_CENSUS test=%s mode=%s present=%d skipped=%d skipped_tools=%s absent=%d absent_tools=%s unresolvable=%d unresolvable_tools=%s argvector_verified=%d presence_only=%d presence_only_tools=%s argvector_rejected=%d rejected_tools=%s",
 		testName, mode, len(present), len(absentUnion), joinOrNone(absentUnion),
 		len(trulyAbsent), joinOrNone(trulyAbsent),
-		len(unresolvable), joinOrNone(unresolvable))
+		len(unresolvable), joinOrNone(unresolvable),
+		len(verified), len(presenceOnly), joinOrNone(presenceOnly),
+		len(rejected), joinOrNone(rejected))
+	if len(verified)+len(presenceOnly)+len(rejected) != len(present) {
+		t.Errorf("%s: census accounting is broken — %d present but %d verified + %d presence-only + %d rejected. "+
+			"Every present tool must land in exactly one bucket, or argvector_verified overstates coverage.",
+			testName, len(present), len(verified), len(presenceOnly), len(rejected))
+	}
 	t.Logf("REALTOOLS_CENSUS_REASON test=%s %s", testName, reason)
 	for _, tool := range unresolvable {
 		t.Logf("REALTOOLS_UNRESOLVABLE test=%s tool=%s reason=%s", testName, tool, c.reason[tool])

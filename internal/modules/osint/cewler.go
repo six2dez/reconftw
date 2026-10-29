@@ -4,23 +4,21 @@
 // password_dict generation: cewler -d <depth> -m <minlen> -l -o <out> <target>)
 // to crawl each host and harvest target-specific words into a custom wordlist.
 //
-// THE ARTEFACT IS THE WORDLIST (D-O5): cewler's product is the aggregated wordlist
+// THE ARTEFACT IS THE WORDLIST: cewler's product is the aggregated wordlist
 // itself, written as the single-writer human file osint/cewler_wordlist.txt — NOT
 // a findings record. A single informational OSINTFindingRecord noting the wordlist
 // size is emitted so the run is visible in the findings stream; the words
 // themselves are never findings.
 //
-// OPPORTUNISTIC ENRICHMENT (D-O2): cewler is a v1 web.sh function (host-corpus
+// OPPORTUNISTIC ENRICHMENT: cewler is a v1 web.sh function (host-corpus
 // seeded). It reads the discovered hosts from the workspace artefacts
 // (artefacts/hosts.jsonl or artefacts/urls.jsonl) IF present. When NO workspace
 // hosts exist it logs an Info note and returns StatusSkipped — it NEVER fails or
-// bootstraps subs/web (best_effort, D-O1/D-O2). Hosts are scope-filtered by Phase 5.
+// bootstraps subs/web (best_effort). Hosts are scope-filtered by the web stage.
 //
-// SEEDING (D-O1): no DependsOn edges — the workspace-host enrichment is
+// SEEDING: no DependsOn edges — the workspace-host enrichment is
 // opportunistic, not a DAG edge.
-// FAILURE POLICY (D-O8, ARCH-09): best_effort.
-//
-// Source: .planning/phases/07-osint-e2e/07-05-PLAN.md Task 2.
+// FAILURE POLICY (ARCH-09): best_effort.
 package osint
 
 import (
@@ -37,7 +35,7 @@ import (
 )
 
 // cewler v1 conservative defaults (web.sh:2768-2787): cap targets, crawl depth 1,
-// min word length 5 (D-O8 conservative caps).
+// min word length 5 (conservative caps).
 const (
 	cewlerMaxTargets = 50
 	cewlerDepth      = 1
@@ -63,26 +61,24 @@ func (t *CewlerTask) Enabled(cfg *config.Config) bool {
 	return cfg.OSINT.Cewler.Enabled
 }
 
-// DependsOn returns nil — the workspace-host enrichment (D-O2) is OPPORTUNISTIC,
+// DependsOn returns nil — the workspace-host enrichment is OPPORTUNISTIC,
 // not a DAG edge.
 func (t *CewlerTask) DependsOn() []string { return nil }
 
 // Run executes cewler over the workspace hosts and writes the aggregated wordlist.
 //
 // Steps:
-//  1. D-O2: read workspace hosts (artefacts/hosts.jsonl|urls.jsonl) IF present;
+//  1. read workspace hosts (artefacts/hosts.jsonl|urls.jsonl) IF present;
 //     absent → log Info + StatusSkipped (best_effort, NO fail/bootstrap).
 //  2. Loop cewler per host (LITERAL web.sh:2782 arg vector); aggregate words.
-//  3. Write osint/cewler_wordlist.txt (D-O5 single-writer artefact).
+//  3. Write osint/cewler_wordlist.txt (single-writer artefact).
 //  4. Emit ONE informational size record; write inputs/findings.cewler.jsonl.
 func (t *CewlerTask) Run(ctx context.Context, app *appctx.AppContext) (task.Result, error) {
-	// Step 1: D-O2 opportunistic host read.
+	// Step 1: opportunistic host read.
 	hosts := readWorkspaceHosts(app.Target.WorkDir)
 	if len(hosts) == 0 {
-		// D-O2: log-skip when absent — best_effort, NOT an error/bootstrap.
-		if app.Log != nil {
-			app.Log.Info("osint.cewler: no workspace hosts (artefacts/hosts.jsonl|urls.jsonl) — skipping (D-O2)")
-		}
+		// log-skip when absent — best_effort, NOT an error/bootstrap.
+		app.Log.Info("osint.cewler: no workspace hosts (artefacts/hosts.jsonl|urls.jsonl) — skipping")
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
@@ -95,7 +91,7 @@ func (t *CewlerTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resu
 	_ = os.MkdirAll(osintDir, 0o755) //nolint:errcheck // best_effort
 
 	if len(hosts) > cewlerMaxTargets {
-		hosts = hosts[:cewlerMaxTargets] // conservative cap (D-O8)
+		hosts = hosts[:cewlerMaxTargets] // conservative cap
 	}
 
 	// Step 2: loop cewler per host, aggregating words into a deduped set.
@@ -103,7 +99,7 @@ func (t *CewlerTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resu
 	partFile := filepath.Join(inputsDir, "cewler.part.txt")
 	// cewlerRan records whether AT LEAST ONE host was actually crawled. An absent
 	// cewler means this task observed nothing and must not clear a previous run's
-	// staging (F3 did-not-run — see writeOSINTStaging). A cancelled loop is
+	// staging (did-not-run rule — see writeOSINTStaging). A cancelled loop is
 	// covered by the same flag when it fires before the first successful crawl.
 	cewlerRan := false
 	for _, host := range hosts {
@@ -120,9 +116,7 @@ func (t *CewlerTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resu
 			host,
 		}
 		if _, err := app.Tools.Run(ctx, "cewler", args); err != nil {
-			if app.Log != nil {
-				app.Log.Debug("osint.cewler: cewler run failed (best_effort)", "host", host, "err", err)
-			}
+			app.Log.Debug("osint.cewler: cewler run failed (best_effort)", "host", host, "err", err)
 			continue
 		}
 		cewlerRan = true
@@ -136,7 +130,7 @@ func (t *CewlerTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resu
 		_ = os.Remove(partFile) //nolint:errcheck // best_effort cleanup between hosts
 	}
 
-	// Step 3: write the aggregated wordlist (D-O5 single-writer artefact).
+	// Step 3: write the aggregated wordlist (single-writer artefact).
 	words := make([]string, 0, len(wordSet))
 	for w := range wordSet {
 		words = append(words, w)
@@ -145,7 +139,7 @@ func (t *CewlerTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resu
 	wordlistFile := filepath.Join(osintDir, "cewler_wordlist.txt")
 	if len(words) > 0 {
 		if wErr := os.WriteFile(wordlistFile,
-			[]byte(strings.Join(words, "\n")+"\n"), 0o644); wErr != nil && app.Log != nil { //nolint:gosec
+			[]byte(strings.Join(words, "\n")+"\n"), 0o644); wErr != nil { //nolint:gosec
 			app.Log.Debug("osint.cewler: write cewler_wordlist.txt failed", "err", wErr)
 		}
 	}
@@ -161,17 +155,15 @@ func (t *CewlerTask) Run(ctx context.Context, app *appctx.AppContext) (task.Resu
 			PoCRedacted: fmt.Sprintf("cewler_wordlist.txt: %d words from %d hosts", len(words), len(hosts)),
 		})
 	}
-	// F3: a run that crawled no word REMOVES the staging file rather than
+	// Run isolation: a run that crawled no word REMOVES the staging file rather than
 	// republishing the previous run's wordlist-size record.
 	if cewlerRan {
 		writeOSINTStaging(app, inputsDir, "findings.cewler.jsonl", records)
-	} else if app.Log != nil {
-		app.Log.Debug("osint.cewler: cewler did not run — staging preserved (F3 did-not-run)")
+	} else {
+		app.Log.Debug("osint.cewler: cewler did not run — staging preserved (did-not-run rule)")
 	}
 
-	if app.Log != nil {
-		app.Log.Info("osint.cewler: completed", "words", len(words), "hosts_scanned", len(hosts))
-	}
+	app.Log.Info("osint.cewler: completed", "words", len(words), "hosts_scanned", len(hosts))
 	return task.Result{
 		Status: task.StatusDone,
 		Stats:  map[string]int{"words": len(words), "hosts_scanned": len(hosts)},

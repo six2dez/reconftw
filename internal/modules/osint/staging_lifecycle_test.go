@@ -1,5 +1,5 @@
-// staging_lifecycle_test.go — behavioural proof of the F3 write-or-remove
-// staging contract for the osint package (plan 15-14 Task 1).
+// staging_lifecycle_test.go — behavioural proof of the write-or-remove
+// staging contract for the osint package.
 //
 // osint has exactly ONE staging writer — writeOSINTStaging (domain_info.go) —
 // which fronts 23 call sites across 20 producer files, so a single migration
@@ -104,6 +104,7 @@ func newOsintStageApp(t *testing.T, be backend.Backend) *appctx.AppContext {
 		reg.Register(&backend.Tool{Name: name})
 	}
 	return &appctx.AppContext{
+		Log:    appctx.NopLogger(),
 		Tools:  backend.NewRunner(be, reg, nil),
 		Target: &appctx.Target{Domain: "example.com", WorkDir: t.TempDir()},
 		Cfg:    &config.Config{},
@@ -258,7 +259,7 @@ func TestMisconfigDidNotRunPreservesStaging(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 // TestKeyGatedSkipDoesNotClearOSINTStaging drives osint.github_leaks with no
-// GitHub token: it returns StatusSkipped at the D-O8 key gate WITHOUT invoking
+// GitHub token: it returns StatusSkipped at the key gate WITHOUT invoking
 // any scanner. It observed nothing, so a previously reported secret exposure
 // must survive — this is the criterion a careless sweep breaks.
 func TestKeyGatedSkipDoesNotClearOSINTStaging(t *testing.T) {
@@ -283,7 +284,7 @@ func TestKeyGatedSkipDoesNotClearOSINTStaging(t *testing.T) {
 // Gate 3 end to end — producer → MergeOSINTFindings → artefacts/findings.jsonl
 // ---------------------------------------------------------------------------
 
-// TestGate3OSINTProducerToMergedFindings drives the audit's F3 scenario for
+// TestGate3OSINTProducerToMergedFindings drives the run-isolation scenario for
 // osint: run A publishes an exposure, run B finds nothing and the artefact must
 // become PRESENT and EMPTY rather than keeping run A's record.
 func TestGate3OSINTProducerToMergedFindings(t *testing.T) {
@@ -363,7 +364,7 @@ func TestWriteOSINTStagingIsTheOnlyStagingWriter(t *testing.T) {
 		}
 		if strings.Contains(body, "output.WriteJSONL(") && name != "merge.go" {
 			t.Errorf("%s calls output.WriteJSONL directly — producer staging must go through "+
-				"writeOSINTStaging so the F3 write-or-remove lifecycle stays in one place", name)
+				"writeOSINTStaging so the write-or-remove lifecycle stays in one place", name)
 		}
 	}
 }
@@ -378,8 +379,8 @@ func countOSINTLines(s string) int {
 	return n
 }
 
-// ExecOpts satisfies the backend.Backend options seam added in 18-01. It
-// PRESERVES this fake's pre-18-01 dispatch exactly: Runner.Run used to call
+// ExecOpts satisfies the backend.Backend options seam added with the Runner move. It
+// PRESERVES this fake's pre-Runner dispatch exactly: Runner.Run used to call
 // Backend.Exec and Runner.RunEnv used to call Backend.ExecEnv, and both now
 // arrive here, so the env-set case forwards to ExecEnv and the zero case to Exec.
 //

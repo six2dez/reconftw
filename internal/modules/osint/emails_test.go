@@ -1,8 +1,8 @@
-// emails_test.go — behavior tests for the EmailsTask LeakSearch fold (13-05 Task 1).
+// emails_test.go — behavior tests for the EmailsTask LeakSearch fold.
 //
 // Proves the PAR-03 parity restore: after EmailHarvester, EmailsTask runs
 // LeakSearch → osint/passwords.txt (plaintext, single-writer) + a REDACTED
-// findings.passwords.jsonl stream (XCUT-07 / T-13-05-02 — the raw password is
+// findings.passwords.jsonl stream (XCUT-07 — the raw password is
 // registered with the Redactor and never reaches the JSONL or a log line), and
 // a LeakSearch failure degrades to StatusDone without disturbing the emails path.
 //
@@ -10,8 +10,6 @@
 // redacting-logger idiom (github_actions_test.go). Synthetic FAKE_ markers mirror
 // the vulns dalfox FAKE_XSS_MARKER convention so redaction is asserted without
 // committing a real credential.
-//
-// Source: .planning/phases/13-domain-parity/13-05-PLAN.md Task 1.
 package osint
 
 import (
@@ -135,7 +133,7 @@ func TestEmailsTask_LeakSearchWritesPasswordsAndRedacts(t *testing.T) {
 		t.Fatalf("status = %q, want done", res.Status)
 	}
 
-	// 1. osint/passwords.txt holds the PLAINTEXT passwords (D-O5 human file), deduped.
+	// 1. osint/passwords.txt holds the PLAINTEXT passwords (human file), deduped.
 	pwPath := filepath.Join(app.Target.WorkDir, "osint", "passwords.txt")
 	pwData, err := os.ReadFile(pwPath)
 	if err != nil {
@@ -255,8 +253,8 @@ func TestParseLeakSearchPasswords_Dedup(t *testing.T) {
 	}
 }
 
-// ExecOpts satisfies the backend.Backend options seam added in 18-01. It
-// PRESERVES this fake's pre-18-01 dispatch exactly: Runner.Run used to call
+// ExecOpts satisfies the backend.Backend options seam added with the Runner move. It
+// PRESERVES this fake's pre-Runner dispatch exactly: Runner.Run used to call
 // Backend.Exec and Runner.RunEnv used to call Backend.ExecEnv, and both now
 // arrive here, so the env-set case forwards to ExecEnv and the zero case to Exec.
 //

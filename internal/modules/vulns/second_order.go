@@ -8,7 +8,7 @@
 // DEPENDENCY: DependsOn ["vulns.gf"] — second-order depends on the URL corpus
 // being ready; the gf DAG root ensures that corpus is finalized before this task.
 //
-// INPUT: artefacts/urls.jsonl — host URL list from Phase 5 web probe (D-V5).
+// INPUT: artefacts/urls.jsonl — host URL list from the web probe.
 // second-order does NOT need gf-pattern-filtered input; it tests all web hosts
 // (v1 brokenLinks() reads webs/webs_all.txt, the unfiltered host list).
 //
@@ -19,22 +19,20 @@
 // Output: second-order writes non-200-url-attributes.json to an -output directory.
 // v2: parse JSON to extract dangling link URLs → VulnFindingRecord.
 //
-// PAYLOAD REDACTION (XCUT-07, T-06-06-03):
+// PAYLOAD REDACTION (XCUT-07):
 // second-order discovers dangling/broken link URLs. Raw dangling link URLs
 // MUST NOT be logged at Info/Warn. Only finding count is logged. MatchedParam
 // stores the hostname only. PayloadRedacted and PoCRedacted are always "***".
 //
-// SUBPROCESS SAFETY (FOUND-09, T-06-06-01):
+// SUBPROCESS SAFETY (FOUND-09):
 // Backend.Run uses LocalBackend which sets SysProcAttr.Setpgid=true and
 // WaitDelay for all subprocess invocations — orphan processes are kill-tree safe.
 // No raw exec.Command calls in SecondOrderTask code.
 //
-// PATH CONTAINMENT (T-06-06-03):
+// PATH CONTAINMENT:
 // configFile is derived from cfg.Paths (trusted config value); validated via
 // os.Stat before use. Path traversal in operator-supplied config is blocked by
 // the config validator (validate:"omitempty,nopath_traversal" in config.go).
-//
-// Source: .planning/phases/06-vulnerability-scanning-e2e/06-06-PLAN.md Task 2.
 package vulns
 
 import (
@@ -90,15 +88,13 @@ func (t *SecondOrderTask) Run(ctx context.Context, app *appctx.AppContext) (task
 	const toolName = "second-order"
 	cfg := app.Cfg
 
-	// Step 1: Resolve URL corpus via D-V5 precedence (--urls ctx > artefacts/urls.jsonl).
+	// Step 1: Resolve URL corpus via precedence (--urls ctx > artefacts/urls.jsonl).
 	hostURLs, err := readURLsWithCtx(ctx, app)
-	if err != nil && app.Log != nil {
+	if err != nil {
 		app.Log.Debug("vulns.second_order: read URL corpus error (best_effort)", "err", err)
 	}
 	if len(hostURLs) == 0 {
-		if app.Log != nil {
-			app.Log.Info("vulns.second_order: no host URLs in URL corpus — skipping")
-		}
+		app.Log.Info("vulns.second_order: no host URLs in URL corpus — skipping")
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
@@ -108,16 +104,16 @@ func (t *SecondOrderTask) Run(ctx context.Context, app *appctx.AppContext) (task
 			fmt.Errorf("vulns.second_order: mkdir inputs/: %w", err)
 	}
 
-	// Step 2: Resolve the second-order config file path (T-06-06-03 containment).
+	// Step 2: Resolve the second-order config file path.
 	// v1: SECOND_ORDER_CONFIG="${tools}/second-order/config/takeover.json"
 	// v2: cfg.Advanced.Tools.SecondOrder.Config (maps from SECOND_ORDER_CONFIG legacy alias).
 	configFile := cfg.Advanced.Tools.SecondOrder.Config
 	if configFile == "" {
 		// Fallback to the canonical v1 default path.
 		//
-		// 18-05: THE TOOLS ROOT IS NAMED ONCE. This used to be an inline
+		// THE TOOLS ROOT IS NAMED ONCE. This used to be an inline
 		// filepath.Join(os.Getenv("HOME"), "Tools") — the third of the three
-		// hand-rolled resolvers 18-02 named, and the only one that ignored
+		// hand-rolled resolvers the config-path hardening named, and the only one that ignored
 		// configuration entirely: an operator who set paths.tools_dir still had
 		// this one path go to $HOME/Tools, and one on a box with no HOME in the
 		// environment got the relative "Tools". cfg.ToolsRoot() honours
@@ -131,8 +127,8 @@ func (t *SecondOrderTask) Run(ctx context.Context, app *appctx.AppContext) (task
 		// tools live.
 		configFile = filepath.Join(cfg.ToolsRoot(), "second-order", "config", "takeover.json")
 	}
-	// Validate config file exists (T-06-06-03 — path traversal via os.Stat check).
-	// If not found, omit the -config flag rather than failing (best_effort, D-V7).
+	// Validate config file exists (path traversal via os.Stat check).
+	// If not found, omit the -config flag rather than failing (best_effort).
 	configFileValid := false
 	if info, statErr := os.Stat(configFile); statErr == nil && info.Mode().IsRegular() {
 		configFileValid = true
@@ -166,7 +162,7 @@ func (t *SecondOrderTask) Run(ctx context.Context, app *appctx.AppContext) (task
 	// toolRan records whether AT LEAST ONE second-order invocation succeeded, and
 	// cancelled records that the loop was interrupted. Neither an uninstalled
 	// second-order nor a cancelled run observed the corpus, so neither may clear
-	// a previous run's staging (F3 did-not-run — staging.go).
+	// a previous run's staging (did-not-run rule — staging.go).
 	toolRan := false
 	cancelled := false
 
@@ -176,9 +172,7 @@ func (t *SecondOrderTask) Run(ctx context.Context, app *appctx.AppContext) (task
 		// Check for context cancellation between targets.
 		select {
 		case <-ctx.Done():
-			if app.Log != nil {
-				app.Log.Debug("vulns.second_order: context cancelled", "processed", processedTargets)
-			}
+			app.Log.Debug("vulns.second_order: context cancelled", "processed", processedTargets)
 			cancelled = true
 			goto writefindings
 		default:
@@ -194,10 +188,8 @@ func (t *SecondOrderTask) Run(ctx context.Context, app *appctx.AppContext) (task
 		safeTarget := soSanitizeTargetName(targetURL)
 		outDir := filepath.Join(scratchDir, safeTarget)
 		if err := os.MkdirAll(outDir, 0o755); err != nil {
-			if app.Log != nil {
-				app.Log.Debug("vulns.second_order: mkdir outDir (best_effort)",
-					"target", targetURL, "err", err)
-			}
+			app.Log.Debug("vulns.second_order: mkdir outDir (best_effort)",
+				"target", targetURL, "err", err)
 			continue
 		}
 
@@ -221,10 +213,8 @@ func (t *SecondOrderTask) Run(ctx context.Context, app *appctx.AppContext) (task
 		if runErr != nil {
 			// Non-fatal per best_effort policy — second-order may not be installed
 			// or may fail on a particular target.
-			if app.Log != nil {
-				app.Log.Debug("vulns.second_order: run error (best_effort)",
-					"target", targetURL, "err", runErr)
-			}
+			app.Log.Debug("vulns.second_order: run error (best_effort)",
+				"target", targetURL, "err", runErr)
 			processedTargets++
 			continue
 		}
@@ -237,17 +227,15 @@ func (t *SecondOrderTask) Run(ctx context.Context, app *appctx.AppContext) (task
 		allFindings = append(allFindings, findings...)
 
 		// XCUT-07: log only count per target, never raw dangling link URLs.
-		if app.Log != nil {
-			app.Log.Debug("vulns.second_order: processed target",
-				"target", safeTarget, "new_findings", len(findings))
-		}
+		app.Log.Debug("vulns.second_order: processed target",
+			"target", safeTarget, "new_findings", len(findings))
 		processedTargets++
 	}
 
 writefindings:
 	// Step 5: Write inputs/findings.second_order.jsonl.
 	//
-	// F3 (phase 15): staged through stageVulnFindings so a run that found no
+	// Run isolation: staged through stageVulnFindings so a run that found no
 	// dangling links REMOVES the previous run's staging instead of republishing
 	// links that have since been fixed. The `goto writefindings` cancellation
 	// path lands here too, which is exactly why `cancelled` is part of the
@@ -256,11 +244,9 @@ writefindings:
 	stageVulnFindings(app, "vulns.second_order", stagingPath, toolRan && !cancelled, allFindings)
 
 	// XCUT-07: log only count, never raw dangling link URLs.
-	if app.Log != nil {
-		app.Log.Info("vulns.second_order: completed",
-			"targets", processedTargets,
-			"second_order_findings", len(allFindings))
-	}
+	app.Log.Info("vulns.second_order: completed",
+		"targets", processedTargets,
+		"second_order_findings", len(allFindings))
 
 	return task.Result{
 		Status: task.StatusDone,

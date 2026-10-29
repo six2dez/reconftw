@@ -2,21 +2,19 @@
 //
 // Name: "web.favirecon"  DependsOn: ["web.httpx"]
 //
-// CRITICAL (Pitfall 7): this Task calls favicon.ExtractWeb (JSON parser), NOT
+// CRITICAL: this Task calls favicon.ExtractWeb (JSON parser), NOT
 // the Phase-4 favicon.Extract (plain-text parser). Do NOT swap these.
 //
-// ARG VECTOR (RESEARCH §favirecon — verbatim v1 form):
+// ARG VECTOR (verbatim v1 form):
 //
 //	favirecon -l <urlsfile> -c 50 -t 10 -s -j -o <stagingfile>
 //
 // [ASSUMED A7: -l file-list flag is current favirecon for web pipeline — verify.]
 //
-// T-05-09: defensive JSON parsing via ExtractWeb (case-insensitive field fallback).
-// T-05-10: tool stdout routed to run.log only (never INFO terminal, GAP-3).
+// Defensive JSON parsing via ExtractWeb (case-insensitive field fallback).
+// Tool stdout routed to run.log only (never INFO terminal).
 //
-// favirecon is a LocalBackend tool only (D-W13).
-//
-// Source: .planning/phases/05-web-pipeline-e2e/05-03-PLAN.md Task 2.
+// favirecon is a LocalBackend tool only.
 package web
 
 import (
@@ -62,9 +60,7 @@ func (t *FaviReconTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 
 	urls, err := readHostURLsFromJSONL(app)
 	if err != nil || len(urls) == 0 {
-		if app.Log != nil {
-			app.Log.Info("web.favirecon: no hosts in hosts.jsonl — skipping")
-		}
+		app.Log.Info("web.favirecon: no hosts in hosts.jsonl — skipping")
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
@@ -97,7 +93,7 @@ func (t *FaviReconTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 		timeout = 10
 	}
 
-	// RESEARCH §favirecon arg vector:
+	// Arg vector:
 	// favirecon -l <urlsfile> -c 50 -t 10 -s -j -o <stagingfile>
 	args := []string{
 		"-l", urlsFile,
@@ -118,15 +114,17 @@ func (t *FaviReconTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 
 	res, execErr := app.Tools.Run(ctx, toolName, args)
 	if execErr != nil {
-		if app.Log != nil {
-			app.Log.Info("web.favirecon: binary absent or failed — skipping",
-				"err", execErr)
-		}
-		return task.Result{Status: task.StatusSkipped}, nil
+		// Absent-vs-failed policy (task.ClassifyToolErr): a favirecon that never
+		// started is "tool absent"; one that could not be run for any other
+		// reason is degraded with its own account of why. Neither fails the
+		// scan (best_effort).
+		status, reason := task.ClassifyToolErr(execErr)
+		app.Log.Info("web.favirecon: favirecon not run — skipping", "reason", reason)
+		return task.Result{Status: status, Reason: reason}, nil
 	}
 
 	// Parse staging file output; fall back to stdout.
-	// CRITICAL (Pitfall 7): call ExtractWeb (JSON parser), NOT favicon.Extract.
+	// CRITICAL: call ExtractWeb (JSON parser), NOT favicon.Extract.
 	var raw []byte
 	if data, rerr := os.ReadFile(stagingFile); rerr == nil { //nolint:gosec
 		raw = data
@@ -149,7 +147,7 @@ func (t *FaviReconTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 			URL:    r.URL,
 			Tech:   r.Tech,
 			Hash:   r.Hash,
-			Domain: r.Host, // WR-03 co-change: WebResult.Domain renamed to Host; FaviconRecord.Domain kept (output schema)
+			Domain: r.Host, // WebResult.Domain renamed to Host; FaviconRecord.Domain kept (output schema)
 		}
 		b, err := json.Marshal(rec)
 		if err != nil {
@@ -159,15 +157,11 @@ func (t *FaviReconTask) Run(ctx context.Context, app *appctx.AppContext) (task.R
 	}
 	if len(lines) > 0 {
 		if appendErr := app.Tree.Append("favicons", lines); appendErr != nil {
-			if app.Log != nil {
-				app.Log.Debug("web.favirecon: Tree.Append failed", "err", appendErr)
-			}
+			app.Log.Debug("web.favirecon: Tree.Append failed", "err", appendErr)
 		}
 	}
 
-	if app.Log != nil {
-		app.Log.Debug("web.favirecon: completed", "favicons_found", len(webResults))
-	}
+	app.Log.Debug("web.favirecon: completed", "favicons_found", len(webResults))
 	return task.Result{
 		Status: task.StatusDone,
 		Stats:  map[string]int{"favicons_found": len(webResults)},

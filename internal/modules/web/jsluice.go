@@ -4,9 +4,9 @@
 //
 // JsluiceTask runs jsluice in two modes:
 //   - urls mode: extracts URLs from sourcemapped JS/TS files
-//   - secrets mode: extracts secrets (XCUT-07: raw values NEVER in artefacts)
+//   - secrets mode: extracts secrets (raw values NEVER in artefacts)
 //
-// ARG VECTORS (RESEARCH §jsluice — verbatim v1 form, web.sh:2310, 2340):
+// ARG VECTORS (verbatim v1 form, web.sh:2310, 2340):
 //
 //	# URLs: find .js/.ts files under raw/sourcemaps/ | jsluice urls
 //	jsluice urls  (stdin: file paths)
@@ -14,7 +14,7 @@
 //	# Secrets: find .js files under raw/sourcemaps/ | jsluice secrets -j
 //	jsluice secrets -j [--patterns <file>]  (stdin: file paths)
 //
-// XCUT-07 / T-05-12 CRITICAL:
+// CRITICAL:
 // jsluice secrets output contains raw credential values in the "value" field.
 // JsluiceTask passes secrets JSONL through extract/js.ExtractSecrets which
 // NEVER propagates the raw value. SecretRecord.Redacted is always "***".
@@ -22,9 +22,7 @@
 // [ASSUMED A6: jsluice secrets uses "filename" field for source file path.]
 // [ASSUMED A13: default patterns exist if --patterns is omitted.]
 //
-// Axiom: LocalBackend only (D-W13).
-//
-// Source: .planning/phases/05-web-pipeline-e2e/05-04-PLAN.md Task 2.
+// Axiom: LocalBackend only.
 package web
 
 import (
@@ -45,8 +43,8 @@ import (
 	extractsourcemap "github.com/six2dez/reconftw/internal/extract/sourcemap"
 )
 
-// jsSecretRecord is the D-W11 js_secrets.jsonl schema row.
-// SecretRecord.Redacted is always "***" (XCUT-07).
+// jsSecretRecord is the js_secrets.jsonl schema row.
+// SecretRecord.Redacted is always "***".
 type jsSecretRecord struct {
 	URL      string `json:"url"`
 	Type     string `json:"type"`
@@ -74,9 +72,7 @@ func (t *JsluiceTask) Run(ctx context.Context, app *appctx.AppContext) (task.Res
 	sourcemapDir := filepath.Join(app.Target.WorkDir, "raw", "sourcemaps")
 	jsFiles, err := findSourcemapFiles(sourcemapDir, []string{".js", ".ts"})
 	if err != nil || len(jsFiles) == 0 {
-		if app.Log != nil {
-			app.Log.Info("web.jsluice: no JS/TS files in raw/sourcemaps/ — skipping")
-		}
+		app.Log.Info("web.jsluice: no JS/TS files in raw/sourcemaps/ — skipping")
 		return task.Result{Status: task.StatusSkipped}, nil
 	}
 
@@ -88,7 +84,7 @@ func (t *JsluiceTask) Run(ctx context.Context, app *appctx.AppContext) (task.Res
 	// --- Part 1: jsluice urls mode ---
 	urlsOutput, urlsErr := runJsluiceWithFileList(ctx, app, "urls", fileListInput)
 	if urlsErr == nil {
-		// F3 (phase 15): jsluice urls mode RAN cleanly this invocation, so its
+		// Jsluice urls mode RAN cleanly this invocation, so its
 		// staging is authoritative for THIS run — stage unconditionally and let
 		// StageJSONL remove the file when nothing was extracted.
 		//
@@ -107,7 +103,7 @@ func (t *JsluiceTask) Run(ctx context.Context, app *appctx.AppContext) (task.Res
 			lines = append(lines, b)
 		}
 		stagingPath := filepath.Join(app.Target.WorkDir, "inputs", "urls.jsluice.jsonl")
-		if wErr := output.StageJSONL(stagingPath, lines); wErr != nil && app.Log != nil {
+		if wErr := output.StageJSONL(stagingPath, lines); wErr != nil {
 			app.Log.Debug("web.jsluice: staging write failed",
 				"path", stagingPath, "err", wErr)
 		}
@@ -120,12 +116,12 @@ func (t *JsluiceTask) Run(ctx context.Context, app *appctx.AppContext) (task.Res
 		secretsFileListInput := []byte(strings.Join(jsOnlyFiles, "\n") + "\n")
 		secretsOutput, secretsErr := runJsluiceWithFileList(ctx, app, "secrets", secretsFileListInput)
 		if secretsErr == nil && len(secretsOutput) > 0 {
-			// XCUT-07: ExtractSecrets NEVER propagates raw value — Redacted is always "***".
+			// ExtractSecrets NEVER propagates raw value — Redacted is always "***".
 			secretRecords, _ := extractjs.ExtractSecrets(secretsOutput, app.Target.Domain)
 			if len(secretRecords) > 0 {
 				var lines [][]byte
 				for _, sr := range secretRecords {
-					// Write D-W11 js_secrets.jsonl record shape.
+					// Write js_secrets.jsonl record shape.
 					rec := jsSecretRecord{
 						URL:      sr.URL,
 						Type:     sr.Type,
@@ -140,13 +136,11 @@ func (t *JsluiceTask) Run(ctx context.Context, app *appctx.AppContext) (task.Res
 				}
 				if len(lines) > 0 {
 					if appendErr := app.Tree.Append("js_secrets", lines); appendErr != nil {
-						// WR-02: promote to Warn — a swallowed Append means redacted
+						// Warn, not Debug: a swallowed Append means redacted
 						// secret records counted in secrets_found never reached
-						// js_secrets.jsonl. Non-fatal per best_effort (D-W12).
-						if app.Log != nil {
-							app.Log.Warn("web.jsluice: Tree.Append(js_secrets) failed — records not persisted",
-								"records", len(lines), "err", appendErr)
-						}
+						// js_secrets.jsonl. Non-fatal per best_effort.
+						app.Log.Warn("web.jsluice: Tree.Append(js_secrets) failed — records not persisted",
+							"records", len(lines), "err", appendErr)
 					}
 				}
 				totalSecrets = len(secretRecords)
@@ -154,12 +148,10 @@ func (t *JsluiceTask) Run(ctx context.Context, app *appctx.AppContext) (task.Res
 		}
 	}
 
-	if app.Log != nil {
-		app.Log.Debug("web.jsluice: completed",
-			"js_files", len(jsFiles),
-			"urls_found", totalURLs,
-			"secrets_found", totalSecrets)
-	}
+	app.Log.Debug("web.jsluice: completed",
+		"js_files", len(jsFiles),
+		"urls_found", totalURLs,
+		"secrets_found", totalSecrets)
 
 	return task.Result{
 		Status: task.StatusDone,
@@ -210,7 +202,7 @@ func runJsluiceWithFileList(ctx context.Context, app *appctx.AppContext,
 	case "urls":
 		args = append([]string{"urls"}, jsFiles...)
 	case "secrets":
-		// -j for structured JSON output (RESEARCH §jsluice).
+		// -j for structured JSON output.
 		args = append([]string{"secrets", "-j"}, jsFiles...)
 	default:
 		return nil, fmt.Errorf("unknown jsluice mode: %s", mode)
