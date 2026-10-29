@@ -26,9 +26,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/six2dez/reconftw/internal/core/appctx"
-	"github.com/six2dez/reconftw/internal/core/backend"
-	"github.com/six2dez/reconftw/internal/core/output"
+	"github.com/six2dez/reconftw/v5/internal/core/appctx"
+	"github.com/six2dez/reconftw/v5/internal/core/backend"
+	"github.com/six2dez/reconftw/v5/internal/core/output"
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -38,11 +38,17 @@ import (
 // oidcDocument carries every word both OIDC templates match on. Verbatim shape
 // of a real .well-known/openid-configuration document, minus anything
 // identifying: the host is "fixture.local" and resolves nowhere.
-const oidcDocument = `{"issuer":"https://fixture.local",` +
-	`"authorization_endpoint":"https://fixture.local/auth",` +
-	`"token_endpoint":"https://fixture.local/token",` +
-	`"userinfo_endpoint":"https://fixture.local/userinfo",` +
-	`"jwks_uri":"https://fixture.local/certs"}`
+//
+// The endpoints use Keycloak's real /realms/<realm>/protocol/openid-connect/
+// layout. keycloak-openid-config was tightened upstream (2026) to require the
+// literal "protocol/openid-connect" in the body; a real Keycloak document
+// carries it, and this one now satisfies both the old word matchers and the
+// new DSL matcher, so a template-tree update cannot silently drop a match.
+const oidcDocument = `{"issuer":"https://fixture.local/realms/master",` +
+	`"authorization_endpoint":"https://fixture.local/realms/master/protocol/openid-connect/auth",` +
+	`"token_endpoint":"https://fixture.local/realms/master/protocol/openid-connect/token",` +
+	`"userinfo_endpoint":"https://fixture.local/realms/master/protocol/openid-connect/userinfo",` +
+	`"jwks_uri":"https://fixture.local/realms/master/protocol/openid-connect/certs"}`
 
 // startOIDCFixture stands up a loopback HTTP server serving the OIDC discovery
 // document at both paths keycloak-openid-config probes, and 404 elsewhere.
