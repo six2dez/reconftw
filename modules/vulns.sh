@@ -38,41 +38,41 @@ function xss() {
             fi
 
             if [[ -n $XSS_SERVER ]]; then
-                OPTIONS="-b ${XSS_SERVER} -w $DALFOX_THREADS"
+                OPTIONS=(-b "${XSS_SERVER}" -w "$DALFOX_THREADS")
             else
                 _print_msg WARN "No XSS_SERVER defined, blind XSS skipped"
-                OPTIONS="-w $DALFOX_THREADS"
+                OPTIONS=(-w "$DALFOX_THREADS")
             fi
 
                 # Run Dalfox with Katana output
                 if [[ -s ".tmp/xss_reflected.txt" ]]; then
                     _print_msg INFO "Running: Dalfox with Katana"
-                    run_command dalfox pipe --silence --no-color --no-spinner --only-poc r --ignore-return 302,404,403 --skip-bav $OPTIONS -d "$DEPTH" <".tmp/xss_reflected.txt" 2>>"$LOGFILE" |
+                    run_command dalfox pipe --silence --no-color --no-spinner --only-poc r --ignore-return 302,404,403 --skip-bav "${OPTIONS[@]}" -d "$DEPTH" <".tmp/xss_reflected.txt" 2>>"$LOGFILE" |
                         anew -q "vulns/xss.txt"
                 fi
 
             
         else
             # Using Axiom
+            _as_array AXIOM_EXTRA_ARGS
+            AXIOM_ARGS=("${AXIOM_EXTRA_ARGS[@]}")
             if [[ $DEEP == true ]]; then
                 DEPTH=3
-                AXIOM_ARGS="$AXIOM_EXTRA_ARGS"
             else
                 DEPTH=2
-                AXIOM_ARGS="$AXIOM_EXTRA_ARGS"
             fi
 
             if [[ -n $XSS_SERVER ]]; then
-                OPTIONS="-b ${XSS_SERVER} -w $DALFOX_THREADS"
+                OPTIONS=(-b "${XSS_SERVER}" -w "$DALFOX_THREADS")
             else
                 _print_msg WARN "No XSS_SERVER defined, blind XSS skipped"
-                OPTIONS="-w $DALFOX_THREADS"
+                OPTIONS=(-w "$DALFOX_THREADS")
             fi
 
             # Run Dalfox with Axiom-scan output
             if [[ -s ".tmp/xss_reflected.txt" ]]; then
                 _print_msg INFO "Running: Dalfox with Axiom"
-                run_command axiom-scan ".tmp/xss_reflected.txt" -m dalfox --skip-bav $OPTIONS -d "$DEPTH" -o "vulns/xss.txt" $AXIOM_ARGS 2>>"$LOGFILE" >/dev/null
+                run_command axiom-scan ".tmp/xss_reflected.txt" -m dalfox --skip-bav "${OPTIONS[@]}" -d "$DEPTH" -o "vulns/xss.txt" "${AXIOM_ARGS[@]}" 2>>"$LOGFILE" >/dev/null
             fi
         fi
 
@@ -956,15 +956,18 @@ function fuzzparams() {
 
                         # Execute Nuclei with the fuzzing templates
 
-                        run_command nuclei -l webs/url_extract_nodupes.txt -nh -rl "$NUCLEI_RATELIMIT" -silent -retries 2 ${NUCLEI_EXTRA_ARGS} -t ${NUCLEI_TEMPLATES_PATH}/dast -dast -j -o ".tmp/fuzzparams_json.txt" <"webs/url_extract_nodupes.txt" 2>>"$LOGFILE" >/dev/null
+                        _as_array NUCLEI_EXTRA_ARGS
+                        run_command nuclei -l webs/url_extract_nodupes.txt -nh -rl "$NUCLEI_RATELIMIT" -silent -retries 2 "${NUCLEI_EXTRA_ARGS[@]}" -t "${NUCLEI_TEMPLATES_PATH}/dast" -dast -j -o ".tmp/fuzzparams_json.txt" <"webs/url_extract_nodupes.txt" 2>>"$LOGFILE" >/dev/null
 
                     else
 
                         _print_msg INFO "Running: Axiom with Nuclei"
 
+                        _as_array NUCLEI_EXTRA_ARGS
+                        _as_array AXIOM_EXTRA_ARGS
                         run_command axiom-scan webs/url_extract_nodupes.txt -m nuclei \
                             -dast -nh -rl "$NUCLEI_RATELIMIT" \
-                            -silent -retries 2 "$NUCLEI_EXTRA_ARGS" -dast -j -o ".tmp/fuzzparams_json.txt" $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
+                            -silent -retries 2 "${NUCLEI_EXTRA_ARGS[@]}" -dast -j -o ".tmp/fuzzparams_json.txt" "${AXIOM_EXTRA_ARGS[@]}" 2>>"$LOGFILE" >/dev/null
 
                     fi
 
@@ -1076,16 +1079,17 @@ function nuclei_dast() {
         fi
 
         local dast_templates="${NUCLEI_DAST_TEMPLATE_PATH:-${NUCLEI_TEMPLATES_PATH}/dast}"
+        _as_array NUCLEI_EXTRA_ARGS
+        _as_array NUCLEI_DAST_EXTRA_ARGS
+        _as_array AXIOM_EXTRA_ARGS
         if [[ $AXIOM != true ]]; then
-            # shellcheck disable=SC2086  # Intentionally allow user-provided nuclei args
             run_command nuclei -l ".tmp/nuclei_dast_targets.txt" -dast -nh -rl "$NUCLEI_RATELIMIT" -silent -retries 2 \
-                $NUCLEI_EXTRA_ARGS $NUCLEI_DAST_EXTRA_ARGS -t "$dast_templates" -j -o ".tmp/nuclei_dast_json_raw.txt" \
+                "${NUCLEI_EXTRA_ARGS[@]}" "${NUCLEI_DAST_EXTRA_ARGS[@]}" -t "$dast_templates" -j -o ".tmp/nuclei_dast_json_raw.txt" \
                 2>>"$LOGFILE" >/dev/null
         else
-            # shellcheck disable=SC2086  # Intentionally allow user-provided nuclei args
             run_command axiom-scan ".tmp/nuclei_dast_targets.txt" -m nuclei -dast -nh -rl "$NUCLEI_RATELIMIT" -silent -retries 2 \
-                $NUCLEI_EXTRA_ARGS $NUCLEI_DAST_EXTRA_ARGS -t "$dast_templates" -j -o ".tmp/nuclei_dast_json_raw.txt" \
-                $AXIOM_EXTRA_ARGS 2>>"$LOGFILE" >/dev/null
+                "${NUCLEI_EXTRA_ARGS[@]}" "${NUCLEI_DAST_EXTRA_ARGS[@]}" -t "$dast_templates" -j -o ".tmp/nuclei_dast_json_raw.txt" \
+                "${AXIOM_EXTRA_ARGS[@]}" 2>>"$LOGFILE" >/dev/null
         fi
 
         if [[ -s ".tmp/nuclei_dast_json_raw.txt" ]]; then

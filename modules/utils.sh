@@ -869,10 +869,8 @@ function sanitize_domain() {
 
     # 5) IPv4 post-normalization: redirect to inline octet validation.
     if [[ "$working" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-        local IFS_bak="$IFS"
-        IFS='.'
-        local -a _octs=($working)
-        IFS="$IFS_bak"
+        local -a _octs=()
+        IFS='.' read -r -a _octs <<<"$working"
         local _o
         for _o in "${_octs[@]}"; do
             if (( _o > 255 )); then
@@ -1394,10 +1392,8 @@ _ip_is_public_ipv4() {
     [[ -z "$ip" ]] && return 1
 
     # Split by dots using IFS (avoids BASH_REMATCH portability issues)
-    local old_ifs="$IFS"
-    IFS='.'
-    local -a parts=($ip)
-    IFS="$old_ifs"
+    local -a parts=()
+    IFS='.' read -r -a parts <<<"$ip"
     [[ ${#parts[@]} -ne 4 ]] && return 1
 
     local o1="${parts[0]}" o2="${parts[1]}" o3="${parts[2]}" o4="${parts[3]}"
