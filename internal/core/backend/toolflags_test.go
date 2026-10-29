@@ -165,7 +165,7 @@ var knownToolFlags = map[string]toolFlagSet{
 		},
 	},
 	"subfinder": {
-		source: "subfinder -h (v2.14.0), flag names only",
+		source: "subfinder -h (v2.14.0, re-checked against v2.16.0: no flag removed), flag names only",
 		flags: []string{
 			"-d", "-domain", "-dL", "-list", "-all", "-s", "-sources",
 			"-es", "-exclude-sources", "-recursive", "-silent", "-o", "-output",

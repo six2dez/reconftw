@@ -107,7 +107,7 @@ default_args    = []
 # config.Defaults(), so raising either value without the other fails there.
 timeout_seconds = 11400
 critical        = true
-version         = "v2.14.0"
+version         = "v2.16.0"
 input_flag      = ""
 [[tools]]
 name            = "httpx"

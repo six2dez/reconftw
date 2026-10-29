@@ -152,8 +152,8 @@ func TestToolsLockSchemaFields(t *testing.T) {
 	if sf == nil {
 		t.Fatal("subfinder not registered from tools.lock")
 	}
-	if sf.Version != "v2.14.0" {
-		t.Errorf("subfinder Version = %q, want v2.14.0 (pinned in tools.lock)", sf.Version)
+	if sf.Version != "v2.16.0" {
+		t.Errorf("subfinder Version = %q, want v2.16.0 (pinned in tools.lock)", sf.Version)
 	}
 	if sf.Kind != "go" {
 		t.Errorf("subfinder Kind = %q, want go", sf.Kind)
