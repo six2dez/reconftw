@@ -26,7 +26,7 @@ import (
 	"testing"
 	"time"
 
-	coreerrors "github.com/six2dez/reconftw/internal/core/errors"
+	coreerrors "github.com/six2dez/reconftw/v5/internal/core/errors"
 )
 
 var sha256HexRe = regexp.MustCompile(`^[0-9a-f]{64}$`)

@@ -10,8 +10,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/six2dez/reconftw/internal/core/backend"
-	"github.com/six2dez/reconftw/internal/core/config"
+	"github.com/six2dez/reconftw/v5/internal/core/backend"
+	"github.com/six2dez/reconftw/v5/internal/core/config"
 )
 
 // newTestCfg returns a config that satisfies the runHealthCheck contract.

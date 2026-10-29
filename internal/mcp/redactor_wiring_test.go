@@ -11,8 +11,8 @@ package mcp
 import (
 	"testing"
 
-	"github.com/six2dez/reconftw/internal/core/log"
-	"github.com/six2dez/reconftw/internal/core/scheduler"
+	"github.com/six2dez/reconftw/v5/internal/core/log"
+	"github.com/six2dez/reconftw/v5/internal/core/scheduler"
 )
 
 // stubSched supplies the one dependency runOptions() dereferences, so these tests

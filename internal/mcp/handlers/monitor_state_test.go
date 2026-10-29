@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/six2dez/reconftw/internal/mcp/handlers"
+	"github.com/six2dez/reconftw/v5/internal/mcp/handlers"
 )
 
 const stateTestTarget = "example.com"

@@ -4,7 +4,7 @@ package sysinfo_test
 import (
 	"testing"
 
-	"github.com/six2dez/reconftw/internal/modules/subdomains/sysinfo"
+	"github.com/six2dez/reconftw/v5/internal/modules/subdomains/sysinfo"
 )
 
 // -------------------------------------------------------------------------

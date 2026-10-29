@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/six2dez/reconftw/internal/mcp/handlers"
+	"github.com/six2dez/reconftw/v5/internal/mcp/handlers"
 )
 
 func TestParseMonitorIntervalFlag(t *testing.T) {

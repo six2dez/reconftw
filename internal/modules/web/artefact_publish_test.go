@@ -29,8 +29,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/six2dez/reconftw/internal/core/appctx"
-	"github.com/six2dez/reconftw/internal/core/task"
+	"github.com/six2dez/reconftw/v5/internal/core/appctx"
+	"github.com/six2dez/reconftw/v5/internal/core/task"
 )
 
 // artefactFile returns <workDir>/artefacts/<name>.jsonl.

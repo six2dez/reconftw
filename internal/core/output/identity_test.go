@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/six2dez/reconftw/internal/core/output"
+	"github.com/six2dez/reconftw/v5/internal/core/output"
 )
 
 func mustID(t *testing.T, target string) output.TargetIdentity {

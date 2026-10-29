@@ -9,9 +9,9 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/six2dez/reconftw/internal/core/checkpoint"
-	coreerrors "github.com/six2dez/reconftw/internal/core/errors"
-	"github.com/six2dez/reconftw/internal/core/testutil"
+	"github.com/six2dez/reconftw/v5/internal/core/checkpoint"
+	coreerrors "github.com/six2dez/reconftw/v5/internal/core/errors"
+	"github.com/six2dez/reconftw/v5/internal/core/testutil"
 )
 
 // Test 10 (interface satisfaction): MockCheckpoint satisfies checkpoint.Interface.

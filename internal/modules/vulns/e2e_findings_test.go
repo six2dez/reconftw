@@ -25,9 +25,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/six2dez/reconftw/internal/core/appctx"
-	"github.com/six2dez/reconftw/internal/core/output"
-	"github.com/six2dez/reconftw/internal/modules/vulns"
+	"github.com/six2dez/reconftw/v5/internal/core/appctx"
+	"github.com/six2dez/reconftw/v5/internal/core/output"
+	"github.com/six2dez/reconftw/v5/internal/modules/vulns"
 )
 
 // newFindingsWorkspace builds a real OutputTree with a real scope filter,

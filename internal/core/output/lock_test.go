@@ -27,7 +27,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/six2dez/reconftw/internal/core/output"
+	"github.com/six2dez/reconftw/v5/internal/core/output"
 )
 
 // lockHelperEnv names the workspace directory the helper subprocess should

@@ -20,8 +20,8 @@ import (
 
 	tomlv2 "github.com/pelletier/go-toml/v2"
 
-	"github.com/six2dez/reconftw/internal/core/log"
-	"github.com/six2dez/reconftw/internal/core/output"
+	"github.com/six2dez/reconftw/v5/internal/core/log"
+	"github.com/six2dez/reconftw/v5/internal/core/output"
 )
 
 // WriteSnapshot writes cfg to path as TOML, with every log.Secret-typed field

@@ -33,12 +33,13 @@ audience line.**
   top-level `Recon/<domain>` symlink pointing at `_compat/` **by default**, with
   `output.compat.recon_symlink = false` as the opt-out. Until that beta ships, point
   pipelines at `workspaces/<target-id>/_compat/`.
-- **No `go install …@latest`.** The module path in `go.mod` is
-  `github.com/six2dez/reconftw` with no `/v5` suffix, so `go install` resolves
-  `@latest` to the last `v4.x` tag and refuses the `v5` tags. Whether the path
-  becomes `…/reconftw/v5` at `v5.0.0` is an open decision; the supported install
-  paths are the release archive for a named tag, `git clone -b dev-go && make
-  build`, or the `5.0.0-beta.N` Docker tag (README, *Installation*).
+- **`go install …@latest` needs `v5.0.0`.** The module path in `go.mod` is now
+  `github.com/six2dez/reconftw/v5`, so
+  `go install github.com/six2dez/reconftw/v5/cmd/reconftw@latest` works once
+  `v5.0.0` is tagged and published. The `v5.0.0-beta.N` tags predate the `/v5`
+  path and cannot be installed that way; for them the supported install paths are
+  the release archive for a named tag, `git clone -b dev-go && make build`, or the
+  `5.0.0-beta.N` Docker tag (README, *Installation*).
 - **Bug-for-bug parity is partially measured.** One canonical target has been run
   side-by-side against bash v1; the acceptance criterion asks for three to five.
   Treat differences as worth reporting rather than as settled behaviour.

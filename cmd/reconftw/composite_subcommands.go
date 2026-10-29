@@ -25,12 +25,12 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/six2dez/reconftw/internal/core/config"
-	"github.com/six2dez/reconftw/internal/core/log"
-	"github.com/six2dez/reconftw/internal/core/scheduler"
-	"github.com/six2dez/reconftw/internal/core/task"
-	"github.com/six2dez/reconftw/internal/core/ui"
-	"github.com/six2dez/reconftw/internal/mcp/handlers"
+	"github.com/six2dez/reconftw/v5/internal/core/config"
+	"github.com/six2dez/reconftw/v5/internal/core/log"
+	"github.com/six2dez/reconftw/v5/internal/core/scheduler"
+	"github.com/six2dez/reconftw/v5/internal/core/task"
+	"github.com/six2dez/reconftw/v5/internal/core/ui"
+	"github.com/six2dez/reconftw/v5/internal/mcp/handlers"
 )
 
 // dryRunCapture holds the task list and config captured during --dry-run mode.

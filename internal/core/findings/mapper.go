@@ -3,7 +3,7 @@ package findings
 import (
 	"strings"
 
-	sqlcgen "github.com/six2dez/reconftw/internal/store/sqlc"
+	sqlcgen "github.com/six2dez/reconftw/v5/internal/store/sqlc"
 )
 
 // MapSeverity maps a store.Finding Severity string to a SARIF level string.

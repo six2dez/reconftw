@@ -20,12 +20,12 @@ package main
 import (
 	"testing"
 
-	"github.com/six2dez/reconftw/internal/core/config"
-	"github.com/six2dez/reconftw/internal/core/task"
+	"github.com/six2dez/reconftw/v5/internal/core/config"
+	"github.com/six2dez/reconftw/v5/internal/core/task"
 
 	// Blank import triggers init() Task registrations for every osint Task so
 	// task.Default.Build() returns the full osint task set.
-	_ "github.com/six2dez/reconftw/internal/modules/osint"
+	_ "github.com/six2dez/reconftw/v5/internal/modules/osint"
 )
 
 // osintStageIndex builds task-name → stage-index from the production

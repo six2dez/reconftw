@@ -20,10 +20,10 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/six2dez/reconftw/internal/core/appctx"
-	"github.com/six2dez/reconftw/internal/core/output"
-	"github.com/six2dez/reconftw/internal/modules/subdomains"
-	"github.com/six2dez/reconftw/internal/modules/web"
+	"github.com/six2dez/reconftw/v5/internal/core/appctx"
+	"github.com/six2dez/reconftw/v5/internal/core/output"
+	"github.com/six2dez/reconftw/v5/internal/modules/subdomains"
+	"github.com/six2dez/reconftw/v5/internal/modules/web"
 )
 
 func newTakeoverApp(t *testing.T) (*appctx.AppContext, string) {

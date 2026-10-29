@@ -24,11 +24,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/six2dez/reconftw/internal/core/appctx"
-	"github.com/six2dez/reconftw/internal/core/config"
-	coreerrors "github.com/six2dez/reconftw/internal/core/errors"
-	"github.com/six2dez/reconftw/internal/core/output"
-	"github.com/six2dez/reconftw/internal/core/task"
+	"github.com/six2dez/reconftw/v5/internal/core/appctx"
+	"github.com/six2dez/reconftw/v5/internal/core/config"
+	coreerrors "github.com/six2dez/reconftw/v5/internal/core/errors"
+	"github.com/six2dez/reconftw/v5/internal/core/output"
+	"github.com/six2dez/reconftw/v5/internal/core/task"
 )
 
 // -------------------------------------------------------------------------

@@ -25,7 +25,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/six2dez/reconftw/internal/core/appctx"
+	"github.com/six2dez/reconftw/v5/internal/core/appctx"
 )
 
 // TestBootAbsolutisesRelativeWorkDir: a relative workspace becomes absolute, and

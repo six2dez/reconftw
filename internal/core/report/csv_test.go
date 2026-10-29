@@ -5,8 +5,8 @@ import (
 	"encoding/csv"
 	"testing"
 
-	"github.com/six2dez/reconftw/internal/core/report"
-	sqlcgen "github.com/six2dez/reconftw/internal/store/sqlc"
+	"github.com/six2dez/reconftw/v5/internal/core/report"
+	sqlcgen "github.com/six2dez/reconftw/v5/internal/store/sqlc"
 )
 
 // TestWriteCSV_FindingsColumns verifies the CSV header for findings matches

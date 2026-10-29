@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/six2dez/reconftw/internal/core/backend"
+	"github.com/six2dez/reconftw/v5/internal/core/backend"
 )
 
 // PythonToolInstaller installs kind=python tools via `uv tool install` with

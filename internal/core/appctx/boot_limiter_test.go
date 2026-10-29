@@ -28,8 +28,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/six2dez/reconftw/internal/core/backend"
-	"github.com/six2dez/reconftw/internal/core/config"
+	"github.com/six2dez/reconftw/v5/internal/core/backend"
+	"github.com/six2dez/reconftw/v5/internal/core/config"
 )
 
 // Task 1 — buildLimiterConfig on Defaults() populates the per-tool map from the

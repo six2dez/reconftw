@@ -20,7 +20,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/six2dez/reconftw/internal/mcp/handlers"
+	"github.com/six2dez/reconftw/v5/internal/mcp/handlers"
 )
 
 // TestFirstReportCallOnAPreRegisteredSessionSucceeds is acceptance gate 6,

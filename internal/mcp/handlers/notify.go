@@ -35,8 +35,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/six2dez/reconftw/internal/core/ingest"
-	"github.com/six2dez/reconftw/internal/core/notifier"
+	"github.com/six2dez/reconftw/v5/internal/core/ingest"
+	"github.com/six2dez/reconftw/v5/internal/core/notifier"
 )
 
 // inScanEventFilter returns a routed EventFilter for the current scan, or

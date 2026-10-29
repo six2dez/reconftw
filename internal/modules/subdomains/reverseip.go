@@ -34,9 +34,9 @@ import (
 	"context"
 	"strings"
 
-	"github.com/six2dez/reconftw/internal/core/appctx"
-	"github.com/six2dez/reconftw/internal/core/backend"
-	coreerrors "github.com/six2dez/reconftw/internal/core/errors"
+	"github.com/six2dez/reconftw/v5/internal/core/appctx"
+	"github.com/six2dez/reconftw/v5/internal/core/backend"
+	coreerrors "github.com/six2dez/reconftw/v5/internal/core/errors"
 )
 
 // hakip2hostRunner runs hakip2host with the given newline-delimited IP list on

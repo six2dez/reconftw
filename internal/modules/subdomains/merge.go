@@ -25,8 +25,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/six2dez/reconftw/internal/core/appctx"
-	"github.com/six2dez/reconftw/internal/core/output"
+	"github.com/six2dez/reconftw/v5/internal/core/appctx"
+	"github.com/six2dez/reconftw/v5/internal/core/output"
 )
 
 // MergeStage reads all inputs/<stage>.*.txt staging files written by passive

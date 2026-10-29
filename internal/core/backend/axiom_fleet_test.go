@@ -30,8 +30,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/six2dez/reconftw/internal/core/backend"
-	coreerrors "github.com/six2dez/reconftw/internal/core/errors"
+	"github.com/six2dez/reconftw/v5/internal/core/backend"
+	coreerrors "github.com/six2dez/reconftw/v5/internal/core/errors"
 )
 
 // axiomScriptFake replays scripted axiom CLI behaviour: it records every

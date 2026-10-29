@@ -6,9 +6,9 @@
 package main
 
 import (
-	"github.com/six2dez/reconftw/internal/core/config"
-	"github.com/six2dez/reconftw/internal/core/task"
-	"github.com/six2dez/reconftw/internal/core/ui"
+	"github.com/six2dez/reconftw/v5/internal/core/config"
+	"github.com/six2dez/reconftw/v5/internal/core/task"
+	"github.com/six2dez/reconftw/v5/internal/core/ui"
 )
 
 // badgeForStatus maps a task.Status to the corresponding ui.Badge for progress display.

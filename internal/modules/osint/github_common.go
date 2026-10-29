@@ -20,7 +20,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/six2dez/reconftw/internal/core/appctx"
+	"github.com/six2dez/reconftw/v5/internal/core/appctx"
 )
 
 // gitHubTokenFile returns the configured GitHub-tokens file path when it exists

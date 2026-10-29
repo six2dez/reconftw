@@ -7,10 +7,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/six2dez/reconftw/internal/core/config"
-	"github.com/six2dez/reconftw/internal/core/log"
-	"github.com/six2dez/reconftw/internal/core/report"
-	sqlcgen "github.com/six2dez/reconftw/internal/store/sqlc"
+	"github.com/six2dez/reconftw/v5/internal/core/config"
+	"github.com/six2dez/reconftw/v5/internal/core/log"
+	"github.com/six2dez/reconftw/v5/internal/core/report"
+	sqlcgen "github.com/six2dez/reconftw/v5/internal/store/sqlc"
 )
 
 // TestAIReporter_RedactBeforeSend verifies that secrets registered with the

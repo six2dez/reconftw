@@ -5,7 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	mcp "github.com/six2dez/reconftw/internal/mcp"
+	mcp "github.com/six2dez/reconftw/v5/internal/mcp"
 )
 
 func TestBearerAuthMiddleware(t *testing.T) {

@@ -13,7 +13,7 @@ import (
 	"log/slog"
 	"testing"
 
-	"github.com/six2dez/reconftw/internal/core/config"
+	"github.com/six2dez/reconftw/v5/internal/core/config"
 )
 
 // withCleanLogState isolates a subtest from the package-level CLI logger globals

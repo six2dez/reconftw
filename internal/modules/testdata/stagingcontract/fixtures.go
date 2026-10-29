@@ -16,7 +16,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/six2dez/reconftw/internal/core/output"
+	"github.com/six2dez/reconftw/v5/internal/core/output"
 )
 
 // ─── PASSING SHAPES ─────────────────────────────────────────────────────────

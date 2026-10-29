@@ -17,12 +17,12 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/six2dez/reconftw/internal/core/appctx"
-	coreerrors "github.com/six2dez/reconftw/internal/core/errors"
-	"github.com/six2dez/reconftw/internal/core/scheduler"
-	"github.com/six2dez/reconftw/internal/core/task"
+	"github.com/six2dez/reconftw/v5/internal/core/appctx"
+	coreerrors "github.com/six2dez/reconftw/v5/internal/core/errors"
+	"github.com/six2dez/reconftw/v5/internal/core/scheduler"
+	"github.com/six2dez/reconftw/v5/internal/core/task"
 
-	"github.com/six2dez/reconftw/internal/core/config"
+	"github.com/six2dez/reconftw/v5/internal/core/config"
 )
 
 // fakeTask is a minimal task.Task implementation for unit tests.

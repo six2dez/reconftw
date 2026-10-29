@@ -8,7 +8,7 @@ package config_test
 import (
 	"testing"
 
-	"github.com/six2dez/reconftw/internal/core/config"
+	"github.com/six2dez/reconftw/v5/internal/core/config"
 )
 
 // TestApplyZenProfile verifies every field set by ApplyZenProfile against the

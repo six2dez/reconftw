@@ -46,11 +46,11 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/six2dez/reconftw/internal/core/config"
-	"github.com/six2dez/reconftw/internal/core/output"
-	"github.com/six2dez/reconftw/internal/core/resolvers"
-	"github.com/six2dez/reconftw/internal/core/scheduler"
-	"github.com/six2dez/reconftw/internal/mcp/handlers"
+	"github.com/six2dez/reconftw/v5/internal/core/config"
+	"github.com/six2dez/reconftw/v5/internal/core/output"
+	"github.com/six2dez/reconftw/v5/internal/core/resolvers"
+	"github.com/six2dez/reconftw/v5/internal/core/scheduler"
+	"github.com/six2dez/reconftw/v5/internal/mcp/handlers"
 )
 
 // --- gen-resolvers ---

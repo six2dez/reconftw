@@ -28,7 +28,7 @@ import (
 	// modernc.org/sqlite registers the "sqlite" driver name.
 	_ "modernc.org/sqlite"
 
-	coreerrors "github.com/six2dez/reconftw/internal/core/errors"
+	coreerrors "github.com/six2dez/reconftw/v5/internal/core/errors"
 )
 
 // Status enumerates the terminal states a checkpoint row may reach.

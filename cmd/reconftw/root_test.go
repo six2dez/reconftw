@@ -13,7 +13,7 @@ import (
 
 	"github.com/spf13/pflag"
 
-	"github.com/six2dez/reconftw/internal/core/config"
+	"github.com/six2dez/reconftw/v5/internal/core/config"
 )
 
 // Test 1 (D-01): rootCmd surfaces all 15 visible v2 subcommands per ADR §8.1

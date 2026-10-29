@@ -11,8 +11,8 @@ import (
 	"strings"
 	"testing"
 
-	coreerrors "github.com/six2dez/reconftw/internal/core/errors"
-	"github.com/six2dez/reconftw/internal/core/output"
+	coreerrors "github.com/six2dez/reconftw/v5/internal/core/errors"
+	"github.com/six2dez/reconftw/v5/internal/core/output"
 )
 
 func newTestTree(t *testing.T) *output.OutputTree {

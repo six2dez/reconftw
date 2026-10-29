@@ -3,7 +3,7 @@ package installer
 import (
 	"context"
 
-	"github.com/six2dez/reconftw/internal/core/backend"
+	"github.com/six2dez/reconftw/v5/internal/core/backend"
 )
 
 // SystemToolInstaller installs kind=system tools via the host package manager

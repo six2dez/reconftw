@@ -18,7 +18,7 @@ package main
 import (
 	"testing"
 
-	"github.com/six2dez/reconftw/internal/core/task"
+	"github.com/six2dez/reconftw/v5/internal/core/task"
 )
 
 // TestRegisteredTaskDAGBuilds asserts the FULL process-singleton task registry

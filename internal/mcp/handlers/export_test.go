@@ -8,7 +8,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/six2dez/reconftw/internal/core/notifier"
+	"github.com/six2dez/reconftw/v5/internal/core/notifier"
 )
 
 // ExportedRunMonitorLoop exposes the unexported runMonitorLoop for testing.

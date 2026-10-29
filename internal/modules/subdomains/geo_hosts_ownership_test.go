@@ -24,7 +24,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/six2dez/reconftw/internal/core/task"
+	"github.com/six2dez/reconftw/v5/internal/core/task"
 )
 
 // TestGeoDoesNotEmptyPublishHostsArtefact runs SubGeoTask against a workspace

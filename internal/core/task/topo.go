@@ -23,7 +23,7 @@ import (
 	"sort"
 	"strings"
 
-	coreerrors "github.com/six2dez/reconftw/internal/core/errors"
+	coreerrors "github.com/six2dez/reconftw/v5/internal/core/errors"
 )
 
 // Sort topologically orders tasks by their DependsOn graph. Returns a

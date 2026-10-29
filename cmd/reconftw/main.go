@@ -47,9 +47,9 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/six2dez/reconftw/internal/core/config"
-	"github.com/six2dez/reconftw/internal/core/log"
-	"github.com/six2dez/reconftw/internal/core/task"
+	"github.com/six2dez/reconftw/v5/internal/core/config"
+	"github.com/six2dez/reconftw/v5/internal/core/log"
+	"github.com/six2dez/reconftw/v5/internal/core/task"
 )
 
 // Version / CommitSHA / BuildDate are populated at link time via XCUT-02 ldflags:

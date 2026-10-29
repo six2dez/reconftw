@@ -19,7 +19,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/six2dez/reconftw/internal/core/backend"
+	"github.com/six2dez/reconftw/v5/internal/core/backend"
 )
 
 // Test 5: After binary startup, backend.Default.All() returns >=10 tools

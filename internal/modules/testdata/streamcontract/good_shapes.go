@@ -17,8 +17,8 @@
 package streamcontract
 
 import (
-	"github.com/six2dez/reconftw/internal/core/backend"
-	"github.com/six2dez/reconftw/internal/core/task"
+	"github.com/six2dez/reconftw/v5/internal/core/backend"
+	"github.com/six2dez/reconftw/v5/internal/core/task"
 )
 
 // drainOK — accepted shape 1: backend.Drain in the function body.

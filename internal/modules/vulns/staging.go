@@ -48,8 +48,8 @@ package vulns
 import (
 	"encoding/json"
 
-	"github.com/six2dez/reconftw/internal/core/appctx"
-	"github.com/six2dez/reconftw/internal/core/output"
+	"github.com/six2dez/reconftw/v5/internal/core/appctx"
+	"github.com/six2dez/reconftw/v5/internal/core/output"
 )
 
 // stageVulnFindings publishes findings to stagingPath under the run-isolation

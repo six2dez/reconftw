@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/six2dez/reconftw/internal/core/backend"
+	"github.com/six2dez/reconftw/v5/internal/core/backend"
 )
 
 // Test 9: NewRateLimiter with per-tool RPS — Wait blocks until token is issued.

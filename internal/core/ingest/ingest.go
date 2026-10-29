@@ -32,8 +32,8 @@ import (
 	// modernc.org/sqlite registers the "sqlite" driver name (pure-Go, CGO-free).
 	_ "modernc.org/sqlite"
 
-	"github.com/six2dez/reconftw/internal/core/output"
-	sqlcgen "github.com/six2dez/reconftw/internal/store/sqlc"
+	"github.com/six2dez/reconftw/v5/internal/core/output"
+	sqlcgen "github.com/six2dez/reconftw/v5/internal/store/sqlc"
 )
 
 // maxJSONLLine bounds a single artefact record; nuclei/dalfox findings can be

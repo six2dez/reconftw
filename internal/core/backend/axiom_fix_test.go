@@ -14,7 +14,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/six2dez/reconftw/internal/core/backend"
+	"github.com/six2dez/reconftw/v5/internal/core/backend"
 )
 
 // axiomOutFake is a fake local backend that behaves like the real `axiom-scan -o`:

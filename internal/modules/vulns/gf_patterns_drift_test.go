@@ -14,7 +14,7 @@ package vulns
 import (
 	"testing"
 
-	"github.com/six2dez/reconftw/internal/installer"
+	"github.com/six2dez/reconftw/v5/internal/installer"
 )
 
 func TestGFRequiredPatternsMatchesGFClasses(t *testing.T) {

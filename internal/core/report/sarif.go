@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/six2dez/reconftw/internal/core/findings"
-	"github.com/six2dez/reconftw/internal/core/output"
-	sqlcgen "github.com/six2dez/reconftw/internal/store/sqlc"
+	"github.com/six2dez/reconftw/v5/internal/core/findings"
+	"github.com/six2dez/reconftw/v5/internal/core/output"
+	sqlcgen "github.com/six2dez/reconftw/v5/internal/store/sqlc"
 )
 
 // WriteSARIF wires findings.BuildSarifLog to output.WriteFile.

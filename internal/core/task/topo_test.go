@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	coreerrors "github.com/six2dez/reconftw/internal/core/errors"
-	"github.com/six2dez/reconftw/internal/core/task"
+	coreerrors "github.com/six2dez/reconftw/v5/internal/core/errors"
+	"github.com/six2dez/reconftw/v5/internal/core/task"
 )
 
 // Test 7: linear chain A→B→C produces [A, B, C].

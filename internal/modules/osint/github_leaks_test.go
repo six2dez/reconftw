@@ -17,7 +17,7 @@ import (
 	"strings"
 	"testing"
 
-	corelog "github.com/six2dez/reconftw/internal/core/log"
+	corelog "github.com/six2dez/reconftw/v5/internal/core/log"
 )
 
 const (

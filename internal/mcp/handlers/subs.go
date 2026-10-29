@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/six2dez/reconftw/internal/core/task"
-	"github.com/six2dez/reconftw/internal/modules/subdomains"
+	"github.com/six2dez/reconftw/v5/internal/core/task"
+	"github.com/six2dez/reconftw/v5/internal/modules/subdomains"
 )
 
 // RunSubsAsync executes the full subdomain enumeration pipeline.

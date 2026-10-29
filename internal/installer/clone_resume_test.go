@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/six2dez/reconftw/internal/core/backend"
+	"github.com/six2dez/reconftw/v5/internal/core/backend"
 )
 
 // findBuiltBinary must see an artefact in bin/, not just the clone root.

@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/six2dez/reconftw/internal/core/backend"
+	"github.com/six2dez/reconftw/v5/internal/core/backend"
 )
 
 // GoToolInstaller installs kind=go tools via `go install <module>@<version>`

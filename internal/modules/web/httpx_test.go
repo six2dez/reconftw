@@ -36,7 +36,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/six2dez/reconftw/internal/modules/web"
+	"github.com/six2dez/reconftw/v5/internal/modules/web"
 )
 
 // argAfter returns the value following flag in argv, or "" when absent.

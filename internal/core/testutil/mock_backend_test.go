@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/six2dez/reconftw/internal/core/backend"
-	coreerrors "github.com/six2dez/reconftw/internal/core/errors"
-	"github.com/six2dez/reconftw/internal/core/testutil"
+	"github.com/six2dez/reconftw/v5/internal/core/backend"
+	coreerrors "github.com/six2dez/reconftw/v5/internal/core/errors"
+	"github.com/six2dez/reconftw/v5/internal/core/testutil"
 )
 
 // Test 1 (interface satisfaction): MockBackend satisfies backend.Backend.

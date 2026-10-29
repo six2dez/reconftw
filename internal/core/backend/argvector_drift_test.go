@@ -45,10 +45,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/six2dez/reconftw/internal/core/appctx"
-	"github.com/six2dez/reconftw/internal/core/backend"
-	"github.com/six2dez/reconftw/internal/core/config"
-	"github.com/six2dez/reconftw/internal/core/task"
+	"github.com/six2dez/reconftw/v5/internal/core/appctx"
+	"github.com/six2dez/reconftw/v5/internal/core/backend"
+	"github.com/six2dez/reconftw/v5/internal/core/config"
+	"github.com/six2dez/reconftw/v5/internal/core/task"
 
 	// Blank imports register the Tasks. Without these the registry is empty and
 	// every case below would skip — which would look exactly like passing.
@@ -57,10 +57,10 @@ import (
 	// 97 registered Tasks are invisible to task.Default.All(), so every count the
 	// coverage census prints would be a false green: it would report full coverage
 	// of a registry two thirds of which had never been loaded.
-	_ "github.com/six2dez/reconftw/internal/modules/osint"
-	_ "github.com/six2dez/reconftw/internal/modules/subdomains"
-	_ "github.com/six2dez/reconftw/internal/modules/vulns"
-	_ "github.com/six2dez/reconftw/internal/modules/web"
+	_ "github.com/six2dez/reconftw/v5/internal/modules/osint"
+	_ "github.com/six2dez/reconftw/v5/internal/modules/subdomains"
+	_ "github.com/six2dez/reconftw/v5/internal/modules/vulns"
+	_ "github.com/six2dez/reconftw/v5/internal/modules/web"
 )
 
 // driveCase is one Task driven for its argv.

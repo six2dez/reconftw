@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	coreerrors "github.com/six2dez/reconftw/internal/core/errors"
-	"github.com/six2dez/reconftw/internal/core/task"
+	coreerrors "github.com/six2dez/reconftw/v5/internal/core/errors"
+	"github.com/six2dez/reconftw/v5/internal/core/task"
 )
 
 func TestClassifyToolErr(t *testing.T) {

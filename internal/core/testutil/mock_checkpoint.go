@@ -13,8 +13,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/six2dez/reconftw/internal/core/checkpoint"
-	coreerrors "github.com/six2dez/reconftw/internal/core/errors"
+	"github.com/six2dez/reconftw/v5/internal/core/checkpoint"
+	coreerrors "github.com/six2dez/reconftw/v5/internal/core/errors"
 )
 
 // Record mirrors the *checkpoint.Store row shape (subset). Exposed by

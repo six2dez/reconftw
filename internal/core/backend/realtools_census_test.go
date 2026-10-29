@@ -63,8 +63,8 @@ import (
 
 	tomlv2 "github.com/pelletier/go-toml/v2"
 
-	"github.com/six2dez/reconftw/internal/core/backend"
-	"github.com/six2dez/reconftw/internal/core/config"
+	"github.com/six2dez/reconftw/v5/internal/core/backend"
+	"github.com/six2dez/reconftw/v5/internal/core/config"
 )
 
 // realtoolsMinToolchain is the floor below which a run is NOT EXECUTED rather

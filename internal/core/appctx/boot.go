@@ -38,12 +38,12 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/six2dez/reconftw/internal/core/backend"
-	"github.com/six2dez/reconftw/internal/core/checkpoint"
-	"github.com/six2dez/reconftw/internal/core/config"
-	"github.com/six2dez/reconftw/internal/core/notifier"
-	"github.com/six2dez/reconftw/internal/core/output"
-	"github.com/six2dez/reconftw/internal/core/ui"
+	"github.com/six2dez/reconftw/v5/internal/core/backend"
+	"github.com/six2dez/reconftw/v5/internal/core/checkpoint"
+	"github.com/six2dez/reconftw/v5/internal/core/config"
+	"github.com/six2dez/reconftw/v5/internal/core/notifier"
+	"github.com/six2dez/reconftw/v5/internal/core/output"
+	"github.com/six2dez/reconftw/v5/internal/core/ui"
 )
 
 // BootOptions adjusts Boot's wiring at construction time. Tests inject

@@ -29,10 +29,10 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/six2dez/reconftw/internal/core/backend"
-	"github.com/six2dez/reconftw/internal/core/task"
+	"github.com/six2dez/reconftw/v5/internal/core/backend"
+	"github.com/six2dez/reconftw/v5/internal/core/task"
 
-	_ "github.com/six2dez/reconftw/internal/modules/subdomains"
+	_ "github.com/six2dez/reconftw/v5/internal/modules/subdomains"
 )
 
 // maxTimeValue returns the argument following -max-time in argv, or "" when the

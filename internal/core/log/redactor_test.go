@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	log "github.com/six2dez/reconftw/internal/core/log"
+	log "github.com/six2dez/reconftw/v5/internal/core/log"
 )
 
 // --- Test 5: Values with length ≤ 4 are silently ignored ---

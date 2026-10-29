@@ -19,8 +19,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/six2dez/reconftw/internal/core/backend"
-	coreerrors "github.com/six2dez/reconftw/internal/core/errors"
+	"github.com/six2dez/reconftw/v5/internal/core/backend"
+	coreerrors "github.com/six2dez/reconftw/v5/internal/core/errors"
 )
 
 // axiomNonZeroFake behaves like the real axiom-scan under no TTY: it writes the

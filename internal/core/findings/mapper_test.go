@@ -6,8 +6,8 @@ package findings_test
 import (
 	"testing"
 
-	"github.com/six2dez/reconftw/internal/core/findings"
-	sqlcgen "github.com/six2dez/reconftw/internal/store/sqlc"
+	"github.com/six2dez/reconftw/v5/internal/core/findings"
+	sqlcgen "github.com/six2dez/reconftw/v5/internal/store/sqlc"
 )
 
 // TestMapSeverity verifies the severity → SARIF level mapping table.

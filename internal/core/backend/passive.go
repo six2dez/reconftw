@@ -10,7 +10,7 @@ import (
 	"context"
 	"strings"
 
-	coreerrors "github.com/six2dez/reconftw/internal/core/errors"
+	coreerrors "github.com/six2dez/reconftw/v5/internal/core/errors"
 )
 
 // activeToolSet is the hard-block list of tool names (exact or prefix-matched)

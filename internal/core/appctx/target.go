@@ -13,7 +13,7 @@ import (
 	"regexp"
 	"strings"
 
-	coreerrors "github.com/six2dez/reconftw/internal/core/errors"
+	coreerrors "github.com/six2dez/reconftw/v5/internal/core/errors"
 )
 
 // domainRegex mirrors v1 lib/validation.sh validate_domain() — rejects

@@ -11,7 +11,7 @@ import (
 	"reflect"
 	"testing"
 
-	log "github.com/six2dez/reconftw/internal/core/log"
+	log "github.com/six2dez/reconftw/v5/internal/core/log"
 )
 
 // --- Test 1: Secret.LogValue() returns "***" ---

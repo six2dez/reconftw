@@ -36,8 +36,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/six2dez/reconftw/internal/extract/js"
-	"github.com/six2dez/reconftw/internal/extract/waf"
+	"github.com/six2dez/reconftw/v5/internal/extract/js"
+	"github.com/six2dez/reconftw/v5/internal/extract/waf"
 )
 
 // webParitySkip checks the first non-empty line of fixtureBytes:

@@ -14,7 +14,7 @@ import (
 
 	"go.uber.org/goleak"
 
-	"github.com/six2dez/reconftw/internal/core/scheduler"
+	"github.com/six2dez/reconftw/v5/internal/core/scheduler"
 )
 
 // TestMain installs goleak — every test in this package must leave no

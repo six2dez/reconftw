@@ -16,8 +16,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/six2dez/reconftw/internal/core/appctx"
-	coreerrors "github.com/six2dez/reconftw/internal/core/errors"
+	"github.com/six2dez/reconftw/v5/internal/core/appctx"
+	coreerrors "github.com/six2dez/reconftw/v5/internal/core/errors"
 )
 
 // TestNewTargetHostnameAcceptSet: syntactically valid names keep working.

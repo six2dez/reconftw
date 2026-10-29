@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	errs "github.com/six2dez/reconftw/internal/core/errors"
+	errs "github.com/six2dez/reconftw/v5/internal/core/errors"
 )
 
 // --- Test 6: All 7 typed structs implement the error interface ---

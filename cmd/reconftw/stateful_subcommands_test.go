@@ -44,9 +44,9 @@ import (
 	// baseline insert is gone), so this file owns the registration it needs.
 	_ "modernc.org/sqlite"
 
-	"github.com/six2dez/reconftw/internal/core/config"
-	"github.com/six2dez/reconftw/internal/core/output"
-	sqlcgen "github.com/six2dez/reconftw/internal/store/sqlc"
+	"github.com/six2dez/reconftw/v5/internal/core/config"
+	"github.com/six2dez/reconftw/v5/internal/core/output"
+	sqlcgen "github.com/six2dez/reconftw/v5/internal/store/sqlc"
 )
 
 // dryRunPathPrefix is the stable per-path prefix printed by

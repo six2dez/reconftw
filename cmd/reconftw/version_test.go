@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/six2dez/reconftw/internal/core/config"
+	"github.com/six2dez/reconftw/v5/internal/core/config"
 )
 
 // Test 1 (D-04): newVersionCmd prints version + commit + built + go version + platform.

@@ -23,7 +23,7 @@ package config
 import (
 	"io"
 
-	"github.com/six2dez/reconftw/internal/core/log"
+	"github.com/six2dez/reconftw/v5/internal/core/log"
 )
 
 // Config is the root configuration struct mirroring ADR §2.2 verbatim. Every

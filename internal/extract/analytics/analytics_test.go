@@ -7,7 +7,7 @@ package analytics_test
 import (
 	"testing"
 
-	"github.com/six2dez/reconftw/internal/extract/analytics"
+	"github.com/six2dez/reconftw/v5/internal/extract/analytics"
 )
 
 // sampleAnalyticsOutput is representative analyticsrelationships output.

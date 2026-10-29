@@ -20,8 +20,8 @@ import (
 	"path/filepath"
 	"sort"
 
-	"github.com/six2dez/reconftw/internal/core/appctx"
-	"github.com/six2dez/reconftw/internal/core/output"
+	"github.com/six2dez/reconftw/v5/internal/core/appctx"
+	"github.com/six2dez/reconftw/v5/internal/core/output"
 )
 
 // MergeVulnsFindings reads all inputs/<stage>.*.jsonl staging files written by

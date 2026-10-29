@@ -66,8 +66,8 @@ import (
 
 	_ "modernc.org/sqlite" // driver registration
 
-	"github.com/six2dez/reconftw/internal/core/notifier"
-	sqlcgen "github.com/six2dez/reconftw/internal/store/sqlc"
+	"github.com/six2dez/reconftw/v5/internal/core/notifier"
+	sqlcgen "github.com/six2dez/reconftw/v5/internal/store/sqlc"
 )
 
 const (

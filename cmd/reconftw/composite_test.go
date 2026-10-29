@@ -20,9 +20,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/six2dez/reconftw/internal/core/backend"
-	coreerrs "github.com/six2dez/reconftw/internal/core/errors"
-	"github.com/six2dez/reconftw/internal/mcp/handlers"
+	"github.com/six2dez/reconftw/v5/internal/core/backend"
+	coreerrs "github.com/six2dez/reconftw/v5/internal/core/errors"
+	"github.com/six2dez/reconftw/v5/internal/mcp/handlers"
 )
 
 // TestReconPipelineOrder verifies that ModeRecon includes subs + web + osint

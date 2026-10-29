@@ -19,7 +19,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/six2dez/reconftw/internal/core/output"
+	"github.com/six2dez/reconftw/v5/internal/core/output"
 )
 
 // RenderManifestName is the per-render manifest written inside the scan's

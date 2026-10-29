@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/six2dez/reconftw/internal/core/output"
+	"github.com/six2dez/reconftw/v5/internal/core/output"
 )
 
 // Test 12: WriteManifest writes JSON with the ADR §3.3 schema.

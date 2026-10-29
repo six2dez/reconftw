@@ -27,7 +27,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/six2dez/reconftw/internal/core/log"
+	"github.com/six2dez/reconftw/v5/internal/core/log"
 )
 
 // RegisterResources adds the scan://{runID}/findings resource template to srv.

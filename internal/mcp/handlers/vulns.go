@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/six2dez/reconftw/internal/core/task"
-	"github.com/six2dez/reconftw/internal/modules/vulns"
+	"github.com/six2dez/reconftw/v5/internal/core/task"
+	"github.com/six2dez/reconftw/v5/internal/modules/vulns"
 )
 
 // RunVulnsAsync executes the full vulnerability scanning pipeline.

@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/six2dez/reconftw/internal/core/checkpoint"
+	"github.com/six2dez/reconftw/v5/internal/core/checkpoint"
 )
 
 // Test 9: InputHash is deterministic — same inputs → same output.

@@ -16,7 +16,7 @@ import (
 
 	stderrors "errors"
 
-	coreerrors "github.com/six2dez/reconftw/internal/core/errors"
+	coreerrors "github.com/six2dez/reconftw/v5/internal/core/errors"
 )
 
 // asAxiom is errors.As, named so the assertion above reads as the question it asks.

@@ -18,7 +18,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/six2dez/reconftw/internal/core/output"
+	"github.com/six2dez/reconftw/v5/internal/core/output"
 )
 
 // ErrOutOfScope is the sentinel error returned by CheckScope and

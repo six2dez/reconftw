@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/six2dez/reconftw/internal/core/report"
+	"github.com/six2dez/reconftw/v5/internal/core/report"
 )
 
 // TestWriteNotesJSONL_FileExists verifies that WriteNotesJSONL creates the

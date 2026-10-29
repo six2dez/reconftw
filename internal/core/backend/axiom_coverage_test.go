@@ -18,7 +18,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/six2dez/reconftw/internal/core/backend"
+	"github.com/six2dez/reconftw/v5/internal/core/backend"
 )
 
 // v1ModuleRe matches an axiom-scan `-m <module>` in the bash tree.

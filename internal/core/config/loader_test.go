@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/six2dez/reconftw/internal/core/config"
-	coreerrors "github.com/six2dez/reconftw/internal/core/errors"
+	"github.com/six2dez/reconftw/v5/internal/core/config"
+	coreerrors "github.com/six2dez/reconftw/v5/internal/core/errors"
 )
 
 // helper: copy a fixture TOML into a temp file so the loader can read it

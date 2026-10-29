@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	mcp "github.com/six2dez/reconftw/internal/mcp"
+	mcp "github.com/six2dez/reconftw/v5/internal/mcp"
 )
 
 func TestSessionScope_Contains(t *testing.T) {

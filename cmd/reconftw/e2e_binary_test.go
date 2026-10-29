@@ -19,7 +19,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/six2dez/reconftw/internal/core/output"
+	"github.com/six2dez/reconftw/v5/internal/core/output"
 )
 
 // buildBinary compiles the CLI once for the whole file.

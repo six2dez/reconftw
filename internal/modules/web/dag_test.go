@@ -21,10 +21,10 @@ package web_test
 import (
 	"testing"
 
-	"github.com/six2dez/reconftw/internal/core/task"
+	"github.com/six2dez/reconftw/v5/internal/core/task"
 
 	// Blank import triggers init() Task registrations for every web Task.
-	_ "github.com/six2dez/reconftw/internal/modules/web"
+	_ "github.com/six2dez/reconftw/v5/internal/modules/web"
 )
 
 // TestWebDAGBuilds is the cheapest durable guard against a DependsOn cycle or a

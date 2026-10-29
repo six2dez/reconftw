@@ -16,7 +16,7 @@ import (
 	"os"
 	"path/filepath"
 
-	coreerrors "github.com/six2dez/reconftw/internal/core/errors"
+	coreerrors "github.com/six2dez/reconftw/v5/internal/core/errors"
 )
 
 // OutputTree is the canonical write-path object for an active workspace.

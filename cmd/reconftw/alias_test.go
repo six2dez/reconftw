@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/six2dez/reconftw/internal/core/config"
+	"github.com/six2dez/reconftw/v5/internal/core/config"
 )
 
 // TestTranslateV1Args is the primary table-driven test covering all 13+ behavior

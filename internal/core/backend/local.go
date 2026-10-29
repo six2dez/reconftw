@@ -31,7 +31,7 @@ import (
 	"syscall"
 	"time"
 
-	coreerrors "github.com/six2dez/reconftw/internal/core/errors"
+	coreerrors "github.com/six2dez/reconftw/v5/internal/core/errors"
 )
 
 // stderrCap bounds the size of ToolError.Stderr per ADR §6 line 1806. W9 — explicit.

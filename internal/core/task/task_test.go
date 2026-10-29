@@ -13,9 +13,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/six2dez/reconftw/internal/core/appctx"
-	"github.com/six2dez/reconftw/internal/core/config"
-	"github.com/six2dez/reconftw/internal/core/task"
+	"github.com/six2dez/reconftw/v5/internal/core/appctx"
+	"github.com/six2dez/reconftw/v5/internal/core/config"
+	"github.com/six2dez/reconftw/v5/internal/core/task"
 )
 
 // fakeTask is a minimal task.Task implementation used as a compile-time
@@ -88,10 +88,10 @@ func TestInterfacesCheckSignaturesMatch(t *testing.T) {
 	src := collapseWhitespace(string(body))
 	want := []string{
 		// Plan 07 Task 3 — real-package imports (BINDING gate).
-		`"github.com/six2dez/reconftw/internal/core/task"`,
-		`"github.com/six2dez/reconftw/internal/core/backend"`,
-		`"github.com/six2dez/reconftw/internal/core/appctx"`,
-		`"github.com/six2dez/reconftw/internal/core/config"`,
+		`"github.com/six2dez/reconftw/v5/internal/core/task"`,
+		`"github.com/six2dez/reconftw/v5/internal/core/backend"`,
+		`"github.com/six2dez/reconftw/v5/internal/core/appctx"`,
+		`"github.com/six2dez/reconftw/v5/internal/core/config"`,
 		// Compile-time assertions on Task (ADR §5.1) + Backend (§5.2)
 		// + SchedulerRunner (Plan 05 cycle-break). LifecycleAware is gone:
 		// it had no implementer and the Scheduler invoked it with a nil app.

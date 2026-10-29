@@ -8,8 +8,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/six2dez/reconftw/internal/core/output"
-	"github.com/six2dez/reconftw/internal/core/testutil"
+	"github.com/six2dez/reconftw/v5/internal/core/output"
+	"github.com/six2dez/reconftw/v5/internal/core/testutil"
 )
 
 // Test 16 (interface satisfaction): MockOutputTree satisfies output.Interface.

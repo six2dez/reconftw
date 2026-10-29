@@ -8,10 +8,10 @@
 //
 // Phase 4-7 plans add lines here when their first module port lands:
 //
-//	_ "github.com/six2dez/reconftw/internal/modules/subdomains"   // Phase 4 ✓
-//	_ "github.com/six2dez/reconftw/internal/modules/web"          // Phase 5
-//	_ "github.com/six2dez/reconftw/internal/modules/vulns"        // Phase 6
-//	_ "github.com/six2dez/reconftw/internal/modules/osint"        // Phase 7
+//	_ "github.com/six2dez/reconftw/v5/internal/modules/subdomains"   // Phase 4 ✓
+//	_ "github.com/six2dez/reconftw/v5/internal/modules/web"          // Phase 5
+//	_ "github.com/six2dez/reconftw/v5/internal/modules/vulns"        // Phase 6
+//	_ "github.com/six2dez/reconftw/v5/internal/modules/osint"        // Phase 7
 
 package main
 
@@ -19,17 +19,17 @@ import (
 	// Phase 4 subdomains passive Tasks — triggers task.Register for
 	// SubfinderTask, CrtTask, GithubSubdomainsTask, GitlabSubdomainsTask,
 	// UrlfinderTask via passive.go init() calls.
-	_ "github.com/six2dez/reconftw/internal/modules/subdomains"
+	_ "github.com/six2dez/reconftw/v5/internal/modules/subdomains"
 
 	// Phase 5 web Tasks — triggers task.Register for HTTPXTask via
 	// internal/modules/web/httpx.go init() call.
-	_ "github.com/six2dez/reconftw/internal/modules/web"
+	_ "github.com/six2dez/reconftw/v5/internal/modules/web"
 
 	// Phase 6 vulns Tasks — triggers task.Register for GFTask and all vuln
 	// scanner Tasks (plan-07+) via internal/modules/vulns/ init() calls.
-	_ "github.com/six2dez/reconftw/internal/modules/vulns"
+	_ "github.com/six2dez/reconftw/v5/internal/modules/vulns"
 
 	// Phase 7 osint Tasks — triggers task.Register for all osint scanner Tasks
 	// (Wave 2 plans) via internal/modules/osint/ init() calls.
-	_ "github.com/six2dez/reconftw/internal/modules/osint"
+	_ "github.com/six2dez/reconftw/v5/internal/modules/osint"
 )

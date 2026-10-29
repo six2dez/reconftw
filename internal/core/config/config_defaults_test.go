@@ -11,8 +11,8 @@ import (
 	"log/slog"
 	"testing"
 
-	"github.com/six2dez/reconftw/internal/core/config"
-	"github.com/six2dez/reconftw/internal/core/log"
+	"github.com/six2dez/reconftw/v5/internal/core/config"
+	"github.com/six2dez/reconftw/v5/internal/core/log"
 )
 
 // --- Test 1: Zero-value Config compiles + has expected nested shape ---

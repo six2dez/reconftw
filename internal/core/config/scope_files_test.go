@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	coreerrors "github.com/six2dez/reconftw/internal/core/errors"
+	coreerrors "github.com/six2dez/reconftw/v5/internal/core/errors"
 )
 
 // TestValidateScopeFilesReadableWhenSet: subdomains.scope.include_file /

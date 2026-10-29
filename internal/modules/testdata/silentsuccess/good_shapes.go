@@ -16,7 +16,7 @@
 package silentsuccess
 
 import (
-	"github.com/six2dez/reconftw/internal/core/task"
+	"github.com/six2dez/reconftw/v5/internal/core/task"
 )
 
 // literalSkipOK — accepted shape 1: a Result literal with a non-Done status,

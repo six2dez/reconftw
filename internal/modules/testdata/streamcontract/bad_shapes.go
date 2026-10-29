@@ -21,7 +21,7 @@ package streamcontract
 import (
 	"os"
 
-	"github.com/six2dez/reconftw/internal/core/task"
+	"github.com/six2dez/reconftw/v5/internal/core/task"
 )
 
 // accumulatorAssignedNeverChecked — REJECTED. ev.Err is assigned and then

@@ -19,7 +19,7 @@ import (
 
 	"github.com/go-playground/validator/v10"
 
-	coreerrors "github.com/six2dez/reconftw/internal/core/errors"
+	coreerrors "github.com/six2dez/reconftw/v5/internal/core/errors"
 )
 
 // validate is the package-level validator instance with all custom rules

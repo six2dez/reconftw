@@ -11,8 +11,8 @@ import (
 	// guarantee: user-controlled finding titles cannot inject raw HTML.
 	"html/template"
 
-	"github.com/six2dez/reconftw/internal/core/output"
-	sqlcgen "github.com/six2dez/reconftw/internal/store/sqlc"
+	"github.com/six2dez/reconftw/v5/internal/core/output"
+	sqlcgen "github.com/six2dez/reconftw/v5/internal/store/sqlc"
 )
 
 // FindingRow is a template-safe representation of a finding for HTML rendering.

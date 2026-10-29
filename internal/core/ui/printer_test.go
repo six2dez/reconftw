@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/six2dez/reconftw/internal/core/ui"
+	"github.com/six2dez/reconftw/v5/internal/core/ui"
 )
 
 // Test 13: dot-fill format — [OK  ] task.name .......... 12s.

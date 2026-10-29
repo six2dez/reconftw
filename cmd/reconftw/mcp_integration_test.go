@@ -24,11 +24,11 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"golang.org/x/sync/semaphore"
 
-	corelog "github.com/six2dez/reconftw/internal/core/log"
-	mcpsrv "github.com/six2dez/reconftw/internal/mcp"
+	corelog "github.com/six2dez/reconftw/v5/internal/core/log"
+	mcpsrv "github.com/six2dez/reconftw/v5/internal/mcp"
 
-	"github.com/six2dez/reconftw/internal/core/config"
-	"github.com/six2dez/reconftw/internal/core/scheduler"
+	"github.com/six2dez/reconftw/v5/internal/core/config"
+	"github.com/six2dez/reconftw/v5/internal/core/scheduler"
 )
 
 // buildTestMCPServer constructs a ready-to-use MCPServer with test credentials.

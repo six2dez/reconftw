@@ -23,7 +23,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/six2dez/reconftw/internal/core/appctx"
+	"github.com/six2dez/reconftw/v5/internal/core/appctx"
 )
 
 // TestCloudEnumExitSevenErrorsAndDoesNotPublish is gate 5 for the osint stream

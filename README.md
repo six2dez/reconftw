@@ -365,12 +365,19 @@ make build                 # → bin/reconftw, stamped with `git describe`
 sudo install -m 755 bin/reconftw /usr/local/bin/reconftw
 ```
 
-`go install github.com/six2dez/reconftw/cmd/reconftw@latest` does **not** give
-you v2: the module path in `go.mod` carries no `/v5` suffix, so Go resolves
-`@latest` to the last `v4.x` tag (`+incompatible`) and never to a `v5` tag.
-Whether the module path becomes `…/reconftw/v5` is an open decision for the
-first stable release (see [MIGRATION.md](MIGRATION.md) §0); until then, clone
-and build.
+### With `go install`
+
+```bash
+go install github.com/six2dez/reconftw/v5/cmd/reconftw@latest
+```
+
+The module path is `github.com/six2dez/reconftw/v5`, so this works once
+`v5.0.0` is tagged and published; before that, `@latest` has no `/v5` release to
+resolve to (the `v5.0.0-beta.N` tags predate the `/v5` path), so use the
+release archive, the Docker tag or the clone-and-build steps above. `go install`
+builds without the version ldflags, so `reconftw version` prints `dev` instead
+of the tag; use a release archive or `make build` if you need the stamped
+version.
 
 ---
 

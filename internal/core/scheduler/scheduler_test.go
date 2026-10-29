@@ -12,11 +12,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/six2dez/reconftw/internal/core/appctx"
-	"github.com/six2dez/reconftw/internal/core/checkpoint"
-	"github.com/six2dez/reconftw/internal/core/config"
-	"github.com/six2dez/reconftw/internal/core/scheduler"
-	"github.com/six2dez/reconftw/internal/core/task"
+	"github.com/six2dez/reconftw/v5/internal/core/appctx"
+	"github.com/six2dez/reconftw/v5/internal/core/checkpoint"
+	"github.com/six2dez/reconftw/v5/internal/core/config"
+	"github.com/six2dez/reconftw/v5/internal/core/scheduler"
+	"github.com/six2dez/reconftw/v5/internal/core/task"
 )
 
 // stubCheckpoint is the test double satisfying checkpoint.Interface. In-

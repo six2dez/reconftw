@@ -16,8 +16,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/six2dez/reconftw/internal/core/ingest"
-	"github.com/six2dez/reconftw/internal/core/report"
+	"github.com/six2dez/reconftw/v5/internal/core/ingest"
+	"github.com/six2dez/reconftw/v5/internal/core/report"
 
 	_ "modernc.org/sqlite"
 )

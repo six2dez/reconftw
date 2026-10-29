@@ -16,7 +16,7 @@ import (
 	"strings"
 	"time"
 
-	coreerrors "github.com/six2dez/reconftw/internal/core/errors"
+	coreerrors "github.com/six2dez/reconftw/v5/internal/core/errors"
 )
 
 // --- Bootstrapper SHA-256 pins (INST-03 / INST-09 / XCUT-08) ---

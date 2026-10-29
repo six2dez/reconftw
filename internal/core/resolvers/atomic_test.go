@@ -19,8 +19,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/six2dez/reconftw/internal/core/config"
-	"github.com/six2dez/reconftw/internal/core/resolvers"
+	"github.com/six2dez/reconftw/v5/internal/core/config"
+	"github.com/six2dez/reconftw/v5/internal/core/resolvers"
 )
 
 // goodList is what a working resolver list looks like on disk.

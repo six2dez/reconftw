@@ -19,7 +19,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/six2dez/reconftw/internal/core/backend"
+	"github.com/six2dez/reconftw/v5/internal/core/backend"
 )
 
 // childDead returns true when syscall.Kill(pid, 0) returns ESRCH — the kernel

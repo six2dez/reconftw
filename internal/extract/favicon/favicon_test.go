@@ -7,7 +7,7 @@ package favicon_test
 import (
 	"testing"
 
-	"github.com/six2dez/reconftw/internal/extract/favicon"
+	"github.com/six2dez/reconftw/v5/internal/extract/favicon"
 )
 
 // Sample favirecon output: one line per match, format "hash subdomain"

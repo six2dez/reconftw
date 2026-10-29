@@ -22,7 +22,7 @@
 package silentsuccess
 
 import (
-	"github.com/six2dez/reconftw/internal/core/task"
+	"github.com/six2dez/reconftw/v5/internal/core/task"
 )
 
 // statusDoneBad breaks the STATUS rule only: the failure is announced at WARN,

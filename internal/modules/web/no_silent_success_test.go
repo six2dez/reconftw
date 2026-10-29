@@ -18,7 +18,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/six2dez/reconftw/internal/core/task"
+	"github.com/six2dez/reconftw/v5/internal/core/task"
 )
 
 // TestHTTPXTotalParseFailureIsNotOK is the 2026-08-21 root cause replayed.

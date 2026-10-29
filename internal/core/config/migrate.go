@@ -36,7 +36,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/six2dez/reconftw/internal/core/output"
+	"github.com/six2dez/reconftw/v5/internal/core/output"
 )
 
 // DispositionCase is the D-02 three-way classification of a single v1 key.

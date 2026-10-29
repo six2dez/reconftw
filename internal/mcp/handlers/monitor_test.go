@@ -18,11 +18,11 @@ import (
 
 	_ "modernc.org/sqlite" // driver registration for the diff-store test
 
-	"github.com/six2dez/reconftw/internal/core/ingest"
-	"github.com/six2dez/reconftw/internal/core/notifier"
-	"github.com/six2dez/reconftw/internal/core/output"
-	"github.com/six2dez/reconftw/internal/mcp/handlers"
-	sqlcgen "github.com/six2dez/reconftw/internal/store/sqlc"
+	"github.com/six2dez/reconftw/v5/internal/core/ingest"
+	"github.com/six2dez/reconftw/v5/internal/core/notifier"
+	"github.com/six2dez/reconftw/v5/internal/core/output"
+	"github.com/six2dez/reconftw/v5/internal/mcp/handlers"
+	sqlcgen "github.com/six2dez/reconftw/v5/internal/store/sqlc"
 )
 
 // instantWait is the loop's wait replaced by a no-op, so tests never sleep for a

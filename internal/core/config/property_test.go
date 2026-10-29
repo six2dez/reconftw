@@ -10,9 +10,9 @@ import (
 	stderrors "errors"
 	"testing"
 
-	"github.com/six2dez/reconftw/internal/core/config"
-	coreerrors "github.com/six2dez/reconftw/internal/core/errors"
-	"github.com/six2dez/reconftw/internal/core/log"
+	"github.com/six2dez/reconftw/v5/internal/core/config"
+	coreerrors "github.com/six2dez/reconftw/v5/internal/core/errors"
+	"github.com/six2dez/reconftw/v5/internal/core/log"
 	"pgregory.net/rapid"
 )
 

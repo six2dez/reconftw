@@ -6,7 +6,7 @@ package report
 import (
 	"path/filepath"
 
-	"github.com/six2dez/reconftw/internal/core/output"
+	"github.com/six2dez/reconftw/v5/internal/core/output"
 )
 
 // WriteNotesJSONL creates the canonical notes.jsonl artefact required by REPORT-01.

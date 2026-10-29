@@ -15,12 +15,12 @@ import (
 
 	_ "modernc.org/sqlite"
 
-	"github.com/six2dez/reconftw/internal/extract/urls"
-	"github.com/six2dez/reconftw/internal/modules/osint"
-	"github.com/six2dez/reconftw/internal/modules/subdomains"
-	"github.com/six2dez/reconftw/internal/modules/vulns"
-	"github.com/six2dez/reconftw/internal/modules/web"
-	sqlcgen "github.com/six2dez/reconftw/internal/store/sqlc"
+	"github.com/six2dez/reconftw/v5/internal/extract/urls"
+	"github.com/six2dez/reconftw/v5/internal/modules/osint"
+	"github.com/six2dez/reconftw/v5/internal/modules/subdomains"
+	"github.com/six2dez/reconftw/v5/internal/modules/vulns"
+	"github.com/six2dez/reconftw/v5/internal/modules/web"
+	sqlcgen "github.com/six2dez/reconftw/v5/internal/store/sqlc"
 )
 
 // writeArtefact writes lines to <workDir>/artefacts/<name>.

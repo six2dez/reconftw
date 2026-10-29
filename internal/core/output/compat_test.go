@@ -11,7 +11,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/six2dez/reconftw/internal/core/output"
+	"github.com/six2dez/reconftw/v5/internal/core/output"
 )
 
 // Test 1: AtomicSymlink creates link → target.

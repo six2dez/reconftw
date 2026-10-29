@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/six2dez/reconftw/internal/core/task"
+	"github.com/six2dez/reconftw/v5/internal/core/task"
 )
 
 func TestProducedIsDoneWithNoReason(t *testing.T) {

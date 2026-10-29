@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/six2dez/reconftw/internal/core/task"
-	"github.com/six2dez/reconftw/internal/modules/osint"
+	"github.com/six2dez/reconftw/v5/internal/core/task"
+	"github.com/six2dez/reconftw/v5/internal/modules/osint"
 )
 
 // osintStageSpec is the per-stage descriptor for the OSINT pipeline.

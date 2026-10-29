@@ -18,10 +18,10 @@ package vulns_test
 import (
 	"testing"
 
-	"github.com/six2dez/reconftw/internal/core/task"
+	"github.com/six2dez/reconftw/v5/internal/core/task"
 
 	// Blank import triggers init() Task registrations for every vulns Task.
-	_ "github.com/six2dez/reconftw/internal/modules/vulns"
+	_ "github.com/six2dez/reconftw/v5/internal/modules/vulns"
 )
 
 // TestVulnsDAGBuilds is the cheapest durable guard against a DependsOn cycle

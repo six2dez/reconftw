@@ -38,7 +38,7 @@ import (
 	tomlv2 "github.com/pelletier/go-toml/v2"
 	"golang.org/x/tools/go/packages"
 
-	"github.com/six2dez/reconftw/internal/core/backend/lint"
+	"github.com/six2dez/reconftw/v5/internal/core/backend/lint"
 )
 
 // -----------------------------------------------------------------------------

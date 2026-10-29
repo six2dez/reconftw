@@ -22,10 +22,10 @@ package osint_test
 import (
 	"testing"
 
-	"github.com/six2dez/reconftw/internal/core/task"
+	"github.com/six2dez/reconftw/v5/internal/core/task"
 
 	// Blank import triggers init() Task registrations for every osint Task.
-	_ "github.com/six2dez/reconftw/internal/modules/osint"
+	_ "github.com/six2dez/reconftw/v5/internal/modules/osint"
 )
 
 // allOSINTTaskNames lists every Task the osint package registers via init().

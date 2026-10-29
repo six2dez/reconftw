@@ -19,8 +19,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/six2dez/reconftw/internal/core/ingest"
-	"github.com/six2dez/reconftw/internal/modules/subdomains"
+	"github.com/six2dez/reconftw/v5/internal/core/ingest"
+	"github.com/six2dez/reconftw/v5/internal/modules/subdomains"
 
 	_ "modernc.org/sqlite"
 )

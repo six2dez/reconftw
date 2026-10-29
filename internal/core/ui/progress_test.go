@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/six2dez/reconftw/internal/core/ui"
+	"github.com/six2dez/reconftw/v5/internal/core/ui"
 )
 
 // TestStageProgress_NonTTY_PlainText verifies that a non-TTY writer (bytes.Buffer)

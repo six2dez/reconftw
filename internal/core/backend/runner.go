@@ -21,7 +21,7 @@ import (
 	stderrors "errors"
 	"time"
 
-	coreerrors "github.com/six2dez/reconftw/internal/core/errors"
+	coreerrors "github.com/six2dez/reconftw/v5/internal/core/errors"
 )
 
 // ErrToolNotRegistered is the Inner of the *ToolError Run/Stream return when

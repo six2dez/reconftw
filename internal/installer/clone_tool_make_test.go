@@ -6,7 +6,7 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/six2dez/reconftw/internal/core/backend"
+	"github.com/six2dez/reconftw/v5/internal/core/backend"
 )
 
 // The make_clone kind exists because dnscewl's upstream is a C++ Makefile

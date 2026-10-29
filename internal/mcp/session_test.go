@@ -5,7 +5,7 @@ import (
 	"sync"
 	"testing"
 
-	mcp "github.com/six2dez/reconftw/internal/mcp"
+	mcp "github.com/six2dez/reconftw/v5/internal/mcp"
 )
 
 func TestSessionRegistry(t *testing.T) {

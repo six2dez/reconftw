@@ -17,7 +17,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/six2dez/reconftw/internal/core/backend"
+	"github.com/six2dez/reconftw/v5/internal/core/backend"
 )
 
 // recordingRegistrar captures what a task registers, and when relative to

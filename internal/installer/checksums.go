@@ -29,7 +29,7 @@ package installer
 import (
 	"fmt"
 
-	coreerrors "github.com/six2dez/reconftw/internal/core/errors"
+	coreerrors "github.com/six2dez/reconftw/v5/internal/core/errors"
 )
 
 // --- pinned versions -------------------------------------------------------

@@ -21,8 +21,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/six2dez/reconftw/internal/mcp/handlers"
-	"github.com/six2dez/reconftw/internal/modules/subdomains"
+	"github.com/six2dez/reconftw/v5/internal/mcp/handlers"
+	"github.com/six2dez/reconftw/v5/internal/modules/subdomains"
 )
 
 // TestIncrementalSeed_ReachesSubdomainsViaMergeStage is the key non-circular

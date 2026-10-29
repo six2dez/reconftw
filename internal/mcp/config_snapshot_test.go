@@ -26,13 +26,13 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	corelog "github.com/six2dez/reconftw/internal/core/log"
+	corelog "github.com/six2dez/reconftw/v5/internal/core/log"
 
-	"github.com/six2dez/reconftw/internal/core/config"
-	"github.com/six2dez/reconftw/internal/core/ingest"
-	"github.com/six2dez/reconftw/internal/core/output"
-	"github.com/six2dez/reconftw/internal/core/scheduler"
-	"github.com/six2dez/reconftw/internal/mcp/handlers"
+	"github.com/six2dez/reconftw/v5/internal/core/config"
+	"github.com/six2dez/reconftw/v5/internal/core/ingest"
+	"github.com/six2dez/reconftw/v5/internal/core/output"
+	"github.com/six2dez/reconftw/v5/internal/core/scheduler"
+	"github.com/six2dez/reconftw/v5/internal/mcp/handlers"
 )
 
 // writeTestConfig writes a minimal but VALID reconftw.toml whose data_dir is

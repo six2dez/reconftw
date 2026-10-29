@@ -23,11 +23,11 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/six2dez/reconftw/internal/core/appctx"
-	"github.com/six2dez/reconftw/internal/core/backend"
-	"github.com/six2dez/reconftw/internal/core/config"
-	corelog "github.com/six2dez/reconftw/internal/core/log"
-	"github.com/six2dez/reconftw/internal/core/task"
+	"github.com/six2dez/reconftw/v5/internal/core/appctx"
+	"github.com/six2dez/reconftw/v5/internal/core/backend"
+	"github.com/six2dez/reconftw/v5/internal/core/config"
+	corelog "github.com/six2dez/reconftw/v5/internal/core/log"
+	"github.com/six2dez/reconftw/v5/internal/core/task"
 )
 
 // fakeWhoisKey is a clearly-synthetic WHOISXML API key (non-AWS/private-key

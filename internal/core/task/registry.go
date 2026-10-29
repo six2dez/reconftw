@@ -30,7 +30,7 @@ func NewRegistry() *Registry {
 // Default is the process-singleton Task registry. Module packages register
 // via blank-imported package init():
 //
-//	import _ "github.com/six2dez/reconftw/internal/modules/subdomains"
+//	import _ "github.com/six2dez/reconftw/v5/internal/modules/subdomains"
 //
 // where subdomains/init.go contains:
 //

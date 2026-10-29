@@ -10,7 +10,7 @@
 //
 //	import (
 //	    stderrors "errors"
-//	    errs "github.com/six2dez/reconftw/internal/core/errors"
+//	    errs "github.com/six2dez/reconftw/v5/internal/core/errors"
 //	)
 //
 // Source: ADR 0002 §6 (BINDING — lines 1771-1898).

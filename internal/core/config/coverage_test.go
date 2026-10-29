@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/six2dez/reconftw/internal/core/config"
-	coreerrors "github.com/six2dez/reconftw/internal/core/errors"
+	"github.com/six2dez/reconftw/v5/internal/core/config"
+	coreerrors "github.com/six2dez/reconftw/v5/internal/core/errors"
 )
 
 // Drives parseLogLevel via the AsLoggerConfig adapter — every level case +

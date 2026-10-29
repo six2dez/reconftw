@@ -8,7 +8,7 @@ package checkpoint_test
 import (
 	"testing"
 
-	"github.com/six2dez/reconftw/internal/core/checkpoint"
+	"github.com/six2dez/reconftw/v5/internal/core/checkpoint"
 )
 
 // TestCheckpointInterfaceShape exists primarily as a compile-time gate.

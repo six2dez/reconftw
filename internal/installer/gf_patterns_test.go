@@ -14,7 +14,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/six2dez/reconftw/internal/core/backend"
+	"github.com/six2dez/reconftw/v5/internal/core/backend"
 )
 
 // swapGFPatternDir points gfPatternDir at a temp dir for the duration of a test

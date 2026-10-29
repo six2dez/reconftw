@@ -11,7 +11,7 @@ import (
 
 	"pgregory.net/rapid"
 
-	"github.com/six2dez/reconftw/internal/core/output"
+	"github.com/six2dez/reconftw/v5/internal/core/output"
 )
 
 // Test 6: positive wildcard match.

@@ -7,7 +7,7 @@ package output_test
 import (
 	"testing"
 
-	"github.com/six2dez/reconftw/internal/core/output"
+	"github.com/six2dez/reconftw/v5/internal/core/output"
 )
 
 func TestOutputInterfaceShape(t *testing.T) {

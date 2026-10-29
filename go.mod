@@ -1,4 +1,4 @@
-module github.com/six2dez/reconftw
+module github.com/six2dez/reconftw/v5
 
 // 1.26.6 is the floor because there is no longer a patched 1.25.
 //

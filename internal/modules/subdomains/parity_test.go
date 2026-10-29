@@ -45,13 +45,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/six2dez/reconftw/internal/core/appctx"
-	"github.com/six2dez/reconftw/internal/core/backend"
-	"github.com/six2dez/reconftw/internal/core/config"
-	"github.com/six2dez/reconftw/internal/core/testutil"
-	"github.com/six2dez/reconftw/internal/modules/subdomains"
+	"github.com/six2dez/reconftw/v5/internal/core/appctx"
+	"github.com/six2dez/reconftw/v5/internal/core/backend"
+	"github.com/six2dez/reconftw/v5/internal/core/config"
+	"github.com/six2dez/reconftw/v5/internal/core/testutil"
+	"github.com/six2dez/reconftw/v5/internal/modules/subdomains"
 
-	_ "github.com/six2dez/reconftw/internal/modules/subdomains"
+	_ "github.com/six2dez/reconftw/v5/internal/modules/subdomains"
 )
 
 // skipLiveRun gates TestLiveSignoff — set PARITY_LIVE=1 to run it manually.

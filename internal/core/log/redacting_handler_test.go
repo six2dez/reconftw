@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	log "github.com/six2dez/reconftw/internal/core/log"
+	log "github.com/six2dez/reconftw/v5/internal/core/log"
 )
 
 func newTestHandler() (*log.RedactingHandler, *log.Redactor, *bytes.Buffer) {

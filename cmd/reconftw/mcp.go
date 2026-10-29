@@ -26,10 +26,10 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/sync/semaphore"
 
-	"github.com/six2dez/reconftw/internal/core/config"
-	"github.com/six2dez/reconftw/internal/core/log"
-	"github.com/six2dez/reconftw/internal/core/scheduler"
-	mcplib "github.com/six2dez/reconftw/internal/mcp"
+	"github.com/six2dez/reconftw/v5/internal/core/config"
+	"github.com/six2dez/reconftw/v5/internal/core/log"
+	"github.com/six2dez/reconftw/v5/internal/core/scheduler"
+	mcplib "github.com/six2dez/reconftw/v5/internal/mcp"
 )
 
 // newMCPCmd returns the cobra "mcp" subcommand with a "serve" sub-subcommand.

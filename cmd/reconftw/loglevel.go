@@ -32,8 +32,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/six2dez/reconftw/internal/core/config"
-	"github.com/six2dez/reconftw/internal/core/log"
+	"github.com/six2dez/reconftw/v5/internal/core/config"
+	"github.com/six2dez/reconftw/v5/internal/core/log"
 )
 
 // cliLogLevel is the operator-requested level ("" when no flag was supplied).

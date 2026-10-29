@@ -16,8 +16,8 @@ import (
 	"strings"
 	"testing"
 
-	corelog "github.com/six2dez/reconftw/internal/core/log"
-	"github.com/six2dez/reconftw/internal/core/notifier"
+	corelog "github.com/six2dez/reconftw/v5/internal/core/log"
+	"github.com/six2dez/reconftw/v5/internal/core/notifier"
 )
 
 // helper: build a slog.Logger writing to buf, with the same

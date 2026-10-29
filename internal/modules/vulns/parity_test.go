@@ -28,7 +28,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/six2dez/reconftw/internal/core/config"
+	"github.com/six2dez/reconftw/v5/internal/core/config"
 )
 
 // vulnsParitySkip checks the first non-empty line of fixtureBytes:

@@ -20,13 +20,13 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/six2dez/reconftw/internal/core/appctx"
-	"github.com/six2dez/reconftw/internal/core/backend"
-	"github.com/six2dez/reconftw/internal/core/task"
-	"github.com/six2dez/reconftw/internal/modules/osint"
-	"github.com/six2dez/reconftw/internal/modules/subdomains"
-	"github.com/six2dez/reconftw/internal/modules/vulns"
-	"github.com/six2dez/reconftw/internal/modules/web"
+	"github.com/six2dez/reconftw/v5/internal/core/appctx"
+	"github.com/six2dez/reconftw/v5/internal/core/backend"
+	"github.com/six2dez/reconftw/v5/internal/core/task"
+	"github.com/six2dez/reconftw/v5/internal/modules/osint"
+	"github.com/six2dez/reconftw/v5/internal/modules/subdomains"
+	"github.com/six2dez/reconftw/v5/internal/modules/vulns"
+	"github.com/six2dez/reconftw/v5/internal/modules/web"
 )
 
 // CompositeMode defines which pipelines RunCompositeAsync executes.

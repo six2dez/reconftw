@@ -23,9 +23,9 @@ import (
 	stderrors "errors"
 	"time"
 
-	"github.com/six2dez/reconftw/internal/core/appctx"
-	"github.com/six2dez/reconftw/internal/core/config"
-	coreerrors "github.com/six2dez/reconftw/internal/core/errors"
+	"github.com/six2dez/reconftw/v5/internal/core/appctx"
+	"github.com/six2dez/reconftw/v5/internal/core/config"
+	coreerrors "github.com/six2dez/reconftw/v5/internal/core/errors"
 )
 
 // Task is the smallest schedulable unit of recon work. Implementors live

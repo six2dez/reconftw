@@ -34,7 +34,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/six2dez/reconftw/internal/core/config"
+	"github.com/six2dez/reconftw/v5/internal/core/config"
 )
 
 // forbiddenRaw is the synthetic secret marker embedded in every secret-emitting

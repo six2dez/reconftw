@@ -24,9 +24,9 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	corelog "github.com/six2dez/reconftw/internal/core/log"
+	corelog "github.com/six2dez/reconftw/v5/internal/core/log"
 
-	"github.com/six2dez/reconftw/internal/mcp/handlers"
+	"github.com/six2dez/reconftw/v5/internal/mcp/handlers"
 )
 
 // setTerminalAtForTest backdates an entry's terminal timestamp so eviction
