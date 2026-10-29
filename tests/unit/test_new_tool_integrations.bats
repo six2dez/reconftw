@@ -18,6 +18,51 @@ setup() {
   mkdir -p "$MOCK_BIN"
   export PATH="$MOCK_BIN:$PATH"
 
+  # Default stubs for the plumbing tools every module pipes through. CI's unit
+  # job installs no recon tools, so without these a module silently writes
+  # nothing ("anew: command not found") and the artifact assertions fail.
+  # Tests that need different behaviour overwrite these files.
+  cat > "$MOCK_BIN/anew" <<'SH'
+#!/usr/bin/env bash
+quiet=false
+if [[ "${1:-}" == "-q" ]]; then
+  quiet=true
+  shift
+fi
+outfile="${1:-}"
+if [[ -z "$outfile" ]]; then
+  awk '!seen[$0]++'
+  exit 0
+fi
+mkdir -p "$(dirname "$outfile")"
+touch "$outfile"
+while IFS= read -r line || [[ -n "$line" ]]; do
+  [[ -z "$line" ]] && continue
+  if ! grep -Fxq -- "$line" "$outfile"; then
+    printf '%s\n' "$line" >> "$outfile"
+    [[ "$quiet" == true ]] || printf '%s\n' "$line"
+  fi
+done
+SH
+  cat > "$MOCK_BIN/qsreplace" <<'SH'
+#!/usr/bin/env bash
+# Replace every query-string value with $1 (default FUZZ), like qsreplace.
+value="${1:-FUZZ}"
+awk -v v="$value" '{
+  q = index($0, "?")
+  if (q == 0) { print; next }
+  base = substr($0, 1, q); qs = substr($0, q + 1)
+  n = split(qs, kv, "&"); out = ""
+  for (i = 1; i <= n; i++) {
+    e = index(kv[i], "=")
+    k = (e ? substr(kv[i], 1, e - 1) : kv[i])
+    out = out (i > 1 ? "&" : "") k "=" v
+  }
+  print base out
+}'
+SH
+  chmod +x "$MOCK_BIN/anew" "$MOCK_BIN/qsreplace"
+
   source "$project_root/reconftw.sh" --source-only
 
   export domain="target.example.com"
@@ -56,31 +101,21 @@ done
 SH
   chmod +x "$MOCK_BIN/anew"
 
-  cat > "$MOCK_BIN/interlace" <<'SH'
+  # lfi runs ffuf directly (argv-safe worker pool, no interlace -c): record
+  # each invocation's argv on its own line and emit one ffuf-style hit.
+  cat > "$MOCK_BIN/ffuf" <<'SH'
 #!/usr/bin/env bash
-raw_args="$*"
-input=""
+printf '%s\n' "$*" >> "$TEST_DIR/lfi_ffuf_calls.txt"
+url=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    -tL)
-      input="$2"
-      shift 2
-      ;;
-    -c)
-      printf '%s\n' "$2" > "$TEST_DIR/lfi_ffuf_cmd.txt"
-      shift 2
-      ;;
-    *)
-      shift
-      ;;
+    -u) url="$2"; shift 2 ;;
+    *) shift ;;
   esac
 done
-printf '%s\n' "$0 $raw_args" > "$TEST_DIR/lfi_interlace_args.txt"
-if [[ -n "$input" ]]; then
-  head -n 1 "$input" | sed 's/^/| URL | /'
-fi
+printf '| URL | %s\n' "$url"
 SH
-  chmod +x "$MOCK_BIN/interlace"
+  chmod +x "$MOCK_BIN/ffuf"
 
   export LFI=true
   export DEEP=false
@@ -88,7 +123,6 @@ SH
   export lfi_wordlist="$TEST_DIR/lfi_wordlist.txt"
   export HEADER="User-Agent: bats"
   export LFI_INTERLACE_THREADS=3
-  export LFI_INTERLACE_TIMEOUT=44
   export LFI_FFUF_THREADS=9
   export LFI_FFUF_RATELIMIT=77
   export LFI_FFUF_TIMEOUT=7
@@ -102,14 +136,17 @@ SH
   [ "$(wc -l < ".tmp/tmp_lfi.txt" | tr -d ' ')" -eq 2 ]
   grep -qx 'https://target.example.com/download?file=FUZZ&q=test' ".tmp/tmp_lfi.txt"
   grep -qx 'https://target.example.com/download?file=1&q=FUZZ' ".tmp/tmp_lfi.txt"
-  grep -q -- '-threads 3' "$TEST_DIR/lfi_interlace_args.txt"
-  grep -q -- '-timeout 44' "$TEST_DIR/lfi_interlace_args.txt"
-  grep -q -- '-noninteractive' "$TEST_DIR/lfi_ffuf_cmd.txt"
-  grep -q -- '-timeout 7' "$TEST_DIR/lfi_ffuf_cmd.txt"
-  grep -q -- '-maxtime 33' "$TEST_DIR/lfi_ffuf_cmd.txt"
-  grep -q -- '-rate 77' "$TEST_DIR/lfi_ffuf_cmd.txt"
-  ! grep -q -- ' -r ' "$TEST_DIR/lfi_ffuf_cmd.txt"
+  # One ffuf call per candidate, each carrying the explicit budgets.
+  [ "$(wc -l < "$TEST_DIR/lfi_ffuf_calls.txt" | tr -d ' ')" -eq 2 ]
+  [ "$(grep -c -- '-noninteractive' "$TEST_DIR/lfi_ffuf_calls.txt")" -eq 2 ]
+  [ "$(grep -c -- ' -t 9 ' "$TEST_DIR/lfi_ffuf_calls.txt")" -eq 2 ]
+  [ "$(grep -c -- '-timeout 7 ' "$TEST_DIR/lfi_ffuf_calls.txt")" -eq 2 ]
+  [ "$(grep -c -- '-maxtime 33 ' "$TEST_DIR/lfi_ffuf_calls.txt")" -eq 2 ]
+  [ "$(grep -c -- '-rate 77 ' "$TEST_DIR/lfi_ffuf_calls.txt")" -eq 2 ]
+  # LFI_FOLLOW_REDIRECTS=false: no -r flag anywhere.
+  [ "$(grep -c -- ' -r ' "$TEST_DIR/lfi_ffuf_calls.txt" || true)" -eq 0 ]
   [ -s "vulns/lfi.txt" ]
+  grep -qx 'https://target.example.com/download?file=FUZZ&q=test' "vulns/lfi.txt"
 }
 
 @test "ssti uses TInjA engine and writes compatible output" {
@@ -304,7 +341,7 @@ SH
   [ -s "webs/url_extract.txt" ]
   grep -q '^https://api.target.example.com/v1/users?first=1$' "webs/url_extract.txt"
   grep -q '^https://postman.target.example.com/path?token=1$' "webs/url_extract.txt"
-  ! grep -q 'outside.example.net' "webs/url_extract.txt"
+  ! grep -q 'outside.example.net' "webs/url_extract.txt" || false
   ! grep -q 'swagger.target.example.com' "webs/url_extract.txt"
 }
 
@@ -416,7 +453,7 @@ SH
   [ "$status" -eq 0 ]
   [ -s "webs/url_extract.txt" ]
   grep -q '^https://api.target.example.com/v1/users?id=1$' "webs/url_extract.txt"
-  ! grep -q 'outside.example.net' "webs/url_extract.txt"
+  ! grep -q 'outside.example.net' "webs/url_extract.txt" || false
   ! grep -q 'graphql.target.example.com' "webs/url_extract.txt"
 }
 
@@ -1579,10 +1616,12 @@ SH
 }
 
 @test "swagger_check runs sj automate and extracts accessible endpoints" {
-  mkdir -p webs .tmp vulns/swagger/automate
+  mkdir -p webs .tmp vulns/swagger/automate nuclei_output
 
-  printf '%s\n' 'https://target.example.com/swagger.json' > .tmp/swagger_urls_all.txt
-  printf '%s\n' 'https://target.example.com/swagger.json' > webs/swagger_urls.txt
+  # swagger_check truncates .tmp/swagger_urls_all.txt on entry, so the
+  # definition must arrive through a real Phase 2 source: a nuclei swagger-api hit.
+  printf '%s\n' '{"template-id":"swagger-api","matched-at":"https://target.example.com/swagger.json","info":{"severity":"info"}}' \
+    > nuclei_output/info_json.txt
 
   cat > "$MOCK_BIN/sj" <<'SH'
 #!/usr/bin/env bash

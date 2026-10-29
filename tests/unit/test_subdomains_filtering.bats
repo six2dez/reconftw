@@ -127,8 +127,8 @@ EOF
     [ -f "subdomains/subdomains.txt" ]
     grep -qx "api.example.com" "subdomains/subdomains.txt"
     grep -qx "example.com" "subdomains/subdomains.txt"
-    ! grep -qx "badexample.com" "subdomains/subdomains.txt"
-    ! grep -qx "foo.example.net" "subdomains/subdomains.txt"
+    ! grep -qx "badexample.com" "subdomains/subdomains.txt" || false
+    ! grep -qx "foo.example.net" "subdomains/subdomains.txt" || false
     [ "$(wc -l < "subdomains/subdomains.txt" | tr -d ' ')" -eq 2 ]
 }
 
@@ -139,7 +139,7 @@ EOF
     [ -f "subdomains/subdomains.txt" ]
     grep -qx "dev.example.com" "subdomains/subdomains.txt"
     grep -qx "example.com" "subdomains/subdomains.txt"
-    ! grep -qx "example.org" "subdomains/subdomains.txt"
+    ! grep -qx "example.org" "subdomains/subdomains.txt" || false
     [ "$(wc -l < "subdomains/subdomains.txt" | tr -d ' ')" -eq 2 ]
 }
 

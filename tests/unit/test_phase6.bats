@@ -9,6 +9,8 @@ setup() {
     export LOGFILE="/dev/null"
     export bred='' bblue='' bgreen='' byellow='' yellow='' reset=''
     source "$project_root/reconftw.sh" --source-only
+    # The incremental tests write relative paths: keep them out of the repo root.
+    cd "$BATS_TEST_TMPDIR"
 }
 
 @test "run_command executes command in normal mode" {
@@ -19,9 +21,13 @@ setup() {
 
 @test "run_command prints command in dry-run mode" {
     export DRY_RUN="true"
-    run run_command echo "hello"
+    # Dry-run commands are tracked by ui_dryrun_track and echoed only at verbosity >= 2.
+    export OUTPUT_VERBOSITY=2
+    local marker="$BATS_TEST_TMPDIR/dry_run_marker"
+    run run_command touch "$marker"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"[DRY-RUN] Would execute: echo hello"* ]]
+    [ ! -e "$marker" ]
+    [[ "$output" == *"[DRY-RUN]"*"touch $marker"* ]]
 }
 
 @test "incremental_init creates directory structure" {
@@ -44,7 +50,7 @@ setup() {
     
     run incremental_diff "test" "current.txt" "new.txt"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"Incremental mode test: 1 new"* ]]
+    [[ "$output" == *"test: 1 new (previous: 1, total: 2)"* ]]
     [ "$(cat new.txt)" = "item2" ]
     
     rm -rf "$INCREMENTAL_DIR" "current.txt" "new.txt"

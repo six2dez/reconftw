@@ -14,7 +14,8 @@ setup() {
   echo "[tpl-c] [http] [critical] https://a.$TEST_DOMAIN" > "$TARGET_DIR/nuclei_output/critical.txt"
 }
 
-after_each() {
+# bats has no after_each hook: teardown is what runs after every test.
+teardown() {
   rm -rf "$TARGET_DIR"
 }
 

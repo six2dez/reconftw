@@ -79,7 +79,7 @@ EOF
 
     [ "$status" -eq 0 ]
     grep -Fq 'from collections.abc import Mapping' "$COLORCLASS_CODES"
-    ! grep -Fq 'from collections import Mapping' "$COLORCLASS_CODES"
+    ! grep -Fq 'from collections import Mapping' "$COLORCLASS_CODES" || false
     [ ! -e "${COLORCLASS_CODES}.bak" ]
 }
 

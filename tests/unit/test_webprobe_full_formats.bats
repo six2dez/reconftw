@@ -65,7 +65,7 @@ SH
   [ -s "webs/webs.txt" ]
   grep -q "https://app.example.com" "webs/webs.txt"
   grep -q "http://api.example.com" "webs/webs.txt"
-  ! grep -q "edge.example.com:8443" "webs/webs.txt"
+  ! grep -q "edge.example.com:8443" "webs/webs.txt" || false
 
   [ -s "webs/webs_uncommon_ports.txt" ]
   grep -q "https://edge.example.com:8443" "webs/webs_uncommon_ports.txt"
@@ -73,7 +73,7 @@ SH
   [ -s "webs/web_full_info.txt" ]
   grep -q "\"port\":\"443\"" "webs/web_full_info.txt"
   grep -q "\"port\":\"80\"" "webs/web_full_info.txt"
-  ! grep -q "\"port\":\"8443\"" "webs/web_full_info.txt"
+  ! grep -q "\"port\":\"8443\"" "webs/web_full_info.txt" || false
 
   [ -s "webs/web_full_info_uncommon.txt" ]
   grep -q "\"port\":\"8443\"" "webs/web_full_info_uncommon.txt"

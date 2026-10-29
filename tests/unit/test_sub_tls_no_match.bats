@@ -60,6 +60,6 @@ teardown() {
   [ "$?" -eq 0 ]
 
   # Our trap should stay empty for this scenario (no-match is not an error).
-  ! grep -q '^ERR\\(' "$LOGFILE"
+  ! grep -q '^ERR\\(' "$LOGFILE" || false
   [ -f ".tmp/subdomains_tlsx_clean.txt" ]
 }

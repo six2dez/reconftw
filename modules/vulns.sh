@@ -446,7 +446,7 @@ function ssti() {
 
                     sstimap_cmd+=(--load-urls ".tmp/tmp_ssti.txt")
 
-                    if ! run_command "${sstimap_cmd[@]}" 2>>"$LOGFILE" | tee ".tmp/sstimap_raw.txt" | grep -i "confirmed\|identified" | grep -oP 'https?://[^\s]+' | anew -q ".tmp/ssti_candidates.txt"; then
+                    if ! run_command "${sstimap_cmd[@]}" 2>>"$LOGFILE" | tee ".tmp/sstimap_raw.txt" | grep -i "confirmed\|identified" | grep -oE 'https?://[^[:space:]]+' | anew -q ".tmp/ssti_candidates.txt"; then
                         log_note "ssti: SSTImap execution failed or no findings" "${FUNCNAME[0]}" "${LINENO}"
                     fi
                 else
