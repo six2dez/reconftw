@@ -19,7 +19,8 @@ setup() {
 
 @test "getElapsedTime calculates zero duration" {
     getElapsedTime 100 100
-    [ "$runtime" = "0 seconds" ]
+    # getElapsedTime always terminates the sentence with a period.
+    [ "$runtime" = "0 seconds." ]
 }
 
 @test "getElapsedTime calculates seconds" {
@@ -74,7 +75,9 @@ setup() {
     export FFUF_THREADS="abc"
     run validate_config
     [ "$status" -ne 0 ]
-    [[ "$output" == *"ERROR"* ]]
+    # validate_config reports errors as [FAIL] lines naming the variable.
+    [[ "$output" == *"FFUF_THREADS must be numeric, got: abc"* ]]
+    [[ "$output" == *"Configuration has 1 error(s)"* ]]
 }
 
 @test "validate_config fails on non-numeric AXIOM_FLEET_COUNT" {
@@ -195,7 +198,7 @@ setup() {
     export CHECKPOINT_DIR="$dir/.checkpoints"
     mkdir -p "$CHECKPOINT_DIR"
     
-    ! checkpoint_exists "missing_phase"
+    ! checkpoint_exists "missing_phase" || false
     
     rm -rf "$dir"
 }
@@ -328,8 +331,12 @@ EOF
         return 0
     }
 
-    run_module_with_axiom_failover fake_module
-    [ "$?" -eq 0 ]
+    # Production runs with errexit off (reconftw.sh: set +e); the first module
+    # call fails by design, so call the wrapper in a list where errexit is
+    # suspended, exactly as it runs in a scan, and assert its rc explicitly.
+    local wrapper_rc=0
+    run_module_with_axiom_failover fake_module || wrapper_rc=$?
+    [ "$wrapper_rc" -eq 0 ]
     [ "$fake_calls" -eq 2 ]
     [ "$local_calls" -eq 1 ]
     [ "$AXIOM_RUNTIME_DISABLED" = "true" ]

@@ -746,7 +746,11 @@ _run_axiom_command_with_detection() {
     fi
     rc=$?
 
-    _handle_axiom_command_result "$rc" "${cmd[*]}" "$axiom_err_tmp"
+    # Join on spaces explicitly: "${cmd[*]}" uses IFS's first char, and reconftw.sh
+    # sets IFS=$'\n\t', which turned the recorded command into one word per line.
+    local cmd_str
+    printf -v cmd_str '%s ' "${cmd[@]}"
+    _handle_axiom_command_result "$rc" "${cmd_str% }" "$axiom_err_tmp"
     rm -f "$axiom_err_tmp" 2>/dev/null || true
     return "$rc"
 }
@@ -1115,6 +1119,12 @@ function cached_download_typed() {
     fi
 
     if run_command "${curl_cmd[@]}"; then
+        # Dry-run previews the download without performing it: there is no file
+        # to cache, and a failing cp would leak a non-JSON line into
+        # --log-format jsonl-strict output.
+        if [[ "${DRY_RUN:-false}" == "true" ]] || [[ ! -s "$destination" ]]; then
+            return 0
+        fi
         # Save to cache for future use
         cp "$destination" "$cache_file"
         printf "%b[%s] Cached for future use: %s%b\n" \
@@ -1293,8 +1303,10 @@ function checkpoint_clear() {
 
 # Circuit breaker pattern for unreliable external tools
 # Prevents repeated calls to tools that are consistently failing
-declare -A CIRCUIT_BREAKER_FAILURES
-declare -A CIRCUIT_BREAKER_STATE
+# -g: stay global even when this file is sourced from inside a function
+# (bats setup(), --source-only), where a plain declare -A would be local.
+declare -gA CIRCUIT_BREAKER_FAILURES
+declare -gA CIRCUIT_BREAKER_STATE
 CIRCUIT_BREAKER_THRESHOLD=${CIRCUIT_BREAKER_THRESHOLD:-3}
 CIRCUIT_BREAKER_TIMEOUT=${CIRCUIT_BREAKER_TIMEOUT:-300}  # 5 minutes
 

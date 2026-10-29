@@ -152,7 +152,7 @@ EOF
 
     [ "$status" -eq 0 ]
     [[ "$output" != *"no ASN data"* ]]
-    ! grep -q "no ASN data" "$LOGFILE"
+    ! grep -q "no ASN data" "$LOGFILE" || false
     [ ! -s "hosts/asn_cidrs.txt" ]
     [ ! -s "hosts/asn_numbers.txt" ]
 }

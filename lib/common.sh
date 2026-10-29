@@ -742,7 +742,10 @@ run_with_heartbeat_shell() {
     if [[ -z "$shell_cmd" ]]; then
         return 1
     fi
-    run_with_heartbeat "$label" /bin/bash -lc "$shell_cmd"
+    # Non-login shell: a login shell (-l) re-runs /etc/profile + ~/.profile, which
+    # rebuilds PATH (macOS path_helper puts /usr/bin ahead of the GNU gnubin dirs;
+    # Debian's /etc/profile resets it) and drops the tool dirs reconftw added.
+    run_with_heartbeat "$label" "${BASH:-/bin/bash}" -c "$shell_cmd"
 }
 
 ###############################################################################

@@ -1,6 +1,14 @@
 #!/bin/bash
 # shellcheck disable=SC2034,SC2154
 
+# When sourced for tests (--source-only), remember whether the caller had
+# errexit on: the `set +e` below would otherwise leak into the test shell and
+# make every bats assertion except a test's last command inert.
+_RECONFTW_CALLER_ERREXIT=false
+if [[ "${1:-}" == "--source-only" ]] && [[ $- == *e* ]]; then
+    _RECONFTW_CALLER_ERREXIT=true
+fi
+
 # Defaults aimed at unattended execution (fail-soft)
 set -o pipefail
 set -E
@@ -122,8 +130,13 @@ function normalize_vps_count_args() {
 # Allow sourcing functions without execution (for testing)
 # Must be checked before argument parsing to avoid side effects
 if [[ "${1:-}" == "--source-only" ]]; then
+    if [[ "$_RECONFTW_CALLER_ERREXIT" == "true" ]]; then
+        set -e
+    fi
+    unset _RECONFTW_CALLER_ERREXIT
     return 0 2>/dev/null || exit 0
 fi
+unset _RECONFTW_CALLER_ERREXIT
 
 ###############################################################################################################
 ########################################### START SCRIPT  #####################################################

@@ -107,7 +107,9 @@ source_reconftw() {
     # shellcheck source=/dev/null
     source "$SCRIPTPATH/lib/common.sh"
     
-    # Test ensure_dirs
+    # ensure_dirs resolves paths against the CWD (start() cd's into $dir before
+    # any module runs); without this cd the dirs land in the repo root.
+    cd "$dir"
     ensure_dirs "subdomains" "webs" "hosts/scans"
     
     [ -d "$dir/subdomains" ]
@@ -119,8 +121,10 @@ source_reconftw() {
     source_reconftw
     
     # Check parallel functions exist
-    type parallel_run &>/dev/null
+    # parallel_run was removed (dead code, injection vector); parallel_batch is
+    # the remaining generic runner.
     type parallel_funcs &>/dev/null
+    type parallel_batch &>/dev/null
     type parallel_passive_enum &>/dev/null
     type parallel_active_enum &>/dev/null
     type parallel_postactive_enum &>/dev/null

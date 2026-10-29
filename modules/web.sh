@@ -1678,7 +1678,8 @@ function swagger_check() {
                 || true
 
             find .tmp/sj_brute/ -type f -name "*.txt" -print0 2>/dev/null \
-                | xargs -0 grep -hoP 'Definition file found: \K\S+' 2>/dev/null \
+                | xargs -0 grep -hoE 'Definition file found: [^[:space:]]+' 2>/dev/null \
+                | sed 's/^Definition file found: //' \
                 | sort -u \
                 | anew -q .tmp/swagger_urls_all.txt
         fi
@@ -1699,7 +1700,7 @@ function swagger_check() {
 
         # SwaggerSpy OSINT output: filter against scope before adding
         if [[ -s "${dir}/osint/swagger_leaks.txt" ]]; then
-            grep -hioP 'https?://\S+' "${dir}/osint/swagger_leaks.txt" 2>/dev/null \
+            grep -hioE 'https?://[^[:space:]]+' "${dir}/osint/swagger_leaks.txt" 2>/dev/null \
                 | grep -iE '\.(json|yaml|yml)$|swagger|openapi|api-docs' \
                 >.tmp/swagger_spy_candidates.txt || true
             if [[ -s .tmp/swagger_spy_candidates.txt ]]; then

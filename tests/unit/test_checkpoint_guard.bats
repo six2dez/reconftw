@@ -48,7 +48,7 @@ _started() { grep -q "Start function: $1" "$LOGFILE"; }
     touch "$called_fn_dir/.nuclei_check"
     run nuclei_check
     [ "$status" -eq 0 ]
-    ! _started nuclei_check
+    ! _started nuclei_check || false
     [[ "$output" != *"nuclei binary not found"* ]]
 }
 

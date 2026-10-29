@@ -36,6 +36,17 @@ setup() {
     source "$project_root/reconftw.cfg" 2>/dev/null || true
     # shellcheck source=/dev/null
     source "$project_root/reconftw.sh" --source-only
+
+    # reconftw.cfg overwrites the paths above with the operator's real ones
+    # (~/Tools, the repo .cache). Re-pin them so no test reads or writes the
+    # real resolver files or the real download cache.
+    export CACHE_DIR="${TEST_DIR}/cache"
+    export tools="${TEST_DIR}/tools"
+    export resolvers="${TEST_DIR}/resolvers.txt"
+    export resolvers_trusted="${TEST_DIR}/resolvers_trusted.txt"
+    # reconftw.cfg also prepends ~/go/bin, ~/.local/bin and ~/.cargo/bin to PATH,
+    # which put a real puredns ahead of the mock on any provisioned box.
+    export PATH="${MOCK_BIN}:$PATH"
 }
 
 teardown() {
@@ -104,6 +115,24 @@ EOF
     grep -q -- "--retry 2" "${TEST_DIR}/curl_args.log"
     grep -q -- "--retry-delay 2" "${TEST_DIR}/curl_args.log"
     grep -q -- "--retry-connrefused" "${TEST_DIR}/curl_args.log"
+}
+
+@test "cached_download_typed in dry-run neither downloads nor copies a missing file" {
+    cat >"${MOCK_BIN}/curl" <<'EOF'
+#!/usr/bin/env bash
+touch "${TEST_DIR}/curl_was_called"
+EOF
+    chmod +x "${MOCK_BIN}/curl"
+    DRY_RUN=true
+    OUTPUT_VERBOSITY=0
+
+    run cached_download_typed "https://example.com/resolvers.txt" "${TEST_DIR}/missing_dir/resolvers.txt" "resolvers.txt" "resolvers"
+
+    # Explicit failures: a bare [[ ]] in the middle of a bats test does not fail it.
+    if [ "$status" -ne 0 ]; then echo "status=$status"; return 1; fi
+    if [ -e "${TEST_DIR}/curl_was_called" ]; then echo "curl ran in dry-run"; return 1; fi
+    if [[ "$output" == *"cp:"* ]]; then echo "cp error leaked: $output"; return 1; fi
+    if [ -e "${CACHE_DIR}/resolvers/resolvers.txt" ]; then echo "dry-run wrote the cache"; return 1; fi
 }
 
 @test "_bruteforce_domains fails fast when required resolver files are missing" {

@@ -619,12 +619,17 @@ mark_missing_tools_warn_once() {
     [[ ${#missing[@]} -eq 0 ]] && return 0
 
     # dnstake is reported in preflight as "Pending tool", so suppress duplicate subtakeover warning.
-    if [[ " ${missing[*]} " == *" dnstake "* ]]; then
+    # Exact element match: "${missing[*]}" joins on IFS's first char, and reconftw.sh
+    # sets IFS=$'\n\t' process-wide, so a " dnstake " substring check never matched.
+    local _tool
+    for _tool in "${missing[@]}"; do
+        [[ "$_tool" == "dnstake" ]] || continue
         if ! declare -p WARN_ONCE_KEYS >/dev/null 2>&1; then
             declare -gA WARN_ONCE_KEYS=()
         fi
         WARN_ONCE_KEYS["missing-tool-dnstake"]=1
-    fi
+        break
+    done
 }
 
 ###############################################################################################################
@@ -1717,7 +1722,7 @@ function process_in_chunks() {
 ###############################################################################################################
 
 # Performance timing storage
-declare -A FUNC_TIMINGS 2>/dev/null || true
+declare -gA FUNC_TIMINGS 2>/dev/null || true
 
 function record_func_timing() {
     # Usage: record_func_timing function_name duration_seconds

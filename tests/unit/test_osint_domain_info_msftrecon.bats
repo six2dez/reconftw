@@ -32,6 +32,9 @@ setup() {
 
     # shellcheck source=/dev/null
     source "$project_root/reconftw.cfg" 2>/dev/null || true
+    # reconftw.cfg prepends ~/go/bin, ~/.local/bin and ~/.cargo/bin: put the
+    # mocks back in front so a dev box with real tools stays hermetic.
+    export PATH="${MOCK_BIN}:$PATH"
     export SCRIPTPATH="$project_root"
     export tools="${TEST_DIR}/tools"
     # shellcheck source=/dev/null

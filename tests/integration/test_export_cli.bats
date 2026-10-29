@@ -13,7 +13,8 @@ setup() {
   echo '{"template-id":"tpl-h","matcher-name":"m1","type":"http","info":{"severity":"high","name":"h"},"matched-at":"https://a.'"$TEST_DOMAIN"'"}' > "$TARGET_DIR/nuclei_output/high_json.txt"
 }
 
-after_each() {
+# bats has no after_each hook: teardown is what runs after every test.
+teardown() {
   rm -rf "$TARGET_DIR"
 }
 
