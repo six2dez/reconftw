@@ -587,6 +587,7 @@ function passive() {
     domain_info
     ip_info
     emails
+    darkeye_exposure
     google_dorks
     github_dorks
     github_repos
@@ -673,7 +674,7 @@ function osint() {
     if [[ "${PARALLEL_MODE:-false}" != "false" ]]; then
         # Group 1: Independent lookups (no shared state)
         parallel_funcs "${PAR_OSINT_GROUP1_SIZE:-4}" \
-            domain_info ip_info emails google_dorks github_dorks
+            domain_info ip_info emails darkeye_exposure google_dorks github_dorks
         # Group 2: GitHub/API analysis
         parallel_funcs "${PAR_OSINT_GROUP2_SIZE:-3}" \
             github_repos github_leaks github_actions_audit
@@ -687,6 +688,7 @@ function osint() {
         domain_info
         ip_info
         emails
+        darkeye_exposure
         google_dorks
         github_dorks
         github_repos
@@ -876,6 +878,7 @@ function multi_osint() {
         domain_info
         ip_info
         emails
+        darkeye_exposure
         google_dorks
         #github_dorks
         github_repos
@@ -907,7 +910,7 @@ function recon() {
 
     if [[ "${PARALLEL_MODE:-true}" == "true" ]] && declare -f parallel_funcs &>/dev/null; then
         # Group 1: balanced with third_party_misconfigs (slow) alongside fast ones
-        parallel_funcs "${PAR_OSINT_GROUP1_SIZE:-5}" domain_info ip_info emails google_dorks third_party_misconfigs
+        parallel_funcs "${PAR_OSINT_GROUP1_SIZE:-5}" domain_info ip_info emails darkeye_exposure google_dorks third_party_misconfigs
         local osint_g1_rc=$?
         if ((osint_g1_rc > 0)); then
             RECON_PARTIAL_RUN=true
@@ -927,6 +930,7 @@ function recon() {
         domain_info
         ip_info
         emails
+        darkeye_exposure
         google_dorks
         #github_dorks
         github_repos
@@ -1130,6 +1134,7 @@ function multi_recon() {
         domain_info
         ip_info
         emails
+        darkeye_exposure
         google_dorks
         #github_dorks
         github_repos

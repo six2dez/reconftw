@@ -108,6 +108,7 @@ reconFTW is packed with features to make reconnaissance thorough and efficient. 
 
 - **Domain Information**: WHOIS lookup for domain registration details ([whois](https://github.com/rfc1036/whois)).
 - **Email and Password Leaks**: Searches for leaked emails and credentials ([emailfinder](https://github.com/Josue87/EmailFinder) and [LeakSearch](https://github.com/JoelGMSec/LeakSearch)).
+- **DarkEye exposure metadata**: Optional domain lookup in [HaveIBeenRansom](https://haveibeenransom.com/) and [Breach House](https://breach.house/), using one [DarkEye](https://darkeye.io) module.
 - **Microsoft 365/Azure Mapping**: Identifies Microsoft 365 and Azure tenants ([msftrecon](https://github.com/Arcanum-Sec/msftrecon)).
 - **Metadata Extraction**: Extracts metadata from indexed office documents ([metagoofil](https://github.com/opsdisk/metagoofil)).
 - **API Leaks**: Detects exposed APIs in public sources ([porch-pirate](https://github.com/MandConsultingGroup/porch-pirate), [SwaggerSpy](https://github.com/UndeadSec/SwaggerSpy) and [postleaksNg](https://github.com/six2dez/postleaksNG)).
@@ -1378,3 +1379,34 @@ reconFTW is licensed under the [MIT License](LICENSE).
 ## ⭐ Star History
 
 [![Star History Chart](https://api.star-history.com/svg?repos=six2dez/reconftw&type=Date)](https://www.star-history.com/#six2dez/reconftw&Date)
+
+
+### DarkEye domain exposure
+
+Set `DARKEYE_EXPOSURE=true` in your configuration to enable the lookup in OSINT
+and recon modes. It is disabled by default because it sends the target domain
+to the configured products. Set `DARKEYE_HIBR_API_KEY`,
+`DARKEYE_BREACHHOUSE_API_KEY`, or both in `secrets.cfg` or the environment.
+Each key is optional; if neither is configured, the module skips the lookup.
+The APIs require access from their respective providers.
+
+`osint/darkeye.json` contains one DarkEye result with `records`, `errors` and
+`truncated`. Each record identifies its product and category, with listing
+metadata only: id, title, website, group, country and discovery date. It does
+not retain leaked records, proof files or leak-site links. Breach House's
+free-text results are filtered to the target hostname or its subdomains.
+A listed domain is not necessarily malicious. Finding no matches does not
+prove that the domain is unexposed.
+
+If one API fails, valid results from the other are saved with an error. If both
+fail, an earlier output file is preserved. Partial results do not create a
+completion checkpoint, so a later run can retry. A successful empty response
+produces an empty record list.
+
+`DARKEYE_MAX_PAGES` (default 5, maximum 20) bounds HaveIBeenRansom pagination;
+`DARKEYE_LIMIT` (default 25, maximum 200) bounds Breach House results per source;
+`DARKEYE_MAX_RECORDS` (default 100, maximum 1000) caps records per product;
+`DARKEYE_TIMEOUT` (default 30, maximum 120) sets each request timeout in seconds.
+These are module settings, not account quotas. `truncated=true` means a limit
+was reached or the API reported further results. Requests are not retried
+automatically. Dry runs send no requests.
