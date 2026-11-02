@@ -13,21 +13,37 @@
 ########################################## OPTIONS & MGMT #####################################################
 ###############################################################################################################
 
+# deleteOutScoped <out_of_scope_list> <file>
+# Removes from <file> every line whose HOST is an out-of-scope entry.
+# Entries are anchored to the whole hostname: "dev.example.com" never deletes
+# "xdev.example.com" or "dev.example.com.cdn.net". "*.example.com" keeps its
+# suffix semantics (any host ending in ".example.com"). Because callers pass
+# both hostname lists (subdomains.txt) and URL lists (webs.txt, probed ports,
+# arjun), an optional scheme, port and path around the host are tolerated.
 function deleteOutScoped() {
-    if [[ -s "$1" ]]; then
-        while IFS= read -r outscoped; do
-            [[ -z "$outscoped" ]] && continue
-            # Escape regex metacharacters including / to prevent sed delimiter injection
-            local escaped
+    [[ -s "$1" ]] && [[ -f "$2" ]] || return 0
+    local outscoped escaped host_re
+    local -a patterns=()
+    while IFS= read -r outscoped; do
+        [[ -z "$outscoped" ]] && continue
+        if [[ "$outscoped" == \** ]]; then
+            # Escape regex metacharacters (ERE) in the suffix after the leading '*'
+            escaped=$(printf '%s' "${outscoped:1}" | sed 's/[.[\*^$()+?{|/\\]/\\&/g')
+            host_re="[^/:]*${escaped}"
+        else
             escaped=$(printf '%s' "$outscoped" | sed 's/[.[\*^$()+?{|/\\]/\\&/g')
-            if grep -q "^[*]" <<<"$outscoped"; then
-                escaped=$(printf '%s' "${outscoped:1}" | sed 's/[.[\*^$()+?{|/\\]/\\&/g')
-                sed_i "/${escaped}$/d" "$2"
-            else
-                sed_i "/${escaped}/d" "$2"
-            fi
-        done <"$1"
-    fi
+            host_re="${escaped}"
+        fi
+        patterns+=("^([A-Za-z][A-Za-z0-9+.-]*://)?${host_re}(:[0-9]+)?(/.*)?$")
+    done <"$1"
+    [[ ${#patterns[@]} -eq 0 ]] && return 0
+    local tmpfile
+    tmpfile=$(mktemp) || return 0
+    # grep -v exits 1 when every line is removed: that is a valid outcome
+    grep -Eiv -f <(printf '%s\n' "${patterns[@]}") "$2" >"$tmpfile" || true
+    cat "$tmpfile" >"$2"
+    rm -f "$tmpfile"
+    return 0
 }
 
 # Callers (apileaks, jschecks) run sequentially (OSINT phase then Web phase).
