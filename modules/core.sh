@@ -1447,7 +1447,7 @@ function sendToNotify {
             register_secret "${slack_auth}"
             notification "Sending ${domain} data over Slack" info
             # files.upload was sunset: get an upload URL, POST the bytes, then complete the upload
-            local slack_filename slack_length slack_response slack_upload_url slack_file_id slack_files_json
+            local slack_filename slack_length slack_response slack_upload_url slack_file_id slack_files_json slack_complete
             slack_filename=$(basename "${1}")
             slack_length=$(wc -c <"${1}" | tr -d ' ')
             slack_response=$(run_command curl -s -H "Authorization: Bearer ${slack_auth}" --data-urlencode "filename=${slack_filename}" --data-urlencode "length=${slack_length}" https://slack.com/api/files.getUploadURLExternal 2>>"$LOGFILE")
@@ -1456,9 +1456,16 @@ function sendToNotify {
             if [[ -n "${slack_upload_url}" ]] && [[ -n "${slack_file_id}" ]]; then
                 run_command curl -s -X POST -H "Authorization: Bearer ${slack_auth}" -H "Content-Type: application/octet-stream" --data-binary "@${1}" "${slack_upload_url}" 2>>"$LOGFILE" >/dev/null
                 slack_files_json=$(jq -nc --arg id "${slack_file_id}" --arg title "${slack_filename}" '[{id: $id, title: $title}]')
-                run_command curl -s -H "Authorization: Bearer ${slack_auth}" --data-urlencode "files=${slack_files_json}" --data-urlencode "channels=${slack_channel}" --data-urlencode "initial_comment=reconftw zip file" https://slack.com/api/files.completeUploadExternal 2>>"$LOGFILE" >/dev/null
+                # Check ok on the last step: without it a file that uploaded but was
+                # never shared to the channel looked exactly like a success, which is
+                # the failure an operator relying on these notifications would miss.
+                slack_complete=$(run_command curl -s -H "Authorization: Bearer ${slack_auth}" --data-urlencode "files=${slack_files_json}" --data-urlencode "channels=${slack_channel}" --data-urlencode "initial_comment=reconftw zip file" https://slack.com/api/files.completeUploadExternal 2>>"$LOGFILE")
+                if [[ "${DRY_RUN:-false}" != "true" ]] \
+                    && [[ "$(printf '%s' "${slack_complete}" | jq -r '.ok // false' 2>/dev/null)" != "true" ]]; then
+                    _print_msg WARN "Slack upload was not shared: $(printf '%s' "${slack_complete}" | jq -r '.error // "unknown error"' 2>/dev/null)"
+                fi
             elif [[ "${DRY_RUN:-false}" != "true" ]]; then
-                _print_msg WARN "Slack upload failed: could not get an upload URL"
+                _print_msg WARN "Slack upload failed: could not get an upload URL ($(printf '%s' "${slack_response}" | jq -r '.error // "no response"' 2>/dev/null))"
             fi
         fi
     fi
