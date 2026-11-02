@@ -19,10 +19,30 @@ setup() {
     export LOGFILE="$TEST_DIR/log.txt"
     : >"$LOGFILE"
 
-    # Empty PATH dir first so no real nuclei/testssl/exifray is reachable
+    # Make the tools under test genuinely unreachable. Prepending an empty
+    # directory does NOT do that: on a provisioned box ~/go/bin/nuclei stayed on
+    # PATH, the "binary not found" branch never ran, and this file only passed on
+    # CI's toolless runner. Drop every PATH entry that actually provides one.
     export MOCK_BIN="$TEST_DIR/mockbin"
     mkdir -p "$MOCK_BIN"
-    export PATH="$MOCK_BIN:$PATH"
+    local _kept="" _dir _tool _keep
+    local IFS=:
+    for _dir in $PATH; do
+        [[ -z "$_dir" ]] && continue
+        _keep=true
+        for _tool in nuclei testssl.sh exiftool; do
+            [[ -x "$_dir/$_tool" ]] && _keep=false
+        done
+        [[ "$_keep" == true ]] && _kept="${_kept:+$_kept:}$_dir"
+    done
+    unset IFS
+    export PATH="$MOCK_BIN:$_kept"
+    for _tool in nuclei testssl.sh exiftool; do
+        command -v "$_tool" >/dev/null 2>&1 && {
+            echo "setup: $_tool is still reachable at $(command -v "$_tool")" >&2
+            return 1
+        }
+    done
 
     source "$project_root/reconftw.sh" --source-only
 
