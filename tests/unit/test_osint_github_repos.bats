@@ -26,16 +26,19 @@ setup() {
     export LOGFILE="${dir}/.tmp/test.log"
     export tools="${TEST_DIR}/tools"
     export GITHUB_TOKENS="${TEST_DIR}/github_tokens.txt"
-    export INTERLACE_LOG="${TEST_DIR}/interlace_calls.log"
+    export CALL_LOG="${TEST_DIR}/tool_calls.log"
 
     mkdir -p "${dir}/.tmp" "$called_fn_dir" "${tools}/titus/dist"
     cd "$dir" || exit 1
     : >"$LOGFILE"
-    : >"$INTERLACE_LOG"
+    : >"$CALL_LOG"
     printf '%s\n' 'ghp_test_token' >"$GITHUB_TOKENS"
 
     # shellcheck source=/dev/null
     source "$project_root/reconftw.cfg" 2>/dev/null || true
+    # reconftw.cfg prepends ~/go/bin, ~/.local/bin and ~/.cargo/bin: put the
+    # mocks back in front so a dev box with real tools stays hermetic.
+    export PATH="${MOCK_BIN}:$PATH"
     export SCRIPTPATH="$project_root"
     export tools="${TEST_DIR}/tools"
     export GITHUB_TOKENS="${TEST_DIR}/github_tokens.txt"
@@ -51,7 +54,8 @@ setup() {
 
     create_mock_unfurl
     create_mock_enumerepo
-    create_mock_interlace
+    create_mock_git
+    create_mock_trufflehog
     create_mock_titus
 }
 
@@ -90,45 +94,33 @@ EOF
     chmod +x "${MOCK_BIN}/enumerepo"
 }
 
-create_mock_interlace() {
-    cat >"${MOCK_BIN}/interlace" <<'EOF'
+# github_repos runs git/titus/trufflehog directly (argv-safe worker pools, no
+# interlace -c). Each mock appends its argv to CALL_LOG so the tests can assert
+# which engine actually ran.
+create_mock_git() {
+    cat >"${MOCK_BIN}/git" <<'EOF'
 #!/usr/bin/env bash
-cmd=""
-outdir=""
-while [[ $# -gt 0 ]]; do
-    case "$1" in
-        -c)
-            cmd="$2"
-            shift 2
-            ;;
-        -o)
-            outdir="$2"
-            shift 2
-            ;;
-        *)
-            shift
-            ;;
-    esac
-done
-
-printf '%s\n' "$cmd" >>"${INTERLACE_LOG}"
-
-if [[ "$cmd" == git\ clone* ]]; then
-    mkdir -p ".tmp/github_repos/mockrepo"
-elif [[ "$cmd" == *"scan --format json"* && "$cmd" == *"titus"* ]]; then
-    mkdir -p ".tmp/github"
-    printf '%s\n' '{"engine":"titus","repo":"mockrepo"}' >".tmp/github/titus__mockrepo.json"
-elif [[ "$cmd" == trufflehog\ git* ]]; then
-    mkdir -p "${outdir:-.tmp/github}"
-    printf '%s\n' '{"engine":"trufflehog","repo":"mockrepo"}' >"${outdir:-.tmp/github}/trufflehog__mockrepo.json"
+printf 'git %s\n' "$*" >>"${CALL_LOG}"
+if [[ "${1:-}" == "clone" ]]; then
+    mkdir -p "${!#}"
 fi
 EOF
-    chmod +x "${MOCK_BIN}/interlace"
+    chmod +x "${MOCK_BIN}/git"
+}
+
+create_mock_trufflehog() {
+    cat >"${MOCK_BIN}/trufflehog" <<'EOF'
+#!/usr/bin/env bash
+printf 'trufflehog %s\n' "$*" >>"${CALL_LOG}"
+printf '%s\n' '{"engine":"trufflehog","repo":"mockrepo"}'
+EOF
+    chmod +x "${MOCK_BIN}/trufflehog"
 }
 
 create_mock_titus() {
     cat >"${MOCK_BIN}/titus" <<'EOF'
 #!/usr/bin/env bash
+printf 'titus %s\n' "$*" >>"${CALL_LOG}"
 printf '%s\n' '{"engine":"titus","repo":"mockrepo"}'
 EOF
     chmod +x "${MOCK_BIN}/titus"
@@ -145,11 +137,12 @@ EOF
 
     [ "$status" -eq 0 ]
     [[ "$output" == *"Unknown SECRETS_ENGINE='bogus', using titus"* ]]
-    [ -s "$INTERLACE_LOG" ]
-    grep -q "scan --format json" "$INTERLACE_LOG"
-    grep -q "titus" "$INTERLACE_LOG"
-    grep -q "trufflehog git" "$INTERLACE_LOG"
-    ! grep -q "noseyparker" "$INTERLACE_LOG"
+    [ -s "$CALL_LOG" ]
+    grep -q "^git clone https://github.com/acme/mockrepo " "$CALL_LOG"
+    grep -q "^titus scan --format json --git " "$CALL_LOG"
+    grep -q "^trufflehog git https://github.com/acme/mockrepo -j" "$CALL_LOG"
+    run grep -c "noseyparker" "$CALL_LOG"
+    [ "$output" = "0" ]
     [ -s "osint/github_company_secrets.json" ]
 
     run jq -s 'map(.engine) | sort == ["titus","trufflehog"]' osint/github_company_secrets.json
@@ -166,11 +159,12 @@ EOF
 
     [ "$status" -eq 0 ]
     [[ "$output" != *"Unknown SECRETS_ENGINE="* ]]
-    [ -s "$INTERLACE_LOG" ]
-    grep -q "scan --format json" "$INTERLACE_LOG"
-    grep -q "titus" "$INTERLACE_LOG"
-    grep -q "trufflehog git" "$INTERLACE_LOG"
-    ! grep -q "noseyparker" "$INTERLACE_LOG"
+    [ -s "$CALL_LOG" ]
+    grep -q "^git clone https://github.com/acme/mockrepo " "$CALL_LOG"
+    grep -q "^titus scan --format json --git " "$CALL_LOG"
+    grep -q "^trufflehog git https://github.com/acme/mockrepo -j" "$CALL_LOG"
+    run grep -c "noseyparker" "$CALL_LOG"
+    [ "$output" = "0" ]
     [ -s "osint/github_company_secrets.json" ]
 
     run jq -s 'map(.engine) | sort == ["titus","trufflehog"]' osint/github_company_secrets.json

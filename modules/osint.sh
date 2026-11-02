@@ -589,10 +589,9 @@ function domain_info() {
         local msftrecon_output msftrecon_rc
         msftrecon_output=$(mktemp)
         msftrecon_rc=0
-        if ! run_command "${tools}/msftrecon/venv/bin/python3" "${tools}/msftrecon/msftrecon/msftrecon.py" -d "${domain}" \
-            >"$msftrecon_output" 2>>"$LOGFILE"; then
-            msftrecon_rc=$?
-        fi
+        # `if ! cmd; then rc=$?` would capture the status of `!` (always 0).
+        run_command "${tools}/msftrecon/venv/bin/python3" "${tools}/msftrecon/msftrecon/msftrecon.py" -d "${domain}" \
+            >"$msftrecon_output" 2>>"$LOGFILE" || msftrecon_rc=$?
 
         if [[ $msftrecon_rc -eq 0 ]]; then
             cat "$msftrecon_output" >osint/azure_tenant_domains.txt
@@ -654,6 +653,134 @@ function third_party_misconfigs() {
         fi
     fi
 }
+
+function darkeye_exposure() (
+    if [[ "${DARKEYE_EXPOSURE:-false}" != true || "${OSINT:-false}" != true ]]; then
+        skip_notification "disabled"
+        return 0
+    fi
+    if [[ -f "$called_fn_dir/.darkeye_exposure" && "${DIFF:-false}" != true ]]; then
+        skip_notification "processed"
+        return 0
+    fi
+    local target
+    target=$(sanitize_domain "$domain") || return 1
+    # Require sanitization to be a no-op rather than enumerating bad characters.
+    # The enumerated class [/?*@:] missed ';', so "example.com;echo" was
+    # rewritten to "example.comecho" -- which validate_domain accepts -- and the
+    # lookup queried a third party for a domain the operator never named. Any
+    # input sanitize_domain had to alter was not a plain hostname to begin with.
+    # The comparison is against the lower-cased input so "EXAMPLE.COM" still works.
+    if [[ "$target" != "${domain,,}" ]] \
+        || [[ "$target" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] \
+        || ! validate_domain "$target"; then
+        _print_msg WARN "DarkEye requires a plain domain name"
+        return 1
+    fi
+    if [[ -z "${DARKEYE_HIBR_API_KEY:-}${DARKEYE_BREACHHOUSE_API_KEY:-}" ]]; then
+        skip_notification "no DarkEye API key configured"
+        return 0
+    fi
+    if [[ "${DRY_RUN:-false}" == true ]]; then
+        _print_msg INFO "DarkEye would query the configured products for the target domain"
+        return 0
+    fi
+    local pages="${DARKEYE_MAX_PAGES:-5}" limit="${DARKEYE_LIMIT:-25}"
+    local cap="${DARKEYE_MAX_RECORDS:-100}" timeout="${DARKEYE_TIMEOUT:-30}"
+    if ! [[ "$pages" =~ ^[1-9][0-9]?$ && "$limit" =~ ^[1-9][0-9]{0,2}$ && "$cap" =~ ^[1-9][0-9]{0,3}$ && "$timeout" =~ ^[1-9][0-9]{0,2}$ ]] \
+        || ((pages > 20 || limit > 200 || cap > 1000 || timeout > 120)); then
+        _print_msg WARN "Invalid DarkEye request limits"
+        return 1
+    fi
+    ensure_dirs osint
+    rm -f "$called_fn_dir/.darkeye_exposure"
+    start_func "darkeye_exposure" "Domain exposure metadata (DarkEye)"
+    local stage
+    umask 077
+    stage=$(mktemp -d "${dir}/osint/.darkeye.XXXXXX") || return 1
+    trap 'rm -rf -- "$stage"' EXIT
+    trap 'exit 130' INT
+    trap 'exit 143' TERM
+    local product key url code page more count any_success=false truncated=false failed
+    printf '[]' >"$stage/records"
+    printf '{}' >"$stage/errors"
+    for product in HaveIBeenRansom 'Breach House'; do
+        if [[ "$product" == HaveIBeenRansom ]]; then
+            key="${DARKEYE_HIBR_API_KEY:-}"
+        else
+            key="${DARKEYE_BREACHHOUSE_API_KEY:-}"
+        fi
+        [[ -z "$key" ]] && continue
+        register_secret "$key"
+        if [[ "$key" == *$'\n'* || "$key" == *$'\r'* ]]; then
+            _print_msg WARN "Invalid DarkEye API key format"
+            return 1
+        fi
+        # Keep the token out of argv; the staging directory is user-only (umask 077).
+        printf 'Authorization: Bearer %s\n' "$key" >"$stage/headers"
+        printf '[]' >"$stage/product"
+        failed=false
+        for ((page = 1; page <= pages; page++)); do
+            if [[ "$product" == HaveIBeenRansom ]]; then
+                url="https://haveibeenransom.com/api/metadata/domain/$target"
+                ((page > 1)) && url+="/$page"
+            else
+                url="https://breach.house/api/v1/search?q=$target&limit=$limit"
+            fi
+            # No redirects and no automatic retries: never replay the token elsewhere,
+            # and never spend extra quota on a failure.
+            code=$(run_command curl -q -s --proto '=https' --max-time "$timeout" \
+                -H "@$stage/headers" -H 'Accept: application/json' \
+                -A 'reconFTW-DarkEye/1.0 (+https://darkeye.io)' \
+                -w '%{http_code}' -o "$stage/response" "$url" 2>>"$LOGFILE") || code=000
+            if [[ "$code" != 200 ]] || ! jq --arg product "$product" --arg domain "$target" \
+                --argjson limit "$limit" -f "$SCRIPTPATH/lib/darkeye.jq" "$stage/response" >"$stage/page" 2>/dev/null; then
+                [[ "$code" =~ ^[0-9]{3}$ ]] || code=000
+                jq --arg product "$product" --arg error "HTTP $code or invalid response; lookup incomplete" \
+                    '. + {($product): $error}' "$stage/errors" >"$stage/next" || return 1
+                mv "$stage/next" "$stage/errors"
+                failed=true
+                break
+            fi
+            any_success=true
+            jq -s '.[0] + .[1].records | unique_by([.product, .category, .id, .title, .website])' \
+                "$stage/product" "$stage/page" >"$stage/next" || return 1
+            mv "$stage/next" "$stage/product"
+            count=$(jq length "$stage/product")
+            more=$(jq -r .has_next "$stage/page")
+            if ((count >= cap)); then
+                [[ "$more" == true ]] || ((count > cap)) && truncated=true
+                break
+            fi
+            if [[ "$product" == 'Breach House' || "$more" != true ]]; then
+                [[ "$more" == true ]] && truncated=true
+                break
+            fi
+            ((page == pages)) && truncated=true
+        done
+        # Keep the pages that did parse even when a later page fails.
+        jq -s --argjson cap "$cap" '.[0] + (.[1][: $cap])' \
+            "$stage/records" "$stage/product" >"$stage/next" || return 1
+        mv "$stage/next" "$stage/records"
+        if [[ "$failed" == true ]]; then
+            _print_msg WARN "DarkEye: $product lookup incomplete"
+        fi
+    done
+    if [[ "$any_success" != true ]]; then
+        _print_msg WARN "DarkEye: all configured products failed; previous result preserved"
+        return 1
+    fi
+    jq -n --arg domain "$target" --argjson truncated "$truncated" \
+        --slurpfile records "$stage/records" --slurpfile errors "$stage/errors" \
+        '{source: "DarkEye", domain: $domain, records: $records[0], errors: $errors[0], truncated: $truncated}' \
+        >"$stage/result" || return 1
+    mv "$stage/result" "${dir}/osint/darkeye.json" || return 1
+    if [[ $(jq length "$stage/errors") != 0 ]]; then
+        _print_msg WARN "DarkEye partial results saved; no completion checkpoint"
+        return 1
+    fi
+    end_func "Results are saved in $domain/osint/darkeye.json" "darkeye_exposure"
+)
 
 function lunar_exposure() {
     ensure_dirs osint

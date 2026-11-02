@@ -13,21 +13,37 @@
 ########################################## OPTIONS & MGMT #####################################################
 ###############################################################################################################
 
+# deleteOutScoped <out_of_scope_list> <file>
+# Removes from <file> every line whose HOST is an out-of-scope entry.
+# Entries are anchored to the whole hostname: "dev.example.com" never deletes
+# "xdev.example.com" or "dev.example.com.cdn.net". "*.example.com" keeps its
+# suffix semantics (any host ending in ".example.com"). Because callers pass
+# both hostname lists (subdomains.txt) and URL lists (webs.txt, probed ports,
+# arjun), an optional scheme, port and path around the host are tolerated.
 function deleteOutScoped() {
-    if [[ -s "$1" ]]; then
-        while IFS= read -r outscoped; do
-            [[ -z "$outscoped" ]] && continue
-            # Escape regex metacharacters including / to prevent sed delimiter injection
-            local escaped
+    [[ -s "$1" ]] && [[ -f "$2" ]] || return 0
+    local outscoped escaped host_re
+    local -a patterns=()
+    while IFS= read -r outscoped; do
+        [[ -z "$outscoped" ]] && continue
+        if [[ "$outscoped" == \** ]]; then
+            # Escape regex metacharacters (ERE) in the suffix after the leading '*'
+            escaped=$(printf '%s' "${outscoped:1}" | sed 's/[.[\*^$()+?{|/\\]/\\&/g')
+            host_re="[^/:]*${escaped}"
+        else
             escaped=$(printf '%s' "$outscoped" | sed 's/[.[\*^$()+?{|/\\]/\\&/g')
-            if grep -q "^[*]" <<<"$outscoped"; then
-                escaped=$(printf '%s' "${outscoped:1}" | sed 's/[.[\*^$()+?{|/\\]/\\&/g')
-                sed_i "/${escaped}$/d" "$2"
-            else
-                sed_i "/${escaped}/d" "$2"
-            fi
-        done <"$1"
-    fi
+            host_re="${escaped}"
+        fi
+        patterns+=("^([A-Za-z][A-Za-z0-9+.-]*://)?${host_re}(:[0-9]+)?(/.*)?$")
+    done <"$1"
+    [[ ${#patterns[@]} -eq 0 ]] && return 0
+    local tmpfile
+    tmpfile=$(mktemp) || return 0
+    # grep -v exits 1 when every line is removed: that is a valid outcome
+    grep -Eiv -f <(printf '%s\n' "${patterns[@]}") "$2" >"$tmpfile" || true
+    cat "$tmpfile" >"$2"
+    rm -f "$tmpfile"
+    return 0
 }
 
 # Callers (apileaks, jschecks) run sequentially (OSINT phase then Web phase).
@@ -730,7 +746,11 @@ _run_axiom_command_with_detection() {
     fi
     rc=$?
 
-    _handle_axiom_command_result "$rc" "${cmd[*]}" "$axiom_err_tmp"
+    # Join on spaces explicitly: "${cmd[*]}" uses IFS's first char, and reconftw.sh
+    # sets IFS=$'\n\t', which turned the recorded command into one word per line.
+    local cmd_str
+    printf -v cmd_str '%s ' "${cmd[@]}"
+    _handle_axiom_command_result "$rc" "${cmd_str% }" "$axiom_err_tmp"
     rm -f "$axiom_err_tmp" 2>/dev/null || true
     return "$rc"
 }
@@ -849,10 +869,8 @@ function sanitize_domain() {
 
     # 5) IPv4 post-normalization: redirect to inline octet validation.
     if [[ "$working" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-        local IFS_bak="$IFS"
-        IFS='.'
-        local -a _octs=($working)
-        IFS="$IFS_bak"
+        local -a _octs=()
+        IFS='.' read -r -a _octs <<<"$working"
         local _o
         for _o in "${_octs[@]}"; do
             if (( _o > 255 )); then
@@ -1101,6 +1119,12 @@ function cached_download_typed() {
     fi
 
     if run_command "${curl_cmd[@]}"; then
+        # Dry-run previews the download without performing it: there is no file
+        # to cache, and a failing cp would leak a non-JSON line into
+        # --log-format jsonl-strict output.
+        if [[ "${DRY_RUN:-false}" == "true" ]] || [[ ! -s "$destination" ]]; then
+            return 0
+        fi
         # Save to cache for future use
         cp "$destination" "$cache_file"
         printf "%b[%s] Cached for future use: %s%b\n" \
@@ -1279,8 +1303,10 @@ function checkpoint_clear() {
 
 # Circuit breaker pattern for unreliable external tools
 # Prevents repeated calls to tools that are consistently failing
-declare -A CIRCUIT_BREAKER_FAILURES
-declare -A CIRCUIT_BREAKER_STATE
+# -g: stay global even when this file is sourced from inside a function
+# (bats setup(), --source-only), where a plain declare -A would be local.
+declare -gA CIRCUIT_BREAKER_FAILURES
+declare -gA CIRCUIT_BREAKER_STATE
 CIRCUIT_BREAKER_THRESHOLD=${CIRCUIT_BREAKER_THRESHOLD:-3}
 CIRCUIT_BREAKER_TIMEOUT=${CIRCUIT_BREAKER_TIMEOUT:-300}  # 5 minutes
 
@@ -1366,10 +1392,8 @@ _ip_is_public_ipv4() {
     [[ -z "$ip" ]] && return 1
 
     # Split by dots using IFS (avoids BASH_REMATCH portability issues)
-    local old_ifs="$IFS"
-    IFS='.'
-    local -a parts=($ip)
-    IFS="$old_ifs"
+    local -a parts=()
+    IFS='.' read -r -a parts <<<"$ip"
     [[ ${#parts[@]} -ne 4 ]] && return 1
 
     local o1="${parts[0]}" o2="${parts[1]}" o3="${parts[2]}" o4="${parts[3]}"

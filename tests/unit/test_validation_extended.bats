@@ -284,7 +284,7 @@ setup() {
     tmpfile="$(mktemp)"
     printf 'safe.com\nevil;rm -rf /\n' > "$tmpfile"
     sanitize_interlace_input "$tmpfile"
-    ! grep -q ";" "$tmpfile"
+    ! grep -q ";" "$tmpfile" || false
     rm -f "$tmpfile"
 }
 
@@ -293,7 +293,7 @@ setup() {
     tmpfile="$(mktemp)"
     printf 'safe.com\nevil|whoami\n' > "$tmpfile"
     sanitize_interlace_input "$tmpfile"
-    ! grep -q "|" "$tmpfile"
+    ! grep -q "|" "$tmpfile" || false
     rm -f "$tmpfile"
 }
 
@@ -302,7 +302,7 @@ setup() {
     tmpfile="$(mktemp)"
     printf 'safe.com\n$(id).attacker.com\n' > "$tmpfile"
     sanitize_interlace_input "$tmpfile"
-    ! grep -q '\$' "$tmpfile"
+    ! grep -q '\$' "$tmpfile" || false
     rm -f "$tmpfile"
 }
 
@@ -311,7 +311,7 @@ setup() {
     tmpfile="$(mktemp)"
     printf 'safe.com\n`id`.evil.com\n' > "$tmpfile"
     sanitize_interlace_input "$tmpfile"
-    ! grep -q '`' "$tmpfile"
+    ! grep -q '`' "$tmpfile" || false
     rm -f "$tmpfile"
 }
 
@@ -333,7 +333,7 @@ setup() {
     printf 'safe.com\nevil;cmd\n' > "$infile"
     sanitize_interlace_input "$infile" "$outfile"
     grep -q "safe.com" "$outfile"
-    ! grep -q ";" "$outfile"
+    ! grep -q ";" "$outfile" || false
     rm -f "$infile" "$outfile"
 }
 

@@ -39,6 +39,11 @@ REDACT_VARS=(
     "discord_webhook_url"
     "XSS_SERVER"
     "COLLAB_SERVER"
+    # darkeye_exposure runs in a subshell (it needs its own umask and EXIT trap),
+    # so its register_secret call never reaches REGISTERED_SECRETS in the parent.
+    # Name-based redaction works from anywhere because these are config globals.
+    "DARKEYE_HIBR_API_KEY"
+    "DARKEYE_BREACHHOUSE_API_KEY"
 )
 
 # Values (not names) registered at runtime from config files or CLI parsing.
@@ -264,6 +269,7 @@ function check_version() {
     fi
 }
 
+# shellcheck disable=SC2034  # runtime_cmd_ref is a nameref written for the caller
 resolve_cloud_enum_runtime() {
     local -n runtime_cmd_ref="$1"
     local cloud_enum_python cloud_enum_script cloud_enum_requirements
@@ -293,6 +299,7 @@ resolve_cloud_enum_runtime() {
     return 1
 }
 
+# shellcheck disable=SC2034  # *_ref are namerefs written for the caller
 resolve_cloud_enum_execution_settings() {
     local caller="$1"
     local -n profile_ref="$2"
@@ -352,6 +359,7 @@ resolve_cloud_enum_execution_settings() {
     return 0
 }
 
+# shellcheck disable=SC2034  # cloud_enum_* locals are filled via nameref by resolve_cloud_enum_execution_settings
 build_cloud_enum_command() {
     local -n cmd_ref="$1"
     local caller="$2"
@@ -616,12 +624,17 @@ mark_missing_tools_warn_once() {
     [[ ${#missing[@]} -eq 0 ]] && return 0
 
     # dnstake is reported in preflight as "Pending tool", so suppress duplicate subtakeover warning.
-    if [[ " ${missing[*]} " == *" dnstake "* ]]; then
+    # Exact element match: "${missing[*]}" joins on IFS's first char, and reconftw.sh
+    # sets IFS=$'\n\t' process-wide, so a " dnstake " substring check never matched.
+    local _tool
+    for _tool in "${missing[@]}"; do
+        [[ "$_tool" == "dnstake" ]] || continue
         if ! declare -p WARN_ONCE_KEYS >/dev/null 2>&1; then
             declare -gA WARN_ONCE_KEYS=()
         fi
         WARN_ONCE_KEYS["missing-tool-dnstake"]=1
-    fi
+        break
+    done
 }
 
 ###############################################################################################################
@@ -706,23 +719,6 @@ function log_json() {
     jq_expr+='}'
 
     jq -n "${jq_args[@]}" "$jq_expr" >>"$STRUCTURED_LOG_FILE"
-}
-
-# Convenience wrappers for different log levels
-function log_info() {
-    log_json "INFO" "${FUNCNAME[1]:-main}" "$@"
-}
-
-function log_warn() {
-    log_json "WARN" "${FUNCNAME[1]:-main}" "$@"
-}
-
-function log_error() {
-    log_json "ERROR" "${FUNCNAME[1]:-main}" "$@"
-}
-
-function log_success() {
-    log_json "SUCCESS" "${FUNCNAME[1]:-main}" "$@"
 }
 
 ###############################################################################################################
@@ -833,7 +829,10 @@ function incremental_diff() {
         # First run, all items are new
         cp "$current_file" "$output_file" 2>/dev/null
         local count
-        count=$(wc -l <"$output_file" 2>/dev/null || echo 0)
+        # count_lines, not `wc -l <file`: BSD wc pads its output with spaces, so
+        # the raw substitution produced "First run for x:        12 items total"
+        # on macOS and leaked the padding into every string use of the count.
+        count=$(count_lines "$output_file")
         print_notice INFO "incremental" "First run for ${type}: ${count} items total"
         return 0
     fi
@@ -842,9 +841,9 @@ function incremental_diff() {
     if [[ -s "$current_file" ]]; then
         comm -13 <(sort -u "$previous_file") <(sort -u "$current_file") | sed '/^$/d' >"$output_file"
         local new_count total_count previous_count
-        new_count=$(wc -l <"$output_file" 2>/dev/null || echo 0)
-        total_count=$(wc -l <"$current_file" 2>/dev/null || echo 0)
-        previous_count=$(wc -l <"$previous_file" 2>/dev/null || echo 0)
+        new_count=$(count_lines "$output_file")
+        total_count=$(count_lines "$current_file")
+        previous_count=$(count_lines "$previous_file")
 
         print_notice INFO "incremental" "${type}: ${new_count} new (previous: ${previous_count}, total: ${total_count})"
 
@@ -1433,7 +1432,27 @@ function sendToNotify {
         if [[ -n "${slack_channel}" ]] && [[ -n "${slack_auth}" ]]; then
             register_secret "${slack_auth}"
             notification "Sending ${domain} data over Slack" info
-            run_command curl -F "file=@${1}" -F "initial_comment=reconftw zip file" -F "channels=${slack_channel}" -H "Authorization: Bearer ${slack_auth}" https://slack.com/api/files.upload 2>>"$LOGFILE" >/dev/null
+            # files.upload was sunset: get an upload URL, POST the bytes, then complete the upload
+            local slack_filename slack_length slack_response slack_upload_url slack_file_id slack_files_json slack_complete
+            slack_filename=$(basename "${1}")
+            slack_length=$(wc -c <"${1}" | tr -d ' ')
+            slack_response=$(run_command curl -s -H "Authorization: Bearer ${slack_auth}" --data-urlencode "filename=${slack_filename}" --data-urlencode "length=${slack_length}" https://slack.com/api/files.getUploadURLExternal 2>>"$LOGFILE")
+            slack_upload_url=$(printf '%s' "${slack_response}" | jq -r '.upload_url // empty' 2>/dev/null)
+            slack_file_id=$(printf '%s' "${slack_response}" | jq -r '.file_id // empty' 2>/dev/null)
+            if [[ -n "${slack_upload_url}" ]] && [[ -n "${slack_file_id}" ]]; then
+                run_command curl -s -X POST -H "Authorization: Bearer ${slack_auth}" -H "Content-Type: application/octet-stream" --data-binary "@${1}" "${slack_upload_url}" 2>>"$LOGFILE" >/dev/null
+                slack_files_json=$(jq -nc --arg id "${slack_file_id}" --arg title "${slack_filename}" '[{id: $id, title: $title}]')
+                # Check ok on the last step: without it a file that uploaded but was
+                # never shared to the channel looked exactly like a success, which is
+                # the failure an operator relying on these notifications would miss.
+                slack_complete=$(run_command curl -s -H "Authorization: Bearer ${slack_auth}" --data-urlencode "files=${slack_files_json}" --data-urlencode "channels=${slack_channel}" --data-urlencode "initial_comment=reconftw zip file" https://slack.com/api/files.completeUploadExternal 2>>"$LOGFILE")
+                if [[ "${DRY_RUN:-false}" != "true" ]] \
+                    && [[ "$(printf '%s' "${slack_complete}" | jq -r '.ok // false' 2>/dev/null)" != "true" ]]; then
+                    _print_msg WARN "Slack upload was not shared: $(printf '%s' "${slack_complete}" | jq -r '.error // "unknown error"' 2>/dev/null)"
+                fi
+            elif [[ "${DRY_RUN:-false}" != "true" ]]; then
+                _print_msg WARN "Slack upload failed: could not get an upload URL ($(printf '%s' "${slack_response}" | jq -r '.error // "no response"' 2>/dev/null))"
+            fi
         fi
     fi
 }
@@ -1442,6 +1461,8 @@ function start_func() {
     # Mid-run disk-full guard (D-07/D-09): abort BEFORE any state write so the
     # Plan 01-01 EXIT trap clears .inprogress_* with no orphan for this function.
     _check_disk_mid_run || _abort_disk_full
+    # Scalar *_FLAGS/*_EXTRA_ARGS from legacy configs -> arrays (see lib/common.sh)
+    declare -F _normalize_flag_arrays >/dev/null 2>&1 && _normalize_flag_arrays
     local current_date
     current_date=$(date +'%Y-%m-%d %H:%M:%S')
     echo "[$current_date] Start function: ${1} " >>"${LOGFILE}"
@@ -1729,7 +1750,7 @@ function process_in_chunks() {
 ###############################################################################################################
 
 # Performance timing storage
-declare -A FUNC_TIMINGS 2>/dev/null || true
+declare -gA FUNC_TIMINGS 2>/dev/null || true
 
 function record_func_timing() {
     # Usage: record_func_timing function_name duration_seconds

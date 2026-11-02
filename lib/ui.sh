@@ -64,10 +64,6 @@ ui_is_jsonl() {
     [[ "$_UI_LOG_FORMAT" == "jsonl" ]] || [[ "$_UI_LOG_FORMAT" == "jsonl-strict" ]]
 }
 
-ui_is_jsonl_strict() {
-    [[ "$_UI_JSONL_STRICT" == true ]]
-}
-
 ui_human_output_enabled() {
     [[ "$_UI_JSONL_STRICT" != true ]]
 }
@@ -226,21 +222,6 @@ ui_header() {
     printf "%s\n\n" "$(ui_truncate_text "$line" "$width")"
 }
 
-ui_progress() {
-    local step="$1" current="$2" total="$3" pct="$4" eta="$5"
-    local counters
-    counters=$(ui_counts_summary)
-    ui_log_jsonl "INFO" "progress" "Module progress" \
-        "step=${step}" "current=${current}" "total=${total}" "pct=${pct}" "eta=${eta}" "counters=${counters}"
-
-    if ui_is_tty; then
-        ui_live_progress_begin
-        ui_live_progress_update "▸ [${current}/${total}] ${pct}% | ETA: ${eta} | ${step} | ${counters}"
-    else
-        :
-    fi
-}
-
 ui_batch_start() {
     local label="$1" total_jobs="$2" batch_num="${3:-}" batch_total="${4:-}"
     ui_log_jsonl "INFO" "parallel_batch" "Parallel batch started" \
@@ -259,15 +240,6 @@ ui_batch_start() {
 
     printf "  %b── %s%s [%d jobs] ──%b\n" \
         "${bgreen:-}" "$batch_label" "$label" "$total_jobs" "${reset:-}"
-}
-
-ui_batch_row() {
-    local badge="$1" task="$2" duration="$3" detail="${4:-}"
-    if declare -F print_task >/dev/null 2>&1; then
-        print_task "$badge" "$task" "$duration" "$detail"
-    else
-        printf "    [%s] %s %ss\n" "$badge" "$task" "$duration"
-    fi
 }
 
 ui_batch_end() {
