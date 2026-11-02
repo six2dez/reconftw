@@ -1,4 +1,4 @@
-# Sólo metadatos; nunca propagar cuerpos de filtraciones, enlaces ni credenciales.
+# Metadata only: never propagate leak bodies, leak-site links or credentials.
 def text: if type == "string" then gsub("[[:space:]]+"; " ") elif type == "number" then tostring else "" end;
 def record($product; $category):
   {product: $product, category: $category,

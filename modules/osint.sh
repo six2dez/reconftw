@@ -665,7 +665,15 @@ function darkeye_exposure() (
     fi
     local target
     target=$(sanitize_domain "$domain") || return 1
-    if [[ "$domain" == *[/?*@:]* || "$target" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] || ! validate_domain "$target"; then
+    # Require sanitization to be a no-op rather than enumerating bad characters.
+    # The enumerated class [/?*@:] missed ';', so "example.com;echo" was
+    # rewritten to "example.comecho" -- which validate_domain accepts -- and the
+    # lookup queried a third party for a domain the operator never named. Any
+    # input sanitize_domain had to alter was not a plain hostname to begin with.
+    # The comparison is against the lower-cased input so "EXAMPLE.COM" still works.
+    if [[ "$target" != "${domain,,}" ]] \
+        || [[ "$target" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] \
+        || ! validate_domain "$target"; then
         _print_msg WARN "DarkEye requires a plain domain name"
         return 1
     fi
@@ -708,7 +716,7 @@ function darkeye_exposure() (
             _print_msg WARN "Invalid DarkEye API key format"
             return 1
         fi
-        # El token queda fuera de argv; el directorio temporal sólo es accesible al usuario.
+        # Keep the token out of argv; the staging directory is user-only (umask 077).
         printf 'Authorization: Bearer %s\n' "$key" >"$stage/headers"
         printf '[]' >"$stage/product"
         failed=false
@@ -719,11 +727,12 @@ function darkeye_exposure() (
             else
                 url="https://breach.house/api/v1/search?q=$target&limit=$limit"
             fi
-            # Sin redirecciones ni reintentos automáticos: no reenviar tokens ni gastar cuota extra.
+            # No redirects and no automatic retries: never replay the token elsewhere,
+            # and never spend extra quota on a failure.
             code=$(run_command curl -q -s --proto '=https' --max-time "$timeout" \
                 -H "@$stage/headers" -H 'Accept: application/json' \
                 -A 'reconFTW-DarkEye/1.0 (+https://darkeye.io)' \
-                -w '%{http_code}' -o "$stage/response" "$url" 2>/dev/null) || code=000
+                -w '%{http_code}' -o "$stage/response" "$url" 2>>"$LOGFILE") || code=000
             if [[ "$code" != 200 ]] || ! jq --arg product "$product" --arg domain "$target" \
                 --argjson limit "$limit" -f "$SCRIPTPATH/lib/darkeye.jq" "$stage/response" >"$stage/page" 2>/dev/null; then
                 [[ "$code" =~ ^[0-9]{3}$ ]] || code=000
@@ -749,7 +758,7 @@ function darkeye_exposure() (
             fi
             ((page == pages)) && truncated=true
         done
-        # Mantener páginas válidas anteriores incluso si falla una página posterior.
+        # Keep the pages that did parse even when a later page fails.
         jq -s --argjson cap "$cap" '.[0] + (.[1][: $cap])' \
             "$stage/records" "$stage/product" >"$stage/next" || return 1
         mv "$stage/next" "$stage/records"

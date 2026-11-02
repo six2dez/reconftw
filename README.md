@@ -95,6 +95,7 @@ reconFTW leverages a wide range of techniques, including passive and active subd
 - [🙏 Thanks](#-thanks)
 - [📝 Changelog](#-changelog)
 - [🛠️ Development](#️-development)
+- [🕶️ DarkEye domain exposure](#️-darkeye-domain-exposure)
 - [📜 License](#-license)
 - [⭐ Star History](#-star-history)
 
@@ -1370,18 +1371,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines and [docs/ARCH
 
 ---
 
-## 📜 License
-
-reconFTW is licensed under the [MIT License](LICENSE).
-
----
-
-## ⭐ Star History
-
-[![Star History Chart](https://api.star-history.com/svg?repos=six2dez/reconftw&type=Date)](https://www.star-history.com/#six2dez/reconftw&Date)
-
-
-### DarkEye domain exposure
+## 🕶️ DarkEye domain exposure
 
 Set `DARKEYE_EXPOSURE=true` in your configuration to enable the lookup in OSINT
 and recon modes. It is disabled by default because it sends the target domain
@@ -1410,3 +1400,15 @@ produces an empty record list.
 These are module settings, not account quotas. `truncated=true` means a limit
 was reached or the API reported further results. Requests are not retried
 automatically. Dry runs send no requests.
+
+---
+
+## 📜 License
+
+reconFTW is licensed under the [MIT License](LICENSE).
+
+---
+
+## ⭐ Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=six2dez/reconftw&type=Date)](https://www.star-history.com/#six2dez/reconftw&Date)

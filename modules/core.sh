@@ -39,6 +39,11 @@ REDACT_VARS=(
     "discord_webhook_url"
     "XSS_SERVER"
     "COLLAB_SERVER"
+    # darkeye_exposure runs in a subshell (it needs its own umask and EXIT trap),
+    # so its register_secret call never reaches REGISTERED_SECRETS in the parent.
+    # Name-based redaction works from anywhere because these are config globals.
+    "DARKEYE_HIBR_API_KEY"
+    "DARKEYE_BREACHHOUSE_API_KEY"
 )
 
 # Values (not names) registered at runtime from config files or CLI parsing.

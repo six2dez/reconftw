@@ -44,7 +44,7 @@ MOCK
     chmod +x "$TEST_DIR/bin/curl"
     export PATH="$TEST_DIR/bin:$PATH"
     source "$SCRIPTPATH/reconftw.sh" --source-only
-    # Aislar sólo la presentación; usar validación, run_command y módulo reales.
+    # Stub presentation only; validation, run_command and the module stay real.
     start_func() { :; }
     end_func() { touch "$called_fn_dir/.$2"; }
     skip_notification() { :; }
