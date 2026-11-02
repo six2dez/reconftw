@@ -838,7 +838,10 @@ function incremental_diff() {
         # First run, all items are new
         cp "$current_file" "$output_file" 2>/dev/null
         local count
-        count=$(wc -l <"$output_file" 2>/dev/null || echo 0)
+        # count_lines, not `wc -l <file`: BSD wc pads its output with spaces, so
+        # the raw substitution produced "First run for x:        12 items total"
+        # on macOS and leaked the padding into every string use of the count.
+        count=$(count_lines "$output_file")
         print_notice INFO "incremental" "First run for ${type}: ${count} items total"
         return 0
     fi
@@ -847,9 +850,9 @@ function incremental_diff() {
     if [[ -s "$current_file" ]]; then
         comm -13 <(sort -u "$previous_file") <(sort -u "$current_file") | sed '/^$/d' >"$output_file"
         local new_count total_count previous_count
-        new_count=$(wc -l <"$output_file" 2>/dev/null || echo 0)
-        total_count=$(wc -l <"$current_file" 2>/dev/null || echo 0)
-        previous_count=$(wc -l <"$previous_file" 2>/dev/null || echo 0)
+        new_count=$(count_lines "$output_file")
+        total_count=$(count_lines "$current_file")
+        previous_count=$(count_lines "$previous_file")
 
         print_notice INFO "incremental" "${type}: ${new_count} new (previous: ${previous_count}, total: ${total_count})"
 

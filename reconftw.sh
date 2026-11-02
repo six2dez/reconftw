@@ -139,9 +139,59 @@ if [[ -n "${AXIOM_EXTRA_ARGS:-}" ]]; then
     unset _axiom_ifs_saved
 fi
 
+# macOS PATH initialization, thanks @0xtavian <3
+#
+# The modules assume the GNU userland: `wc -l` without BSD's leading padding,
+# `stat -c`, GNU `sed -i` semantics, `grep -P`. On macOS those live in
+# Homebrew's gnubin directories, so they have to be on PATH before anything
+# calls them -- including when this file is sourced with --source-only, which
+# is how every bats suite loads the modules. Leaving them out of the sourced
+# path meant the suites exercised the modules against BSD tools, matching
+# neither production nor CI (the macos-smoke job puts gnubin on PATH itself),
+# so a GNU-only assumption failed locally and passed in CI, or the reverse.
+#
+# Sourcing callers get a warning rather than an exit: killing the caller's
+# shell is worse than running with whatever is on PATH.
+# Usage: _init_gnu_path [fatal]   (fatal defaults to true)
+function _init_gnu_path() {
+    [[ $OSTYPE == "darwin"* ]] || return 0
+    local fatal="${1:-true}" missing="" _brew_prefix=""
+
+    if ! command -v brew &>/dev/null; then
+        missing="Brew is not installed or not in the PATH"
+    else
+        # Cache brew --prefix to avoid calling it 6+ times (100-300ms each)
+        _brew_prefix="$(brew --prefix)"
+        if [[ ! -x "${_brew_prefix}/opt/gnu-getopt/bin/getopt" ]]; then
+            missing="Brew formula gnu-getopt is not installed"
+        elif [[ ! -d "${_brew_prefix}/opt/coreutils/libexec/gnubin" ]]; then
+            missing="Brew formula coreutils is not installed"
+        elif [[ ! -d "${_brew_prefix}/opt/gnu-sed/libexec/gnubin" ]]; then
+            missing="Brew formula gnu-sed is not installed"
+        fi
+    fi
+
+    if [[ -n "$missing" ]]; then
+        if [[ "$fatal" == "true" ]]; then
+            _print_error "$missing"
+            exit 1
+        fi
+        printf 'reconFTW: %s - sourced modules will run against the BSD userland\n' \
+            "$missing" >&2
+        return 1
+    fi
+
+    PATH="${_brew_prefix}/opt/gnu-getopt/bin:$PATH"
+    PATH="${_brew_prefix}/opt/coreutils/libexec/gnubin:$PATH"
+    PATH="${_brew_prefix}/opt/gnu-sed/libexec/gnubin:$PATH"
+    export PATH
+    return 0
+}
+
 # Allow sourcing functions without execution (for testing)
 # Must be checked before argument parsing to avoid side effects
 if [[ "${1:-}" == "--source-only" ]]; then
+    _init_gnu_path false || true
     if [[ "$_RECONFTW_CALLER_ERREXIT" == "true" ]]; then
         set -e
     fi
@@ -154,31 +204,8 @@ unset _RECONFTW_CALLER_ERREXIT
 ########################################### START SCRIPT  #####################################################
 ###############################################################################################################
 
-# macOS PATH initialization, thanks @0xtavian <3
-if [[ $OSTYPE == "darwin"* ]]; then
-    if ! command -v brew &>/dev/null; then
-        _print_error "Brew is not installed or not in the PATH"
-        exit 1
-    fi
-    # Cache brew --prefix to avoid calling it 6+ times (100-300ms each)
-    _brew_prefix="$(brew --prefix)"
-    if [[ ! -x "${_brew_prefix}/opt/gnu-getopt/bin/getopt" ]]; then
-        _print_error "Brew formula gnu-getopt is not installed"
-        exit 1
-    fi
-    if [[ ! -d "${_brew_prefix}/opt/coreutils/libexec/gnubin" ]]; then
-        _print_error "Brew formula coreutils is not installed"
-        exit 1
-    fi
-    if [[ ! -d "${_brew_prefix}/opt/gnu-sed/libexec/gnubin" ]]; then
-        _print_error "Brew formula gnu-sed is not installed"
-        exit 1
-    fi
-    PATH="${_brew_prefix}/opt/gnu-getopt/bin:$PATH"
-    PATH="${_brew_prefix}/opt/coreutils/libexec/gnubin:$PATH"
-    PATH="${_brew_prefix}/opt/gnu-sed/libexec/gnubin:$PATH"
-    unset _brew_prefix
-fi
+# GNU userland on PATH (macOS); defined above so --source-only gets it too.
+_init_gnu_path true
 
 CLI_ARGS=()
 mapfile -d '' -t CLI_ARGS < <(normalize_vps_count_args "$@")
