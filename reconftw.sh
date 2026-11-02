@@ -143,29 +143,29 @@ function normalize_vps_count_args() {
 # Usage: _init_gnu_path [fatal]   (fatal defaults to true)
 function _init_gnu_path() {
     [[ $OSTYPE == "darwin"* ]] || return 0
-    local fatal="${1:-true}" missing="" _brew_prefix=""
+    local fatal="${1:-true}" _gnu_missing="" _brew_prefix=""
 
     if ! command -v brew &>/dev/null; then
-        missing="Brew is not installed or not in the PATH"
+        _gnu_missing="Brew is not installed or not in the PATH"
     else
         # Cache brew --prefix to avoid calling it 6+ times (100-300ms each)
         _brew_prefix="$(brew --prefix)"
         if [[ ! -x "${_brew_prefix}/opt/gnu-getopt/bin/getopt" ]]; then
-            missing="Brew formula gnu-getopt is not installed"
+            _gnu_missing="Brew formula gnu-getopt is not installed"
         elif [[ ! -d "${_brew_prefix}/opt/coreutils/libexec/gnubin" ]]; then
-            missing="Brew formula coreutils is not installed"
+            _gnu_missing="Brew formula coreutils is not installed"
         elif [[ ! -d "${_brew_prefix}/opt/gnu-sed/libexec/gnubin" ]]; then
-            missing="Brew formula gnu-sed is not installed"
+            _gnu_missing="Brew formula gnu-sed is not installed"
         fi
     fi
 
-    if [[ -n "$missing" ]]; then
+    if [[ -n "$_gnu_missing" ]]; then
         if [[ "$fatal" == "true" ]]; then
-            _print_error "$missing"
+            _print_error "$_gnu_missing"
             exit 1
         fi
         printf 'reconFTW: %s - sourced modules will run against the BSD userland\n' \
-            "$missing" >&2
+            "$_gnu_missing" >&2
         return 1
     fi
 
